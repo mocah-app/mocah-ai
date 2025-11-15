@@ -1,0 +1,33 @@
+{
+  "name": "@mocah/api",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./src/index.ts"
+    },
+    "./*": {
+      "types": "./dist/*.d.ts",
+      "default": "./src/*.ts"
+    }
+  },
+  "type": "module",
+  "scripts": {
+    "build": "tsdown"
+  },
+  "devDependencies": {
+    "tsdown": "catalog:",
+    "@mocah/config": "workspace:*"
+  },
+  "peerDependencies": {
+    "typescript": "^5"
+  },
+  "dependencies": {
+    "@trpc/server": "catalog:",
+    "@trpc/client": "catalog:",
+    "next": "catalog:",
+    "dotenv": "catalog:",
+    "zod": "catalog:",
+    "@mocah/auth": "workspace:*",
+    "@mocah/db": "workspace:*"
+  }
+}
