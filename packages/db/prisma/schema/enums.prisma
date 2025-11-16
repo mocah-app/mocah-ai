@@ -63,3 +63,11 @@ enum IntegrationType {
   custom_api
 }
 
+enum ImageVariationType {
+  original      // First generation
+  regeneration  // Same prompt, new generation
+  variation     // Variation of existing image (DALL-E variations)
+  upscale       // Upscaled version
+  edit          // Edited/modified version
+}
+

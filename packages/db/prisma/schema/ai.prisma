@@ -32,18 +32,28 @@ model GenerationHistory {
 model GeneratedImage {
   id                String   @id @default(uuid())
   generationHistoryId String
+  parentImageId     String?  // Self-referential: links to original image for variations
   url               String
   prompt            String   @db.Text
   model             AIModel?
   size              String?  // 1024x1024, etc.
   cost              Decimal? @db.Decimal(10, 4)
+  version           Int      @default(1) // Version number (1 for original, increments for variations)
+  variationType     ImageVariationType @default(original)
+  isActive          Boolean  @default(true) // Current/active version
+  changeNote        String?  @db.Text // Optional note about this version
   createdAt         DateTime @default(now())
 
   // Relations
   generationHistory GenerationHistory @relation(fields: [generationHistoryId], references: [id], onDelete: Cascade)
+  parentImage       GeneratedImage?   @relation("ImageVersions", fields: [parentImageId], references: [id], onDelete: SetNull)
+  childImages       GeneratedImage[]  @relation("ImageVersions")
 
   @@index([generationHistoryId])
+  @@index([parentImageId])
   @@index([createdAt])
+  @@index([isActive])
+  @@index([variationType])
   @@map("generated_image")
 }
 
