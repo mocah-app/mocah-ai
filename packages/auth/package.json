@@ -15,16 +15,18 @@
     "build": "tsdown"
   },
   "devDependencies": {
-    "tsdown": "catalog:",
-    "@mocah/config": "workspace:*"
+    "@mocah/config": "workspace:*",
+    "tsdown": "catalog:"
   },
   "peerDependencies": {
     "typescript": "^5"
   },
   "dependencies": {
+    "@better-auth/stripe": "catalog:",
+    "@mocah/db": "workspace:*",
     "better-auth": "catalog:",
     "dotenv": "catalog:",
-    "zod": "catalog:",
-    "@mocah/db": "workspace:*"
+    "stripe": "catalog:",
+    "zod": "catalog:"
   }
 }
