@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import {
   Card,
   CardContent,
@@ -17,10 +18,13 @@ interface AuthCardProps {
 
 export function AuthCard({ title, description, children }: AuthCardProps) {
   return (
-    <div className="flex flex-col items-center justify-center w-full h-full">
-      <Card className="mx-auto w-full max-w-md rounded-none">
+    <main className="w-screen h-svh flex items-center justify-center gap-4">
+      <Card className="mx-auto w-full max-w-md rounded-none relative">
         <CardHeader className="pb-2">
-          <CardTitle className="text-center text-3xl font-semibold">
+          <div className="flex flex-col items-center justify-center">
+            <Image src="/logoipsum.svg" alt="Logo" width={50} height={50} />
+          </div>
+          <CardTitle className="text-center text-xl md:text-2xl font-semibold">
             {title}
           </CardTitle>
           {description && (
@@ -31,6 +35,6 @@ export function AuthCard({ title, description, children }: AuthCardProps) {
         </CardHeader>
         <CardContent className="pt-0">{children}</CardContent>
       </Card>
-    </div>
+    </main>
   );
 }

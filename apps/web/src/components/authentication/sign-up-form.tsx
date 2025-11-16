@@ -13,7 +13,8 @@ import { Card } from "../ui/card";
 import { cn } from "@/lib/utils";
 import { useState } from "react";
 import { VerificationEmailSent } from "./verification-email-sent";
-
+import EdgeRayLoader from "../EdgeLoader";
+import Image from "next/image";
 
 const autofillStyles =
   "[&:-webkit-autofill]:bg-white [&:-webkit-autofill]:shadow-[0_0_0_30px_white_inset] [&:-webkit-autofill]:[-webkit-text-fill-color:black] [&:-webkit-autofill]:text-black dark:[&:-webkit-autofill]:bg-gray-900 dark:[&:-webkit-autofill]:shadow-[0_0_0_30px_rgb(17_24_39)_inset] dark:[&:-webkit-autofill]:[-webkit-text-fill-color:white] dark:[&:-webkit-autofill]:text-white";
@@ -24,31 +25,38 @@ export default function SignUpForm() {
   const [userEmail, setUserEmail] = useState("");
   const [userPassword, setUserPassword] = useState("");
   const [isResending, setIsResending] = useState(false);
-
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const form = useForm({
     defaultValues: {
       email: "",
       password: "",
     },
     onSubmit: async ({ value }) => {
-      await authClient.signUp.email(
-        {
-          email: value.email,
-          password: value.password,
-          name: value.email.split("@")[0] || "User", // Derive name from email since name field is removed from UI
-        },
-        {
-          onSuccess: () => {
-            setUserEmail(value.email);
-            setUserPassword(value.password);
-            setEmailSent(true);
-            toast.success("Verification email sent! Please check your inbox.");
+      setIsSubmitting(true); // Add this
+      try {
+        await authClient.signUp.email(
+          {
+            email: value.email,
+            password: value.password,
+            name: value.email.split("@")[0] || "User",
           },
-          onError: (error) => {
-            toast.error(error.error.message || error.error.statusText);
-          },
-        }
-      );
+          {
+            onSuccess: () => {
+              setUserEmail(value.email);
+              setUserPassword(value.password);
+              setEmailSent(true);
+              toast.success(
+                "Verification email sent! Please check your inbox."
+              );
+            },
+            onError: (error) => {
+              toast.error(error.error.message || error.error.statusText);
+            },
+          }
+        );
+      } finally {
+        setIsSubmitting(false); // Add this
+      }
     },
     validators: {
       onSubmit: z.object({
@@ -60,7 +68,7 @@ export default function SignUpForm() {
 
   const handleResend = async () => {
     if (!userEmail || !userPassword) return;
-    
+
     setIsResending(true);
     try {
       await authClient.signUp.email(
@@ -71,7 +79,9 @@ export default function SignUpForm() {
         },
         {
           onSuccess: () => {
-            toast.success("Verification email resent! Please check your inbox.");
+            toast.success(
+              "Verification email resent! Please check your inbox."
+            );
           },
           onError: (error) => {
             toast.error(error.error.message || error.error.statusText);
@@ -90,14 +100,13 @@ export default function SignUpForm() {
     });
   };
 
-  if (isPending) {
-    return <Loader />;
-  }
-
   if (emailSent) {
     return (
-      <Card className="mx-auto w-full max-w-md p-6 rounded-none">
-        <h1 className="mb-8 text-center text-3xl font-semibold">
+      <Card className="mx-auto w-full max-w-md p-6 rounded-none relative">
+        <div className="flex flex-col items-center justify-center">
+          <Image src="/logoipsum.svg" alt="Logo" width={50} height={50} />
+        </div>
+        <h1 className="mb-2 text-center text-xl md:text-2xl font-semibold">
           Check Your Email
         </h1>
         <VerificationEmailSent
@@ -110,8 +119,12 @@ export default function SignUpForm() {
   }
 
   return (
-    <Card className="mx-auto w-full max-w-md p-6 rounded-none">
-      <h1 className="mb-8 text-center text-3xl font-semibold">
+    <Card className="mx-auto w-full max-w-md p-6 rounded-none relative">
+      {isSubmitting && <EdgeRayLoader />}
+      <div className="flex flex-col items-center justify-center">
+        <Image src="/logoipsum.svg" alt="Logo" width={50} height={50} />
+      </div>
+      <h1 className="mb-2 text-center text-xl md:text-2xl font-semibold relative z-10">
         Create Account
       </h1>
 
@@ -121,7 +134,7 @@ export default function SignUpForm() {
           e.stopPropagation();
           form.handleSubmit();
         }}
-        className="space-y-4"
+        className="space-y-4 relative z-10"
       >
         <div>
           <form.Field name="email">
@@ -178,11 +191,15 @@ export default function SignUpForm() {
             <Button
               type="submit"
               className="w-full"
-              disabled={!state.canSubmit || state.isSubmitting}
+              disabled={!state.canSubmit || state.isSubmitting || isPending}
             >
-              {state.isSubmitting
-                ? "Creating account..."
-                : "Sign Up with Email"}
+              {state.isSubmitting || isPending ? (
+                <>
+                  <Loader />
+                </>
+              ) : (
+                <span>Sign Up with Email</span>
+              )}
             </Button>
           )}
         </form.Subscribe>

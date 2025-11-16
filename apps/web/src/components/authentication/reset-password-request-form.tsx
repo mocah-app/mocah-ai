@@ -7,6 +7,9 @@ import z from "zod";
 import { Button } from "../ui/button";
 import { FormField } from "./form-field";
 import Link from "next/link";
+import { useState } from "react";
+import EdgeRayLoader from "../EdgeLoader";
+import Loader from "../loader";
 
 interface ResetPasswordRequestFormProps {
   onEmailSent: () => void;
@@ -15,11 +18,14 @@ interface ResetPasswordRequestFormProps {
 export function ResetPasswordRequestForm({
   onEmailSent,
 }: ResetPasswordRequestFormProps) {
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
   const form = useForm({
     defaultValues: {
       email: "",
     },
     onSubmit: async ({ value }) => {
+      setIsSubmitting(true);
       try {
         await authClient.requestPasswordReset({
           email: value.email,
@@ -29,6 +35,8 @@ export function ResetPasswordRequestForm({
         toast.success("Password reset email sent! Check your inbox.");
       } catch (error: any) {
         toast.error(error?.message || "Failed to send reset email");
+      } finally {
+        setIsSubmitting(false);
       }
     },
     validators: {
@@ -40,6 +48,7 @@ export function ResetPasswordRequestForm({
 
   return (
     <>
+      {isSubmitting && <EdgeRayLoader />}
       <form
         onSubmit={(e) => {
           e.preventDefault();
@@ -68,7 +77,13 @@ export function ResetPasswordRequestForm({
               className="w-full"
               disabled={!state.canSubmit || state.isSubmitting}
             >
-              {state.isSubmitting ? "Sending..." : "Send Reset Link"}
+              {state.isSubmitting ? (
+                <>
+                  <Loader />
+                </>
+              ) : (
+                <span>Send Reset Link</span>
+              )}
             </Button>
           )}
         </form.Subscribe>

@@ -5,6 +5,7 @@ import { ReactQueryDevtools } from "@tanstack/react-query-devtools";
 import { queryClient } from "@/utils/trpc";
 import { ThemeProvider } from "./theme-provider";
 import { Toaster } from "./ui/sonner";
+import { SidebarProvider } from "./ui/sidebar";
 
 export default function Providers({ children }: { children: React.ReactNode }) {
 	return (
@@ -14,11 +15,13 @@ export default function Providers({ children }: { children: React.ReactNode }) {
 			enableSystem
 			disableTransitionOnChange
 		>
-			<QueryClientProvider client={queryClient}>
-				{children}
-				<ReactQueryDevtools />
-			</QueryClientProvider>
-			<Toaster richColors />
+			<SidebarProvider>
+				<QueryClientProvider client={queryClient}>
+					{children}
+					<ReactQueryDevtools />
+				</QueryClientProvider>
+				<Toaster richColors />
+			</SidebarProvider>
 		</ThemeProvider>
 	);
 }

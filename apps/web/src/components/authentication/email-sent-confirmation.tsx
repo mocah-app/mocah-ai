@@ -10,7 +10,7 @@ interface EmailSentConfirmationProps {
 export function EmailSentConfirmation({ onResend }: EmailSentConfirmationProps) {
   return (
     <>
-      <p className="mb-6 text-center text-gray-600">
+      <p className="mb-6 text-center text-muted-foreground">
         We've sent a password reset link to your email address. Please check
         your inbox and click the link to reset your password.
       </p>

@@ -8,6 +8,9 @@ import { Button } from "../ui/button";
 import { FormField } from "./form-field";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { useState } from "react";
+import EdgeRayLoader from "../EdgeLoader";
+import Loader from "../loader";
 
 interface ResetPasswordFormProps {
   token: string;
@@ -19,6 +22,7 @@ export function ResetPasswordForm({
   onSuccess,
 }: ResetPasswordFormProps) {
   const router = useRouter();
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   const form = useForm({
     defaultValues: {
@@ -31,6 +35,7 @@ export function ResetPasswordForm({
         return;
       }
 
+      setIsSubmitting(true);
       try {
         await authClient.resetPassword({
           newPassword: value.password,
@@ -43,6 +48,8 @@ export function ResetPasswordForm({
         }, 2000);
       } catch (error: any) {
         toast.error(error?.message || "Failed to reset password");
+      } finally {
+        setIsSubmitting(false);
       }
     },
     validators: {
@@ -55,6 +62,7 @@ export function ResetPasswordForm({
 
   return (
     <>
+      {isSubmitting && <EdgeRayLoader />}
       <form
         onSubmit={(e) => {
           e.preventDefault();
@@ -96,7 +104,13 @@ export function ResetPasswordForm({
               className="w-full"
               disabled={!state.canSubmit || state.isSubmitting}
             >
-              {state.isSubmitting ? "Resetting..." : "Reset Password"}
+              {state.isSubmitting ? (
+                <>
+                  <Loader />
+                </>
+              ) : (
+                <span>Reset Password</span>
+              )}
             </Button>
           )}
         </form.Subscribe>

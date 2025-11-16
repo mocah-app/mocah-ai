@@ -12,6 +12,9 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { Card } from "../ui/card";
 import { cn } from "@/lib/utils";
+import EdgeRayLoader from "../EdgeLoader";
+import { useState } from "react";
+import Image from "next/image";
 
 const autofillStyles =
   "[&:-webkit-autofill]:bg-white [&:-webkit-autofill]:shadow-[0_0_0_30px_white_inset] [&:-webkit-autofill]:[-webkit-text-fill-color:black] [&:-webkit-autofill]:text-black dark:[&:-webkit-autofill]:bg-gray-900 dark:[&:-webkit-autofill]:shadow-[0_0_0_30px_rgb(17_24_39)_inset] dark:[&:-webkit-autofill]:[-webkit-text-fill-color:white] dark:[&:-webkit-autofill]:text-white";
@@ -19,28 +22,33 @@ const autofillStyles =
 export default function SignInForm() {
   const router = useRouter();
   const { isPending } = authClient.useSession();
-
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const form = useForm({
     defaultValues: {
       email: "",
       password: "",
     },
     onSubmit: async ({ value }) => {
-      await authClient.signIn.email(
-        {
-          email: value.email,
-          password: value.password,
-        },
-        {
-          onSuccess: () => {
-            router.push("/dashboard");
-            toast.success("Sign in successful");
+      setIsSubmitting(true);
+      try {
+        await authClient.signIn.email(
+          {
+            email: value.email,
+            password: value.password,
           },
-          onError: (error) => {
-            toast.error(error.error.message || error.error.statusText);
-          },
-        }
-      );
+          {
+            onSuccess: () => {
+              router.push("/dashboard");
+              toast.success("Sign in successful");
+            },
+            onError: (error) => {
+              toast.error(error.error.message || error.error.statusText);
+            },
+          }
+        );
+      } finally {
+        setIsSubmitting(false);
+      }
     },
     validators: {
       onSubmit: z.object({
@@ -57,21 +65,24 @@ export default function SignInForm() {
     });
   };
 
-  if (isPending) {
-    return <Loader />;
-  }
-
   return (
-    <Card className="mx-auto w-full max-w-md p-6 rounded-none">
-      <h1 className="mb-8 text-center text-3xl font-semibold">Sign In</h1>
+    <Card className="mx-auto w-full max-w-md p-6 rounded-none relative">
+      {isSubmitting && <EdgeRayLoader />}
 
+      <div className="flex flex-col items-center justify-center">
+        <Image src="/logoipsum.svg" alt="Logo" width={50} height={50} />
+      </div>
+
+      <h1 className="mb-2 text-center text-xl md:text-2xl font-semibold">
+        Sign In
+      </h1>
       <form
         onSubmit={(e) => {
           e.preventDefault();
           e.stopPropagation();
           form.handleSubmit();
         }}
-        className="space-y-4"
+        className="space-y-4 relative z-10"
       >
         <div>
           <form.Field name="email">
@@ -128,9 +139,15 @@ export default function SignInForm() {
             <Button
               type="submit"
               className="w-full"
-              disabled={!state.canSubmit || state.isSubmitting}
+              disabled={!state.canSubmit || state.isSubmitting || isPending}
             >
-              {state.isSubmitting ? "Signing in..." : "Sign In with Email"}
+              {state.isSubmitting || isPending ? (
+                <>
+                  <Loader />
+                </>
+              ) : (
+                <span>Sign In with Email</span>
+              )}
             </Button>
           )}
         </form.Subscribe>
