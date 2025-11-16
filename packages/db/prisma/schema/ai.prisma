@@ -1,0 +1,94 @@
+// ai.prisma
+// AI & Generation - Tracking AI operations and content
+
+model GenerationHistory {
+  id          String   @id @default(uuid())
+  organizationId String
+  userId      String
+  type        GenerationType
+  prompt      String   @db.Text
+  result      String?  @db.Text
+  model       AIModel?
+  tokensUsed  Int?
+  cost        Decimal? @db.Decimal(10, 4)
+  status      GenerationStatus @default(completed)
+  error       String?  @db.Text
+  metadata    Json?
+  createdAt   DateTime @default(now())
+
+  // Relations
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  user         User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  images       GeneratedImage[]
+
+  @@index([organizationId])
+  @@index([userId])
+  @@index([type])
+  @@index([status])
+  @@index([createdAt])
+  @@map("generation_history")
+}
+
+model GeneratedImage {
+  id                String   @id @default(uuid())
+  generationHistoryId String
+  url               String
+  prompt            String   @db.Text
+  model             AIModel?
+  size              String?  // 1024x1024, etc.
+  cost              Decimal? @db.Decimal(10, 4)
+  createdAt         DateTime @default(now())
+
+  // Relations
+  generationHistory GenerationHistory @relation(fields: [generationHistoryId], references: [id], onDelete: Cascade)
+
+  @@index([generationHistoryId])
+  @@index([createdAt])
+  @@map("generated_image")
+}
+
+model AIPrompt {
+  id          String   @id @default(uuid())
+  organizationId String
+  userId      String
+  prompt      String   @db.Text
+  context     Json?    // Additional context data
+  createdAt   DateTime @default(now())
+
+  // Relations
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  user         User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId])
+  @@index([userId])
+  @@index([createdAt])
+  @@map("ai_prompt")
+}
+
+model UsageQuota {
+  id          String   @id @default(uuid())
+  organizationId String
+  userId      String?
+  period      QuotaPeriod
+  periodStart DateTime
+  periodEnd   DateTime
+  textGenerations Int  @default(0)
+  imageGenerations Int @default(0)
+  totalTokens     Int  @default(0)
+  limitTextGenerations Int?
+  limitImageGenerations Int?
+  limitTokens         Int?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  // Relations
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  user         User?         @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([organizationId, userId, period, periodStart])
+  @@index([organizationId])
+  @@index([userId])
+  @@index([periodStart, periodEnd])
+  @@map("usage_quota")
+}
+

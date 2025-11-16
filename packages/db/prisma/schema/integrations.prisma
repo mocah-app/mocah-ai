@@ -1,0 +1,50 @@
+// integrations.prisma
+// Export & Integration - Platform connections and API configurations
+
+model Integration {
+  id                String   @id @default(uuid())
+  organizationId    String
+  type              IntegrationType
+  name              String
+  isActive          Boolean  @default(true)
+  credentials       Json     // Encrypted API keys and tokens
+  config            Json?    // Additional configuration
+  lastSyncAt        DateTime?
+  syncStatus        String?  // success, failed, pending
+  errorMessage      String?  @db.Text
+  metadata          Json?
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+  deletedAt         DateTime?
+
+  // Relations
+  organization      Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  syncs             IntegrationSync[]
+
+  @@index([organizationId])
+  @@index([type])
+  @@index([isActive])
+  @@index([deletedAt])
+  @@map("integration")
+}
+
+model IntegrationSync {
+  id                String   @id @default(uuid())
+  integrationId     String
+  status            String   // success, failed, partial
+  recordsSynced     Int      @default(0)
+  recordsFailed     Int      @default(0)
+  errorMessage      String?  @db.Text
+  startedAt         DateTime @default(now())
+  completedAt       DateTime?
+  metadata          Json?
+
+  // Relations
+  integration       Integration @relation(fields: [integrationId], references: [id], onDelete: Cascade)
+
+  @@index([integrationId])
+  @@index([status])
+  @@index([startedAt])
+  @@map("integration_sync")
+}
+

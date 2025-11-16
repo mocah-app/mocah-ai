@@ -1,0 +1,203 @@
+# AI Email Template Platform - Database Design Foundation
+
+## Core Design Philosophy
+
+We're building a database that supports:
+- **Multi-tenancy** through workspaces
+- **AI-powered content generation** with usage tracking
+- **Template management** with versioning
+- **Subscription-based monetization** with feature gating
+- **Future scalability** for collaboration and automation
+
+---
+
+## Primary Entity Groups
+
+### 1. Identity & Access
+The foundation of who uses the system and how they authenticate.
+- Users (authentication, profiles)
+- Sessions (security, token management)
+
+### 2. Organization & Workspace
+Multi-tenant architecture for agencies and teams.
+- Workspaces (brand isolation)
+- Workspace memberships (user-workspace associations)
+- Brand kits (per-workspace branding)
+
+### 3. Template Management
+Core content creation and storage.
+- Templates (user-created emails)
+- Template library (pre-built templates)
+- Template versions (history tracking)
+- Template sections (modular components)
+
+### 4. AI & Generation
+Tracking AI operations and content.
+- Generation history (audit trail)
+- AI prompts (user inputs)
+- Generated images (DALL-E outputs)
+- Usage quotas (tier limits)
+
+### 5. Monetization & Billing
+Subscription management and payment processing.
+- Subscriptions (Stripe integration)
+- Plans (tier definitions)
+- Usage tracking (generation counts)
+- Invoices (payment history)
+
+### 6. Export & Integration
+Output management and platform connections.
+- Exports (download history)
+- Export formats (HTML, platform-specific)
+- Integration settings (API configurations)
+
+---
+
+## Relationship Architecture
+
+### Hierarchical Structure
+```
+User → Workspace → Brand Kit
+                 → Templates → Sections
+                             → Versions
+                 → Subscription → Usage Tracking
+```
+
+### Many-to-Many Relationships
+- Users ↔ Workspaces (via membership table)
+- Templates ↔ Categories (via join table)
+- Workspaces ↔ Template Library (customization tracking)
+
+### One-to-Many Relationships
+- Workspace → Templates
+- Template → Versions
+- Template → Exports
+- User → Generation History
+- Subscription → Invoices
+
+---
+
+## Critical Design Patterns
+
+### 1. Workspace Isolation
+Every major entity must be **workspace-scoped**:
+- All queries filter by `workspace_id`
+- No cross-workspace data leakage
+- Enables clean agency/client separation
+
+### 2. Usage Tracking
+Real-time quota management:
+- Track generations per period (monthly reset)
+- Track image generations separately
+- Enforce limits before API calls
+- Log all AI operations for analytics
+
+### 3. Soft Deletes
+Preserve data for audit and recovery:
+- `deleted_at` timestamp instead of hard deletes
+- Allows "undo" functionality
+- Maintains referential integrity
+- Enables data export on request
+
+### 4. Versioning Strategy
+Template history without bloat:
+- Auto-save creates versions periodically
+- Keep last N versions (5 for free, unlimited for pro)
+- Snapshots before major changes
+- Enable rollback functionality
+
+### 5. Feature Gating
+Database-driven tier enforcement:
+- Plan features stored in database
+- Usage limits checked before operations
+- Graceful degradation (preview instead of generate)
+- Upgrade prompts based on limits
+
+---
+
+## Scalability Considerations
+
+### Immediate (MVP)
+- Single database instance
+- Primary/foreign key relationships
+- Standard indexing on lookup fields
+- Timestamp-based queries
+
+### Near-term (6-12 months)
+- Read replicas for analytics queries
+- Caching layer (Redis) for quotas
+- Archive old versions to cold storage
+- CDN for generated images
+
+### Long-term (Phase 2+)
+- Separate analytics database
+- Event sourcing for AI operations
+- Sharding by workspace for large agencies
+- Message queue for async operations
+
+---
+
+## Data Integrity Rules
+
+### Always Include
+- `id` (UUID primary key)
+- `created_at` (timestamp)
+- `updated_at` (timestamp)
+- `workspace_id` (for tenant isolation)
+
+### Never Store
+- Plain text passwords (bcrypt hash)
+- Credit card details (Stripe tokens only)
+- API keys unencrypted (encrypt at rest)
+- Full email HTML repeatedly (reference templates)
+
+### Cascade Rules
+- Delete workspace → soft delete all workspace data
+- Delete user → reassign or orphan workspaces
+- Delete template → preserve versions for audit
+- Cancel subscription → maintain data, restrict access
+
+---
+
+## Next Steps: Incremental Build Order
+
+We'll design each entity group in this sequence:
+
+1. **Identity & Access** (Week 1)
+   - Foundation for everything else
+   - Authentication must work first
+
+2. **Organization & Workspace** (Week 1)
+   - Multi-tenancy before content
+   - Brand kit structure
+
+3. **Template Management** (Week 2)
+   - Core product functionality
+   - After workspace context exists
+
+4. **AI & Generation** (Week 2)
+   - Integrate with template creation
+   - Usage tracking setup
+
+5. **Monetization & Billing** (Week 4)
+   - After features are testable
+   - Stripe integration last
+
+6. **Export & Integration** (Week 3)
+   - After templates are working
+   - Output mechanisms
+
+---
+
+## Design Validation Questions
+
+Before building each entity group, we'll ask:
+1. **Isolation**: Does this properly scope to workspace?
+2. **Performance**: Will this query efficiently at 10k+ records?
+3. **Future-proof**: Does this support Phase 2 features?
+4. **Security**: Can users access only their own data?
+5. **Audit**: Can we track who changed what when?
+
+---
+
+This foundation gives us a clear roadmap. Ready to dive into **Identity & Access** entity design first?

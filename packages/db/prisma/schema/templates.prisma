@@ -1,0 +1,165 @@
+// templates.prisma
+// Template Management - Core content creation and storage
+
+model Template {
+  id          String   @id @default(uuid())
+  organizationId String
+  name        String
+  description String?
+  content     String   @db.Text // HTML content
+  subject     String?  // Email subject line
+  category    String?
+  isPublic    Boolean  @default(false)
+  isFavorite  Boolean  @default(false)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  deletedAt   DateTime?
+
+  // Relations
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  versions    TemplateVersion[]
+  sections    TemplateSection[]
+  exports     Export[]
+  categoryRelations TemplateCategoryRelation[]
+
+  @@index([organizationId])
+  @@index([category])
+  @@index([isPublic])
+  @@index([deletedAt])
+  @@map("template")
+}
+
+model TemplateVersion {
+  id          String   @id @default(uuid())
+  templateId  String
+  version     Int      @default(1)
+  content     String   @db.Text
+  subject     String?
+  changeNote  String?
+  createdAt   DateTime @default(now())
+  createdBy   String?  // userId who created this version
+
+  // Relations
+  template    Template @relation(fields: [templateId], references: [id], onDelete: Cascade)
+
+  @@unique([templateId, version])
+  @@index([templateId])
+  @@index([createdAt])
+  @@map("template_version")
+}
+
+model TemplateSection {
+  id          String   @id @default(uuid())
+  templateId  String
+  name        String
+  type        TemplateSectionType
+  content     String   @db.Text
+  order       Int      @default(0)
+  isReusable  Boolean  @default(false)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  deletedAt   DateTime?
+
+  // Relations
+  template    Template @relation(fields: [templateId], references: [id], onDelete: Cascade)
+
+  @@index([templateId])
+  @@index([type])
+  @@index([isReusable])
+  @@index([deletedAt])
+  @@map("template_section")
+}
+
+model TemplateCategory {
+  id          String   @id @default(uuid())
+  name        String
+  slug        String   @unique
+  description String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  deletedAt   DateTime?
+
+  // Relations
+  templates   TemplateCategoryRelation[]
+
+  @@index([slug])
+  @@index([deletedAt])
+  @@map("template_category")
+}
+
+model TemplateCategoryRelation {
+  id          String   @id @default(uuid())
+  templateId  String
+  categoryId String
+  createdAt   DateTime @default(now())
+
+  // Relations
+  template    Template @relation(fields: [templateId], references: [id], onDelete: Cascade)
+  category    TemplateCategory @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+
+  @@unique([templateId, categoryId])
+  @@index([templateId])
+  @@index([categoryId])
+  @@map("template_category_relation")
+}
+
+model TemplateLibrary {
+  id          String   @id @default(uuid())
+  name        String
+  description String?
+  content     String   @db.Text
+  subject     String?
+  category    String?
+  thumbnail   String?
+  isPremium   Boolean  @default(false)
+  tags        String[] // Array of tags
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  deletedAt   DateTime?
+
+  // Relations
+  customizations WorkspaceTemplateLibrary[]
+
+  @@index([category])
+  @@index([isPremium])
+  @@index([deletedAt])
+  @@map("template_library")
+}
+
+model WorkspaceTemplateLibrary {
+  id          String   @id @default(uuid())
+  organizationId String
+  templateLibraryId String
+  isCustomized Boolean @default(false)
+  customContent String? @db.Text
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  // Relations
+  organization     Organization   @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  templateLibrary  TemplateLibrary @relation(fields: [templateLibraryId], references: [id], onDelete: Cascade)
+
+  @@unique([organizationId, templateLibraryId])
+  @@index([organizationId])
+  @@index([templateLibraryId])
+  @@map("workspace_template_library")
+}
+
+model Export {
+  id          String   @id @default(uuid())
+  templateId  String
+  format      ExportFormat
+  fileUrl     String?
+  fileSize    Int?
+  metadata    Json?    // Additional export metadata
+  createdAt   DateTime @default(now())
+
+  // Relations
+  template    Template @relation(fields: [templateId], references: [id], onDelete: Cascade)
+
+  @@index([templateId])
+  @@index([format])
+  @@index([createdAt])
+  @@map("export")
+}
+

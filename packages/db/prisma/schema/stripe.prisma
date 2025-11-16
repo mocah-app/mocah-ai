@@ -1,0 +1,32 @@
+// stripe.prisma
+// Better Auth Stripe Plugin Models
+// These models are managed by Better Auth's Stripe plugin
+// We extend them with our custom fields and relations
+
+model Subscription {
+  id                  String   @id @map("_id")
+  plan                String   // Plan name (e.g., "free", "starter", "pro", "scale")
+  referenceId         String   @unique // User ID or Organization ID
+  stripeCustomerId   String?
+  stripeSubscriptionId String?
+  status              String   @default("incomplete") // active, canceled, incomplete, etc.
+  periodStart         DateTime?
+  periodEnd           DateTime?
+  cancelAtPeriodEnd   Boolean  @default(false)
+  seats               Int?
+  trialStart          DateTime?
+  trialEnd            DateTime?
+  createdAt           DateTime?
+  updatedAt           DateTime?
+
+  // Note: referenceId can point to either User or Organization
+  // Better Auth manages this relationship
+  // Invoices are fetched from Stripe API when needed
+
+  @@index([referenceId])
+  @@index([status])
+  @@index([stripeSubscriptionId])
+  @@index([periodEnd])
+  @@map("subscription")
+}
+

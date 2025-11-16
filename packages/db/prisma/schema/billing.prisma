@@ -1,0 +1,36 @@
+// billing.prisma
+// Monetization & Billing - Plan definitions and payment processing
+// Note: Subscriptions are managed by Better Auth Stripe plugin (see stripe.prisma)
+
+model Plan {
+  id                String   @id @default(uuid())
+  name              String   @unique // free, starter, pro, scale (must match Better Auth plan names)
+  displayName       String
+  description       String?  @db.Text
+  price             Decimal  @db.Decimal(10, 2) // Monthly price in USD
+  interval          String   @default("month") // month, year
+  stripePriceId     String?  @unique
+  stripeProductId   String?  @unique
+  annualDiscountPriceId String? // For annual billing discount
+  features          Json?    // Feature flags and limits
+  limits            Json?    // Plan limits (matches Better Auth limits format)
+  maxWorkspaces     Int      @default(1)
+  maxTextGenerations Int?    // null = unlimited
+  maxImageGenerations Int?
+  maxTokens         Int?
+  allowedExportFormats String[] // Array of allowed export formats
+  isActive          Boolean  @default(true)
+  sortOrder         Int      @default(0)
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  @@index([name])
+  @@index([isActive])
+  @@index([sortOrder])
+  @@map("plan")
+}
+
+// Note: Invoices and Payment Methods are managed by Stripe
+// Fetch invoices via Stripe API: stripe.invoices.list({ customer: customerId })
+// Access payment methods via Stripe API: stripe.paymentMethods.list({ customer: customerId })
+

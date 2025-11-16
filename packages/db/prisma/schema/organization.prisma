@@ -1,0 +1,121 @@
+// organization.prisma
+// Better Auth Organization Plugin Models
+// These models are managed by Better Auth's organization plugin
+// We extend them with our custom fields and relations
+
+model Organization {
+  id          String   @id @map("_id")
+  name        String
+  slug        String   @unique
+  logo        String?
+  metadata    Json?
+  createdAt   DateTime
+
+  // Relations
+  members     Member[]
+  invitations Invitation[]
+  teams       Team[]
+  brandKit    BrandKit?
+  templates   Template[]
+  templateLibraries WorkspaceTemplateLibrary[]
+  generationHistory GenerationHistory[]
+  aiPrompts   AIPrompt[]
+  usageQuotas UsageQuota[]
+  integrations Integration[]
+
+  @@index([slug])
+  @@map("organization")
+}
+
+model Member {
+  id             String   @id @map("_id")
+  userId         String
+  organizationId String
+  role           String   // Better Auth uses string for roles (can be array)
+  createdAt      DateTime
+
+  // Relations
+  user           User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@unique([organizationId, userId])
+  @@index([userId])
+  @@index([organizationId])
+  @@map("member")
+}
+
+model Invitation {
+  id             String   @id @map("_id")
+  email          String
+  inviterId      String
+  organizationId String
+  role           String
+  status         String   // pending, accepted, rejected, expired
+  expiresAt      DateTime
+  teamId         String?
+  createdAt      DateTime?
+
+  // Relations
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@index([email])
+  @@index([organizationId])
+  @@index([status])
+  @@index([expiresAt])
+  @@map("invitation")
+}
+
+model Team {
+  id             String   @id @map("_id")
+  name           String
+  organizationId String
+  createdAt      DateTime
+  updatedAt      DateTime?
+
+  // Relations
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  members        TeamMember[]
+
+  @@index([organizationId])
+  @@map("team")
+}
+
+model TeamMember {
+  id        String   @id @map("_id")
+  teamId    String
+  userId    String
+  createdAt DateTime
+
+  // Relations
+  team      Team   @relation(fields: [teamId], references: [id], onDelete: Cascade)
+  user      User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([teamId, userId])
+  @@index([teamId])
+  @@index([userId])
+  @@map("team_member")
+}
+
+// Custom extensions for Better Auth Organization
+model BrandKit {
+  id          String   @id @default(uuid())
+  organizationId String @unique
+  primaryColor String?
+  secondaryColor String?
+  accentColor   String?
+  fontFamily    String?
+  logo          String?
+  favicon       String?
+  customCss     String?  @db.Text
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  deletedAt     DateTime?
+
+  // Relations
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId])
+  @@index([deletedAt])
+  @@map("brand_kit")
+}
+

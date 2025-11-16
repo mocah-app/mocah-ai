@@ -1,0 +1,65 @@
+// enums.prisma
+// Shared enums across the application
+
+enum GenerationType {
+  text
+  image
+  template
+  email
+}
+
+enum GenerationStatus {
+  pending
+  processing
+  completed
+  failed
+}
+
+enum AIModel {
+  gpt_4
+  gpt_4_turbo
+  gpt_3_5_turbo
+  dall_e_2
+  dall_e_3
+  claude_3_opus
+  claude_3_sonnet
+  claude_3_haiku
+}
+
+enum TemplateSectionType {
+  header
+  body
+  footer
+  cta
+  divider
+  image
+  text
+  button
+}
+
+enum ExportFormat {
+  html
+  pdf
+  json
+  mailchimp
+  sendgrid
+  campaign_monitor
+  constant_contact
+}
+
+enum QuotaPeriod {
+  daily
+  weekly
+  monthly
+}
+
+enum IntegrationType {
+  mailchimp
+  sendgrid
+  klaviyo
+  hubspot
+  constant_contact
+  campaign_monitor
+  custom_api
+}
+
