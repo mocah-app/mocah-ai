@@ -97,11 +97,11 @@ body {
   --chart-3: oklch(0.7530 0.0716 170.1071);
   --chart-4: oklch(0.8753 0.0769 76.8223);
   --chart-5: oklch(0.8199 0.0547 257.0821);
-  --sidebar: oklch(0.2365 0.0157 274.1214);
+  --sidebar: oklch(0.1645 0.0086 274.3354);
   --sidebar-foreground: oklch(0.9478 0.0148 294.4640);
   --sidebar-primary: oklch(0.4885 0.2170 264.5183);
   --sidebar-primary-foreground: oklch(1.0000 0 0);
-  --sidebar-accent: oklch(0.4288 0.0257 270.7551);
+  --sidebar-accent: oklch(0.2091 0.0104 268.1867);
   --sidebar-accent-foreground: oklch(0.8779 0.0458 270.4236);
   --sidebar-border: oklch(0.3030 0.0281 270.3205);
   --sidebar-ring: oklch(0.4885 0.2170 264.5183);

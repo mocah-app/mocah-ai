@@ -1,14 +1,18 @@
 "use client";
 import { authClient } from "@/lib/auth-client";
 import { redirect } from "next/navigation";
+import { useEffect } from "react";
 import Dashboard from "./dashboard";
 
 export default function DashboardPage() {
-  const { data: session } = authClient.useSession();
+  const { data: session, isPending } = authClient.useSession();
+  console.log(session?.user.email);
 
-  if (!session?.user) {
-    redirect("/login");
-  }
+  useEffect(() => {
+    if (!isPending && !session?.user) {
+      redirect("/login");
+    }
+  }, [session, isPending]);
 
   return (
     <div className="flex flex-1 flex-col h-full gap-4 p-1 w-full bg-secondary/15">
