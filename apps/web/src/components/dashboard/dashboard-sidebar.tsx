@@ -16,6 +16,7 @@ import {
   SidebarMenuButton,
   SidebarMenuItem,
   SidebarRail,
+  SidebarTrigger,
   useSidebar,
 } from "@/components/ui/sidebar";
 import { Button } from "@/components/ui/button";
@@ -26,7 +27,7 @@ import UserMenu from "../user-menu";
 
 export function DashboardSidebar() {
   const pathname = usePathname();
-  const { state, open } = useSidebar();
+  const { state, isMobile, open } = useSidebar();
   const isActive = (href: string) => {
     if (href === "/dashboard") {
       return pathname === href;
@@ -38,31 +39,23 @@ export function DashboardSidebar() {
     <Sidebar collapsible="icon">
       <SidebarHeader>
         <SidebarMenu>
-          <SidebarMenuItem>
+          <SidebarMenuItem className="flex items-center gap-1">
+            {!isMobile && <SidebarTrigger className="size-8" />}
             <SidebarMenuButton
               asChild
-              size="lg"
-              className="data-[state=open]:bg-sidebar-accent data-[state=open]:text-sidebar-accent-foreground"
+              className={`data-[state=open]:bg-sidebar-accent data-[state=open]:text-sidebar-accent-foreground ${
+                state === "collapsed" ? "hidden" : "blockw-fit"
+              }`}
             >
-              <Link href="/dashboard">
-                <div className="flex aspect-square size-8 items-center justify-center rounded-lg bg-sidebar-primary text-sidebar-primary-foreground">
-                  <span className="text-sm font-semibold">
-                    {navigationConfig.workspace.name.charAt(0).toUpperCase()}
-                  </span>
-                </div>
-                <div className="grid flex-1 text-left text-sm leading-tight">
-                  <span className="truncate font-semibold">
-                    {navigationConfig.workspace.name}
-                  </span>
-                  <span className="truncate text-xs text-muted-foreground">
-                    {navigationConfig.workspace.memberCount} Member
-                  </span>
-                </div>
-                <Button variant="ghost" size="icon" className="ml-auto size-7">
-                  <ChevronsUpDown className="size-4" />
-                  <span className="sr-only">More</span>
-                </Button>
-              </Link>
+              <Button
+                variant="outline"
+                className="justify-between w-fit flex-1"
+              >
+                <span className="truncate max-w-38 font-light">
+                  {navigationConfig.workspace.name}
+                </span>
+                <ChevronsUpDown className="size-4" aria-label="More" />
+              </Button>
             </SidebarMenuButton>
           </SidebarMenuItem>
         </SidebarMenu>
@@ -190,9 +183,15 @@ export function DashboardSidebar() {
             )}
           >
             <SidebarMenuItem className="flex items-center gap-1">
-              <Button variant="ghost">
+              <Button variant="ghost" asChild>
+                <Link href="/help">
                 <HelpCircle className="size-4 text-muted-foreground/80" />
-                Need help?
+                {open && (
+                  <span className="truncate max-w-24 font-light">
+                    Need help?
+                  </span>
+                )}
+                </Link>
               </Button>
             </SidebarMenuItem>
 

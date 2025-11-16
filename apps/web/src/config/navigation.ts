@@ -34,7 +34,7 @@ export const navigationConfig: {
   footerActions: NavLink[];
 } = {
   workspace: {
-    name: "Raymond Asogwa's workspace",
+    name: "Mocah workspace",
     memberCount: 1,
   },
   mainNav: [

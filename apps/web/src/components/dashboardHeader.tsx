@@ -1,28 +1,21 @@
 "use client";
 import { SidebarTrigger } from "@/components/ui/sidebar";
+import { navigationConfig } from "@/config/navigation";
 import { Plus } from "lucide-react";
-import Link from "next/link";
-import { ModeToggle } from "./mode-toggle";
 import { Button } from "./ui/button";
 import { Input } from "./ui/input";
+import { useSidebar } from "./ui/sidebar";
 
-export default function Header() {
-  const links = [{ to: "/dashboard", label: "Dashboard" }] as const;
-
+export default function DashboardHeader() {
+  const { isMobile } = useSidebar();
   return (
     <div>
-      <div className="flex flex-row items-center justify-between px-2 py-1 bg-sidebar">
+      <div className="flex flex-row items-center justify-between p-2 bg-secondary/15">
         <div className="flex items-center gap-2">
-          <SidebarTrigger className="-ml-1" />
-          <nav className="flex gap-4 text-lg">
-            {links.map(({ to, label }) => {
-              return (
-                <Link key={to} href={to}>
-                  {label}
-                </Link>
-              );
-            })}
-          </nav>
+          {isMobile && <SidebarTrigger className="size-8" />}
+          <h1 className="text-xl font-base text-muted-foreground">
+            {navigationConfig.workspace.name}
+          </h1>
         </div>
         <div className="flex items-center gap-2">
           <Input

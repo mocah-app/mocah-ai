@@ -7,7 +7,7 @@ export default function DashboardLayout({
 }>) {
   return (
     <>
-      <div className="grid grid-rows-[auto_1fr] h-svh">
+      <div className="w-screen h-svh">
         <PublicHeader />
         {children}
       </div>

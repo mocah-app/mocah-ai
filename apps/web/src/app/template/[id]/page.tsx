@@ -1,8 +1,20 @@
-import React from "react";
+"use client";
+import { useParams } from "next/navigation";
 
-function TemplatePage({ params }: { params: { id: string } }) {
-  const { id } = params;
-  return <div>TemplatePage {id}</div>;
-}
+const TemplatePage = () => {
+  const params = useParams();
+  return (
+    <div
+      className="flex flex-1 flex-col min-h-dvh w-screen bg-dot"
+      // style={{
+      //   backgroundImage: "bg-dot",
+      // }}
+    >
+      <div className="flex items-center justify-center bg-background/50 dark:bg-background/90 flex-1 flex-col gap-4 p-4 border border-border">
+        <p className="text-2xl font-bold">Template Canvas {params.id}</p>
+      </div>
+    </div>
+  );
+};
 
 export default TemplatePage;
