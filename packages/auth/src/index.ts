@@ -6,9 +6,10 @@ import { prismaAdapter } from "better-auth/adapters/prisma";
 import prisma from "@mocah/db";
 import Stripe from "stripe";
 import { subscriptionPlans } from "./subscription-plans";
+import { EmailService } from "./email-service";
 
 const stripeClient = new Stripe(process.env.STRIPE_SECRET_KEY || "", {
-  apiVersion: "2025-08-27.basil",
+  apiVersion: "2025-10-29.clover",
 });
 
 export const auth = betterAuth<BetterAuthOptions>({
@@ -16,25 +17,19 @@ export const auth = betterAuth<BetterAuthOptions>({
     provider: "postgresql",
   }),
   trustedOrigins: [process.env.CORS_ORIGIN || ""],
+  emailVerification: {
+    sendVerificationEmail: async ({ user, url, token }) => {
+      await EmailService.sendVerificationEmail({ user, url, token });
+    },
+    sendOnSignUp: true,
+    autoSignInAfterVerification: true,
+    expiresIn: 86400, // 24 hours
+  },
   emailAndPassword: {
     enabled: true,
-    requireEmailVerification: false, // Set to true if email verification is required
+    requireEmailVerification: true,
     sendResetPassword: async ({ user, url, token }) => {
-      // TODO: Implement email sending service (e.g., Resend, SendGrid, etc.)
-      // For now, this is a placeholder. You'll need to configure your email service.
-      console.log("Password reset email:", {
-        to: user.email,
-        url,
-        token,
-      });
-      
-      // Example with a service like Resend:
-      // await resend.emails.send({
-      //   from: "noreply@yourdomain.com",
-      //   to: user.email,
-      //   subject: "Reset your password",
-      //   html: `<p>Click the link to reset your password: <a href="${url}">${url}</a></p>`,
-      // });
+      await EmailService.sendPasswordResetEmail({ user, url, token });
     },
     resetPasswordTokenExpiresIn: 3600, // 1 hour
   },

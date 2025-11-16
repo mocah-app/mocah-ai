@@ -8,36 +8,41 @@ import Loader from "../loader";
 import { Button } from "../ui/button";
 import { Input } from "../ui/input";
 import { Label } from "../ui/label";
-import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { Card } from "../ui/card";
 import { cn } from "@/lib/utils";
+import { useState } from "react";
+import { VerificationEmailSent } from "./verification-email-sent";
 
 
 const autofillStyles =
   "[&:-webkit-autofill]:bg-white [&:-webkit-autofill]:shadow-[0_0_0_30px_white_inset] [&:-webkit-autofill]:[-webkit-text-fill-color:black] [&:-webkit-autofill]:text-black dark:[&:-webkit-autofill]:bg-gray-900 dark:[&:-webkit-autofill]:shadow-[0_0_0_30px_rgb(17_24_39)_inset] dark:[&:-webkit-autofill]:[-webkit-text-fill-color:white] dark:[&:-webkit-autofill]:text-white";
 
 export default function SignUpForm() {
-  const router = useRouter();
   const { isPending } = authClient.useSession();
+  const [emailSent, setEmailSent] = useState(false);
+  const [userEmail, setUserEmail] = useState("");
+  const [userPassword, setUserPassword] = useState("");
+  const [isResending, setIsResending] = useState(false);
 
   const form = useForm({
     defaultValues: {
       email: "",
       password: "",
-      name: "",
     },
     onSubmit: async ({ value }) => {
       await authClient.signUp.email(
         {
           email: value.email,
           password: value.password,
-          name: value.name,
+          name: value.email.split("@")[0] || "User", // Derive name from email since name field is removed from UI
         },
         {
           onSuccess: () => {
-            router.push("/dashboard");
-            toast.success("Sign up successful");
+            setUserEmail(value.email);
+            setUserPassword(value.password);
+            setEmailSent(true);
+            toast.success("Verification email sent! Please check your inbox.");
           },
           onError: (error) => {
             toast.error(error.error.message || error.error.statusText);
@@ -47,12 +52,36 @@ export default function SignUpForm() {
     },
     validators: {
       onSubmit: z.object({
-        name: z.string().min(2, "Name must be at least 2 characters"),
         email: z.email("Invalid email address"),
         password: z.string().min(8, "Password must be at least 8 characters"),
       }),
     },
   });
+
+  const handleResend = async () => {
+    if (!userEmail || !userPassword) return;
+    
+    setIsResending(true);
+    try {
+      await authClient.signUp.email(
+        {
+          email: userEmail,
+          password: userPassword,
+          name: userEmail.split("@")[0] || "User",
+        },
+        {
+          onSuccess: () => {
+            toast.success("Verification email resent! Please check your inbox.");
+          },
+          onError: (error) => {
+            toast.error(error.error.message || error.error.statusText);
+          },
+        }
+      );
+    } finally {
+      setIsResending(false);
+    }
+  };
 
   const handleGoogleSignUp = async () => {
     await authClient.signIn.social({
@@ -63,6 +92,21 @@ export default function SignUpForm() {
 
   if (isPending) {
     return <Loader />;
+  }
+
+  if (emailSent) {
+    return (
+      <Card className="mx-auto w-full max-w-md p-6 rounded-none">
+        <h1 className="mb-8 text-center text-3xl font-semibold">
+          Check Your Email
+        </h1>
+        <VerificationEmailSent
+          email={userEmail}
+          onResend={handleResend}
+          isResending={isResending}
+        />
+      </Card>
+    );
   }
 
   return (
@@ -79,30 +123,6 @@ export default function SignUpForm() {
         }}
         className="space-y-4"
       >
-        <div>
-          <form.Field name="name">
-            {(field) => (
-              <div className="space-y-2">
-                <Label htmlFor={field.name}>Name</Label>
-                <Input
-                  id={field.name}
-                  name={field.name}
-                  placeholder="Enter your name"
-                  value={field.state.value}
-                  onBlur={field.handleBlur}
-                  onChange={(e) => field.handleChange(e.target.value)}
-                  className={cn(autofillStyles)}
-                />
-                {field.state.meta.errors.map((error) => (
-                  <p key={error?.message} className="text-sm text-destructive">
-                    {error?.message}
-                  </p>
-                ))}
-              </div>
-            )}
-          </form.Field>
-        </div>
-
         <div>
           <form.Field name="email">
             {(field) => (

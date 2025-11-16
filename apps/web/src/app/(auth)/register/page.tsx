@@ -8,7 +8,7 @@ export default function RegisterPage() {
       <div className="flex flex-col items-center justify-center w-full h-full rounded-none p-6">
         <SignUpForm />
       </div>
-      <div className="w-full bg-card min-h-full flex items-center justify-center">
+      <div className="w-full bg-card min-h-full hidden md:flex items-center justify-center">
         <span className="text-4xl text-muted-foreground">Image here</span>
       </div>
     </div>

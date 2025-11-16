@@ -1,9 +1,13 @@
 {
-  "name": "@mocah/auth",
+  "name": "@mocah/shared",
   "exports": {
     ".": {
       "types": "./dist/index.d.ts",
       "default": "./src/index.ts"
+    },
+    "./logger": {
+      "types": "./dist/logger.d.ts",
+      "default": "./src/logger.ts"
     },
     "./*": {
       "types": "./dist/*.d.ts",
@@ -20,14 +24,6 @@
   },
   "peerDependencies": {
     "typescript": "^5"
-  },
-  "dependencies": {
-    "@better-auth/stripe": "catalog:",
-    "@mocah/db": "workspace:*",
-    "better-auth": "catalog:",
-    "dotenv": "catalog:",
-    "resend": "^6.4.2",
-    "stripe": "catalog:",
-    "zod": "catalog:"
   }
 }
+

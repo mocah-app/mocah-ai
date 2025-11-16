@@ -139,7 +139,7 @@
 
 ---
 
-### 2.2 Brand Workspace Management
+### 2.2 Brand Workspace (Organization) Management
 **Duration:** 8-10 hours  
 **Status:** ⚠️ **PARTIALLY COMPLETED**
 
