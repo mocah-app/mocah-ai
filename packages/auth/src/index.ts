@@ -18,6 +18,31 @@ export const auth = betterAuth<BetterAuthOptions>({
   trustedOrigins: [process.env.CORS_ORIGIN || ""],
   emailAndPassword: {
     enabled: true,
+    requireEmailVerification: false, // Set to true if email verification is required
+    sendResetPassword: async ({ user, url, token }) => {
+      // TODO: Implement email sending service (e.g., Resend, SendGrid, etc.)
+      // For now, this is a placeholder. You'll need to configure your email service.
+      console.log("Password reset email:", {
+        to: user.email,
+        url,
+        token,
+      });
+      
+      // Example with a service like Resend:
+      // await resend.emails.send({
+      //   from: "noreply@yourdomain.com",
+      //   to: user.email,
+      //   subject: "Reset your password",
+      //   html: `<p>Click the link to reset your password: <a href="${url}">${url}</a></p>`,
+      // });
+    },
+    resetPasswordTokenExpiresIn: 3600, // 1 hour
+  },
+  socialProviders: {
+    google: {
+      clientId: process.env.GOOGLE_CLIENT_ID as string,
+      clientSecret: process.env.GOOGLE_CLIENT_SECRET as string,
+    },
   },
   plugins: [
     nextCookies(),
