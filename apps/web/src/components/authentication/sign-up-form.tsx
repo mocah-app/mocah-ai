@@ -39,6 +39,7 @@ export default function SignUpForm() {
             email: value.email,
             password: value.password,
             name: value.email.split("@")[0] || "User",
+            callbackURL: "/welcome", // Redirect to welcome page after email verification
           },
           {
             onSuccess: () => {
@@ -76,6 +77,7 @@ export default function SignUpForm() {
           email: userEmail,
           password: userPassword,
           name: userEmail.split("@")[0] || "User",
+          callbackURL: "/welcome", // Redirect to welcome page after email verification
         },
         {
           onSuccess: () => {
@@ -96,7 +98,7 @@ export default function SignUpForm() {
   const handleGoogleSignUp = async () => {
     await authClient.signIn.social({
       provider: "google",
-      callbackURL: "/dashboard",
+      callbackURL: "/welcome", // Redirect to onboarding
     });
   };
 

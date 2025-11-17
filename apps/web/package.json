@@ -8,10 +8,13 @@
     "start": "next start"
   },
   "dependencies": {
+    "@aws-sdk/client-s3": "^3.823.0",
+    "@aws-sdk/s3-request-presigner": "^3.824.0",
     "@better-auth/stripe": "catalog:",
     "@hookform/resolvers": "^5.2.2",
     "@mocah/api": "workspace:*",
     "@mocah/auth": "workspace:*",
+    "@mocah/shared": "workspace:*",
     "@prisma/client": "catalog:",
     "@radix-ui/react-accordion": "^1.2.12",
     "@radix-ui/react-alert-dialog": "^1.1.15",

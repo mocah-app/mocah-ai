@@ -24,6 +24,7 @@ import { ChevronsUpDown, HelpCircle, LogOut } from "lucide-react";
 import { navigationConfig } from "@/config/navigation";
 import { cn } from "@/lib/utils";
 import UserMenu from "../user-menu";
+import { WorkspaceSwitcher } from "../workspace-switcher";
 
 export function DashboardSidebar() {
   const pathname = usePathname();
@@ -47,15 +48,9 @@ export function DashboardSidebar() {
                 state === "collapsed" ? "hidden" : "blockw-fit"
               }`}
             >
-              <Button
-                variant="outline"
-                className="justify-between w-fit flex-1"
-              >
-                <span className="truncate max-w-38 font-light">
-                  {navigationConfig.workspace.name}
-                </span>
-                <ChevronsUpDown className="size-4" aria-label="More" />
-              </Button>
+              <div className="flex justify-center">
+          <WorkspaceSwitcher />
+        </div>
             </SidebarMenuButton>
           </SidebarMenuItem>
         </SidebarMenu>

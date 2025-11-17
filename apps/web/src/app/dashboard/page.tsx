@@ -6,7 +6,6 @@ import Dashboard from "./dashboard";
 
 export default function DashboardPage() {
   const { data: session, isPending } = authClient.useSession();
-  console.log(session?.user.email);
 
   useEffect(() => {
     if (!isPending && !session?.user) {

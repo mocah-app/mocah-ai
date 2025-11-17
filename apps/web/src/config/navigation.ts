@@ -62,7 +62,7 @@ export const navigationConfig: {
     links: [
       {
         label: "All",
-        href: "/dashboard/workspace",
+        href: "/dashboard",
         icon: LayoutGrid,
         badge: 481,
       },

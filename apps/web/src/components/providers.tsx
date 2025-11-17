@@ -6,6 +6,7 @@ import { queryClient } from "@/utils/trpc";
 import { ThemeProvider } from "./theme-provider";
 import { Toaster } from "./ui/sonner";
 import { SidebarProvider } from "./ui/sidebar";
+import { OrganizationProvider } from "@/contexts/organization-context";
 
 export default function Providers({ children }: { children: React.ReactNode }) {
 	return (
@@ -17,8 +18,10 @@ export default function Providers({ children }: { children: React.ReactNode }) {
 		>
 			<SidebarProvider>
 				<QueryClientProvider client={queryClient}>
-					{children}
-					<ReactQueryDevtools />
+					<OrganizationProvider>
+						{children}
+						<ReactQueryDevtools />
+					</OrganizationProvider>
 				</QueryClientProvider>
 				<Toaster richColors />
 			</SidebarProvider>

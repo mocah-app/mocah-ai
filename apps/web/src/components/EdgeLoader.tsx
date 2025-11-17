@@ -42,7 +42,7 @@ export default function EdgeRayLoader({
   const gradientId = `rayGradient-${Math.random().toString(36).substr(2, 9)}`;
   
   return (
-    <div className="absolute inset-0 rounded-[inherit] overflow-hidden pointer-events-none">
+    <div className="absolute inset-0 rounded-[inherit] overflow-hidden pointer-events-none z-9999">
       <svg 
         className="absolute inset-0 w-full h-full"
         preserveAspectRatio="none"

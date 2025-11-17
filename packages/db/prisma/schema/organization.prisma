@@ -104,6 +104,7 @@ model BrandKit {
   secondaryColor String?
   accentColor   String?
   fontFamily    String?
+  brandVoice    String?  // "professional", "casual", "playful", "luxury"
   logo          String?
   favicon       String?
   customCss     String?  @db.Text

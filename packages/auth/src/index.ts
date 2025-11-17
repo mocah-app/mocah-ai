@@ -41,7 +41,32 @@ export const auth = betterAuth<BetterAuthOptions>({
   },
   plugins: [
     nextCookies(),
-    organization(),
+    organization({
+      // Organization hooks for automatic Brand Kit creation
+      organizationHooks: {
+        afterCreateOrganization: async ({ organization }) => {
+          // Create brand kit for new organization using metadata if provided
+          try {
+            const metadata = (organization.metadata as any) || {};
+
+            await prisma.brandKit.create({
+              data: {
+                organizationId: organization.id,
+                primaryColor: metadata.primaryColor || "#3B82F6",
+                secondaryColor: metadata.secondaryColor || "#10B981",
+                accentColor: metadata.accentColor || "#F59E0B",
+                fontFamily: metadata.fontFamily || "Arial, sans-serif",
+                brandVoice: metadata.brandVoice || "professional",
+                logo: organization.logo || metadata.logo || null, // Prioritize top-level logo field
+              },
+            });
+          } catch (error) {
+            console.error("Failed to create brand kit:", error);
+            // Don't throw - organization was created successfully
+          }
+        },
+      },
+    }),
     stripe({
       stripeClient,
       stripeWebhookSecret: process.env.STRIPE_WEBHOOK_SECRET || "",
