@@ -17,8 +17,9 @@ export default function WelcomePage() {
   useEffect(() => {
     if (!sessionLoading && !orgsLoading) {
       if (!session?.user) {
-        // Not logged in, redirect to login
-        router.push("/login");
+        // Not logged in, redirect to login with callback
+        const callbackUrl = encodeURIComponent('/welcome');
+        router.push(`/login?callbackUrl=${callbackUrl}`);
       } else if (organizations && organizations.length > 0) {
         // User already has workspaces, go to dashboard
         router.push("/dashboard");

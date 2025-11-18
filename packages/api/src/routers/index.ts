@@ -1,4 +1,7 @@
 import { protectedProcedure, publicProcedure, router } from "../index";
+import { storageRouter } from "./storage";
+import { organizationRouter } from "./organization";
+import { brandKitRouter } from "./brand-kit";
 
 export const appRouter = router({
 	healthCheck: publicProcedure.query(() => {
@@ -10,5 +13,11 @@ export const appRouter = router({
 			user: ctx.session.user,
 		};
 	}),
+	
+	// Feature routers
+	storage: storageRouter,
+	organization: organizationRouter,
+	brandKit: brandKitRouter,
 });
+
 export type AppRouter = typeof appRouter;

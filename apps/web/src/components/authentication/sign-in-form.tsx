@@ -8,21 +8,23 @@ import Loader from "../loader";
 import { Button } from "../ui/button";
 import { Input } from "../ui/input";
 import { Label } from "../ui/label";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
+import type { Route } from "next";
 import Link from "next/link";
 import { Card } from "../ui/card";
 import { cn } from "@/lib/utils";
 import EdgeRayLoader from "../EdgeLoader";
-import { useState } from "react";
+import { useState, Suspense } from "react";
 import Image from "next/image";
 
 const autofillStyles =
   "[&:-webkit-autofill]:bg-white [&:-webkit-autofill]:shadow-[0_0_0_30px_white_inset] [&:-webkit-autofill]:[-webkit-text-fill-color:black] [&:-webkit-autofill]:text-black dark:[&:-webkit-autofill]:bg-gray-900 dark:[&:-webkit-autofill]:shadow-[0_0_0_30px_rgb(17_24_39)_inset] dark:[&:-webkit-autofill]:[-webkit-text-fill-color:white] dark:[&:-webkit-autofill]:text-white";
 
-export default function SignInForm() {
+function SignInFormContent({ callbackUrl }: { callbackUrl: string }) {
   const router = useRouter();
   const { isPending } = authClient.useSession();
   const [isSubmitting, setIsSubmitting] = useState(false);
+  
   const form = useForm({
     defaultValues: {
       email: "",
@@ -38,7 +40,7 @@ export default function SignInForm() {
           },
           {
             onSuccess: () => {
-              router.push("/dashboard");
+              router.push(callbackUrl as Route);
               toast.success("Sign in successful");
             },
             onError: (error) => {
@@ -61,7 +63,7 @@ export default function SignInForm() {
   const handleGoogleSignIn = async () => {
     await authClient.signIn.social({
       provider: "google",
-      callbackURL: "/dashboard",
+      callbackURL: callbackUrl,
     });
   };
 
@@ -224,5 +226,22 @@ export default function SignInForm() {
         .
       </div>
     </Card>
+  );
+}
+
+// Wrapper component that extracts callbackUrl from search params
+function SignInFormWithParams() {
+  const searchParams = useSearchParams();
+  const callbackUrl = searchParams.get('callbackUrl') || '/dashboard';
+  
+  return <SignInFormContent callbackUrl={callbackUrl} />;
+}
+
+// Export with Suspense boundary
+export default function SignInForm() {
+  return (
+    <Suspense fallback={null}>
+      <SignInFormWithParams />
+    </Suspense>
   );
 }

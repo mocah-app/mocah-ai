@@ -28,6 +28,8 @@
     "dotenv": "catalog:",
     "zod": "catalog:",
     "@mocah/auth": "workspace:*",
-    "@mocah/db": "workspace:*"
+    "@mocah/db": "workspace:*",
+    "@mocah/shared": "workspace:*",
+    "@aws-sdk/client-s3": "catalog:"
   }
 }

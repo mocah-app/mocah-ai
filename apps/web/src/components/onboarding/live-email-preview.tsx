@@ -55,26 +55,25 @@ export function LiveEmailPreview({ brand }: { brand: BrandPreview }) {
     sampleContent.professional;
 
   return (
-    <div className="h-full flex flex-col space-y-4">
-      {/* Preview Label */}
-      <div className="flex items-center gap-2 text-sm text-muted-foreground">
-        <Mail className="h-4 w-4" />
-        <span>Live Preview</span>
-      </div>
-
+    <div className="h-full flex flex-col space-y-4 bg-secondary ">
       {/* Email Client Mockup */}
-      <Card className="flex-1 overflow-hidden">
+      <Card className="flex-1 overflow-hidden p-0 -rotate-3 rounded-none">
         <div className="h-full overflow-auto">
+          <div className="flex gap-2 p-1 px-4">
+            <div className="bg-red-500 h-3 w-3 rounded-full" />
+            <div className="bg-green-500 h-3 w-3 rounded-full" />
+            <div className="bg-blue-500 h-3 w-3 rounded-full" />
+          </div>
           {/* Email Header */}
           <div className="border-b p-4 bg-muted/50">
             <div className="space-y-1 text-sm">
               <div className="flex gap-2">
-                <span className="font-semibold">From:</span>
-                <span>{brandName}</span>
+                <span className="text-muted-foreground">From:</span>
+                <span className="text-foreground">{brandName}</span>
               </div>
               <div className="flex gap-2">
-                <span className="font-semibold">Subject:</span>
-                <span>{content.subject}</span>
+                <span className="text-muted-foreground">Subject:</span>
+                <span className="text-foreground">{content.subject}</span>
               </div>
             </div>
           </div>
