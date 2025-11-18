@@ -14,8 +14,8 @@ export default function DashboardPage() {
   }, [session, isPending]);
 
   return (
-    <div className="flex flex-1 flex-col h-full gap-4 p-1 w-full bg-secondary/15">
-      <div className="flex bg-background flex-1 flex-col gap-4 p-4 border border-border">
+    <div className="flex flex-1 flex-col h-full gap-4 p-1 w-full bg-dot">
+      <div className="flex bg-background/50 dark:bg-background/80 flex-1 flex-col gap-4 p-4 border border-border">
         <Dashboard />
       </div>
     </div>

@@ -19,9 +19,14 @@ export function BrandSettingsForm() {
   const { activeOrganization, refreshOrganizations } = useOrganization();
   const [isLoading, setIsLoading] = useState(false);
   const [formData, setFormData] = useState<BrandFormData | null>(null);
-  const [defaultValues, setDefaultValues] = useState<Partial<BrandFormValues>>(
-    {}
-  );
+  const [defaultValues, setDefaultValues] = useState<Partial<BrandFormValues>>({
+    brandName: "",
+    primaryColor: "#3B82F6",
+    secondaryColor: "#10B981",
+    fontFamily: "Arial, sans-serif",
+    brandVoice: "professional",
+    logo: "",
+  });
 
   // Update form when active organization changes
   useEffect(() => {
@@ -223,14 +228,6 @@ export function BrandSettingsForm() {
     }
   }
 
-  if (!activeOrganization) {
-    return (
-      <div className="text-center py-8 text-muted-foreground">
-        No active organization selected
-      </div>
-    );
-  }
-
   return (
     <div className="grid lg:grid-cols-2 gap-2">
       <BrandForm
@@ -244,10 +241,12 @@ export function BrandSettingsForm() {
         secondaryButtonText="Reset"
         onSecondaryButtonClick={() => setDefaultValues({ ...defaultValues })}
         title="Brand Settings"
-        description="Customize your brand identity and watch it come to life in the preview"
+        description="Customize your brand identity."
         showAvatar={true}
-        organizationName={activeOrganization.name}
-        formKey={activeOrganization.id}
+        organizationName={activeOrganization?.name}
+        formKey={activeOrganization?.id}
+        activeOrganization={activeOrganization}
+        disableWhenNoOrg={true}
       />
 
       {/* Right Side - Live Preview */}
@@ -255,7 +254,7 @@ export function BrandSettingsForm() {
         <LiveEmailPreview
           brand={{
             brandName:
-              formData?.values.brandName || activeOrganization.name,
+              formData?.values.brandName || activeOrganization?.name,
             primaryColor:
               formData?.values.primaryColor ||
               defaultValues.primaryColor ||
@@ -269,7 +268,7 @@ export function BrandSettingsForm() {
               "Arial, sans-serif",
             logo:
               formData?.logoPreview ||
-              activeOrganization.logo ||
+              activeOrganization?.logo ||
               undefined,
             brandVoice:
               formData?.values.brandVoice ||

@@ -1,12 +1,4 @@
-import {
-  Globe,
-  LayoutGrid,
-  Trash2,
-  Settings,
-  HelpCircle,
-  Share2,
-} from "lucide-react";
-import { type LucideIcon } from "lucide-react";
+import { BookOpenText, DollarSign, LayoutGrid, Settings2, type LucideIcon } from "lucide-react";
 import type { Route } from "next";
 
 export type NavLink = {
@@ -23,71 +15,41 @@ export type NavSection = {
 
 // Mock navigation data - easily editable
 export const navigationConfig: {
-  workspace: {
-    name: string;
-    memberCount: number;
-  };
   mainNav: NavSection[];
-  favorites: NavSection;
-  workspaceNav: NavSection;
   privateNav: NavSection;
-  footerActions: NavLink[];
 } = {
-  workspace: {
-    name: "Mocah workspace",
-    memberCount: 1,
-  },
   mainNav: [
     {
+      title: "Workspace",
       links: [
         {
-          label: "Shared with me",
-          href: "/dashboard/shared",
-          icon: Share2,
+          label: "Templates",
+          href: "/dashboard",
+          icon: LayoutGrid,
         },
         {
-          label: "Community",
-          href: "/community",
-          icon: Globe,
+          label: "Library",
+          href: "/library",
+          icon: BookOpenText,
         },
       ],
     },
   ],
-  favorites: {
-    title: "Favorites",
-    links: [],
-  },
-  workspaceNav: {
-    title: "Workspace",
-    links: [
-      {
-        label: "All",
-        href: "/dashboard",
-        icon: LayoutGrid,
-        badge: 481,
-      },
-    ],
-  },
+
+
   privateNav: {
-    title: "Private",
+    title: "Account",
     links: [
       {
-        label: "All",
-        href: "/dashboard/private",
-        icon: LayoutGrid,
+        label: "Settings",
+        href: "/dashboard/settings",
+        icon: Settings2,
       },
+      {
+        label: "Billing",
+        href: "/dashboard/billing",
+        icon: DollarSign,
+      }
     ],
   },
-  footerActions: [
-    {
-      label: "Settings",
-      href: "/dashboard/settings",
-      icon: Settings,
-    },
-    {
-      label: "Help",
-      href: "/dashboard/help",
-      icon: HelpCircle,
-    },
-  ],
 };

@@ -132,7 +132,7 @@ export default function Dashboard() {
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">
-              Templates Created
+              Templates
             </CardTitle>
           </CardHeader>
           <CardContent>
@@ -148,7 +148,7 @@ export default function Dashboard() {
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">
-              AI Generations
+              AI Credits
             </CardTitle>
           </CardHeader>
           <CardContent>
@@ -181,7 +181,7 @@ export default function Dashboard() {
       </div>
 
       {/* Quick Actions */}
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4 relative z-10">
+      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3 relative z-10">
         <Card
           className="cursor-pointer hover:bg-accent transition-colors"
           onClick={() => router.push("/template/new")}
@@ -199,7 +199,7 @@ export default function Dashboard() {
 
         <Card
           className="cursor-pointer hover:bg-accent transition-colors"
-          onClick={() => router.push("/template/library")}
+          onClick={() => router.push("/library")}
         >
           <CardContent className="pt-6">
             <div className="flex flex-col items-center text-center space-y-2">
@@ -215,7 +215,7 @@ export default function Dashboard() {
         {hasBrandKit && (
           <Card
             className="cursor-pointer hover:bg-accent transition-colors"
-            onClick={() => router.push("/brand-setup")}
+            onClick={() => router.push("/dashboard/settings")}
           >
             <CardContent className="pt-6">
               <div className="flex flex-col items-center text-center space-y-2">
@@ -249,7 +249,7 @@ export default function Dashboard() {
             </div>
             <Button onClick={() => router.push("/template/new")}>
               <Plus className="mr-2 h-4 w-4" />
-              Create First Template
+              New Template
             </Button>
           </CardContent>
         </Card>

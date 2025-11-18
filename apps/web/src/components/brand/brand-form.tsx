@@ -24,6 +24,8 @@ import {
 } from "@/components/ui/select";
 import { Upload, Loader2, X } from "lucide-react";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
+import { cn } from "@/lib/utils";
+import type { Organization } from "@/types/organization";
 
 export const brandFormSchema = z.object({
   brandName: z
@@ -79,7 +81,10 @@ interface BrandFormProps {
   organizationName?: string;
   formKey?: string;
   className?: string;
+  activeOrganization?: Organization | null;
+  disableWhenNoOrg?: boolean; // Disable form when no organization (for settings page)
 }
+
 
 export function BrandForm({
   defaultValues = {
@@ -103,12 +108,17 @@ export function BrandForm({
   showAvatar = false,
   organizationName,
   formKey,
-  className = "space-y-6 bg-card p-6 shadow-2xl",
+  className = "space-y-6 bg-card shadow-2xl",
+  activeOrganization = null,
+  disableWhenNoOrg = false,
 }: BrandFormProps) {
   const [logoFile, setLogoFile] = useState<File | null>(null);
   const [logoPreview, setLogoPreview] = useState<string>(
     defaultValues.logo || ""
   );
+
+  // Compute disabled state: disable when loading OR (when disableWhenNoOrg is true and no org exists)
+  const isFormDisabled = isLoading || (disableWhenNoOrg && !activeOrganization);
 
   const form = useForm<BrandFormValues>({
     resolver: zodResolver(brandFormSchema),
@@ -170,12 +180,14 @@ export function BrandForm({
   };
 
   return (
-    <div className={className}>
+    <div className={cn(className, "w-full h-full")}>
       {(title || description) && (
-        <div>
-          {title && <h2 className="text-2xl font-bold">{title}</h2>}
+        <div className="px-4 pt-6">
+          {title && (
+            <h2 className="text-xl font-medium text-foreground">{title}</h2>
+          )}
           {description && (
-            <p className="text-muted-foreground">{description}</p>
+            <p className="text-sm text-muted-foreground">{description}</p>
           )}
         </div>
       )}
@@ -191,16 +203,18 @@ export function BrandForm({
             control={form.control}
             name="brandName"
             render={({ field }) => (
-              <FormItem>
-                <FormLabel>Brand Name *</FormLabel>
+              <FormItem className="border-b pb-4 px-4">
+                <FormLabel className="text-sm font-medium text-foreground">
+                  Brand Name *
+                </FormLabel>
                 <FormControl>
                   <Input
                     placeholder="Acme Fashion Brand"
                     {...field}
-                    disabled={isLoading}
+                    disabled={isFormDisabled}
                   />
                 </FormControl>
-                <FormDescription>
+                <FormDescription className="text-xs text-muted-foreground">
                   The name of your brand or client
                 </FormDescription>
                 <FormMessage />
@@ -209,7 +223,7 @@ export function BrandForm({
           />
 
           {/* Logo Upload */}
-          <FormItem>
+          <FormItem className="border-b pb-4 px-4">
             <FormLabel>Logo {!showAvatar && "(Optional)"}</FormLabel>
             <FormControl>
               <div className="space-y-4">
@@ -236,7 +250,7 @@ export function BrandForm({
                       variant="ghost"
                       size="sm"
                       onClick={handleRemoveLogo}
-                      disabled={isLoading}
+                      disabled={isFormDisabled}
                     >
                       <X className="h-4 w-4" />
                     </Button>
@@ -254,7 +268,7 @@ export function BrandForm({
                       variant="ghost"
                       size="sm"
                       onClick={handleRemoveLogo}
-                      disabled={isLoading}
+                      disabled={isFormDisabled}
                     >
                       Remove
                     </Button>
@@ -267,7 +281,7 @@ export function BrandForm({
                     onClick={() =>
                       document.getElementById("logo-upload")?.click()
                     }
-                    disabled={isLoading}
+                    disabled={isFormDisabled}
                   >
                     <Upload className="mr-2 h-4 w-4" />
                     {logoPreview ? "Change Logo" : "Upload Logo"}
@@ -283,12 +297,12 @@ export function BrandForm({
                     accept="image/png,image/jpeg,image/svg+xml"
                     className="hidden"
                     onChange={handleLogoUpload}
-                    disabled={isLoading}
+                    disabled={isFormDisabled}
                   />
                 </div>
               </div>
             </FormControl>
-            <FormDescription>
+            <FormDescription className="text-xs text-muted-foreground">
               PNG, JPG, or SVG. Recommended size: 200x200px
             </FormDescription>
           </FormItem>
@@ -298,7 +312,7 @@ export function BrandForm({
             control={form.control}
             name="primaryColor"
             render={({ field }) => (
-              <FormItem>
+              <FormItem className="border-b pb-4 px-4">
                 <FormLabel>Primary Color *</FormLabel>
                 <FormControl>
                   <div className="flex gap-2">
@@ -318,7 +332,7 @@ export function BrandForm({
                     />
                   </div>
                 </FormControl>
-                <FormDescription>
+                <FormDescription className="text-xs text-muted-foreground">
                   Your main brand color used throughout templates
                 </FormDescription>
                 <FormMessage />
@@ -331,7 +345,7 @@ export function BrandForm({
             control={form.control}
             name="secondaryColor"
             render={({ field }) => (
-              <FormItem>
+              <FormItem className="border-b pb-4 px-4">
                 <FormLabel>Secondary Color (Optional)</FormLabel>
                 <FormControl>
                   <div className="flex gap-2">
@@ -351,7 +365,7 @@ export function BrandForm({
                     />
                   </div>
                 </FormControl>
-                <FormDescription>
+                <FormDescription className="text-xs text-muted-foreground">
                   Used for buttons and accents
                 </FormDescription>
                 <FormMessage />
@@ -359,103 +373,120 @@ export function BrandForm({
             )}
           />
 
-          {/* Font Family */}
-          <FormField
-            control={form.control}
-            name="fontFamily"
-            render={({ field }) => (
-              <FormItem>
-                <FormLabel>Font Family *</FormLabel>
-                <Select
-                  onValueChange={field.onChange}
-                  value={field.value}
-                  disabled={isLoading}
-                >
-                  <FormControl>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Change font" />
-                    </SelectTrigger>
-                  </FormControl>
-                  <SelectContent>
-                    {EMAIL_SAFE_FONTS.map((font) => (
-                      <SelectItem key={font} value={font}>
-                        <span style={{ fontFamily: font }}>
-                          {font.split(",")[0]}
-                        </span>
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                <FormDescription className="text-xs text-muted-foreground">
-                  Email-safe fonts that work across all email clients
-                </FormDescription>
-                <FormMessage />
-              </FormItem>
-            )}
-          />
+          <div className="grid md:grid-cols-2 gap-4 px-4 border-b pb-4">
+            {/* Font Family */}
+            <FormField
+              control={form.control}
+              name="fontFamily"
+              render={({ field }) => (
+                <FormItem className="">
+                  <div className="flex items-center gap-2">
+                    <FormLabel>Font Family *</FormLabel>
+                    <span className="text-xs text-muted-foreground">
+                      Current:{" "}
+                      {defaultValues.fontFamily?.split(",")[0] || "Arial"}
+                    </span>
+                  </div>
+                  <Select
+                    onValueChange={field.onChange}
+                    value={field.value}
+                    disabled={isLoading}
+                  >
+                    <FormControl>
+                      <SelectTrigger className="w-full">
+                        <SelectValue placeholder="Change font" />
+                      </SelectTrigger>
+                    </FormControl>
+                    <SelectContent>
+                      {EMAIL_SAFE_FONTS.map((font) => (
+                        <SelectItem key={font} value={font}>
+                          <span style={{ fontFamily: font }}>
+                            {font.split(",")[0]}
+                          </span>
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <FormDescription className="sr-only">
+                    Email-safe fonts that work across all email clients
+                  </FormDescription>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
 
-          {/* Brand Voice */}
-          <FormField
-            control={form.control}
-            name="brandVoice"
-            render={({ field }) => (
-              <FormItem>
-                <FormLabel>Brand Voice *</FormLabel>
-                <Select
-                  onValueChange={field.onChange}
-                  value={field.value}
-                  disabled={isLoading}
-                >
-                  <FormControl>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Change brand voice" />
-                    </SelectTrigger>
-                  </FormControl>
-                  <SelectContent>
-                    <SelectItem value="professional">
-                      <div className="space-y-1">
-                        <div className="font-semibold">Professional</div>
-                        <div className="text-xs text-muted-foreground">
-                          Formal and authoritative
+            {/* Brand Voice */}
+            <FormField
+              control={form.control}
+              name="brandVoice"
+              render={({ field }) => (
+                <FormItem className="">
+                  <div className="flex items-center gap-2">
+                    <FormLabel>Brand Voice *</FormLabel>
+                    <span className="text-xs text-muted-foreground">
+                      Current:{" "}
+                      {defaultValues.brandVoice
+                        ? defaultValues.brandVoice.charAt(0).toUpperCase() +
+                          defaultValues.brandVoice.slice(1)
+                        : "Professional"}
+                    </span>
+                  </div>
+                  <Select
+                    onValueChange={field.onChange}
+                    value={field.value}
+                    disabled={isLoading}
+                  >
+                    <FormControl>
+                      <SelectTrigger className="w-full">
+                        <SelectValue placeholder="Change brand voice" />
+                      </SelectTrigger>
+                    </FormControl>
+                    <SelectContent>
+                      <SelectItem value="professional">
+                        <div className="space-y-1">
+                          <div className="font-semibold">Professional</div>
+                          <div className="text-xs text-muted-foreground">
+                            Formal and authoritative
+                          </div>
                         </div>
-                      </div>
-                    </SelectItem>
-                    <SelectItem value="casual">
-                      <div className="space-y-1">
-                        <div className="font-semibold">Casual</div>
-                        <div className="text-xs text-muted-foreground">
-                          Friendly and conversational
+                      </SelectItem>
+                      <SelectItem value="casual">
+                        <div className="space-y-1">
+                          <div className="font-semibold">Casual</div>
+                          <div className="text-xs text-muted-foreground">
+                            Friendly and conversational
+                          </div>
                         </div>
-                      </div>
-                    </SelectItem>
-                    <SelectItem value="playful">
-                      <div className="space-y-1">
-                        <div className="font-semibold">Playful</div>
-                        <div className="text-xs text-muted-foreground">
-                          Fun and energetic
+                      </SelectItem>
+                      <SelectItem value="playful">
+                        <div className="space-y-1">
+                          <div className="font-semibold">Playful</div>
+                          <div className="text-xs text-muted-foreground">
+                            Fun and energetic
+                          </div>
                         </div>
-                      </div>
-                    </SelectItem>
-                    <SelectItem value="luxury">
-                      <div className="space-y-1">
-                        <div className="font-semibold">Luxury</div>
-                        <div className="text-xs text-muted-foreground">
-                          Elegant and sophisticated
+                      </SelectItem>
+                      <SelectItem value="luxury">
+                        <div className="space-y-1">
+                          <div className="font-semibold">Luxury</div>
+                          <div className="text-xs text-muted-foreground">
+                            Elegant and sophisticated
+                          </div>
                         </div>
-                      </div>
-                    </SelectItem>
-                  </SelectContent>
-                </Select>
-                <FormDescription className="text-xs text-muted-foreground">
-                  AI will match this tone when generating copy
-                </FormDescription>
-                <FormMessage />
-              </FormItem>
-            )}
-          />
+                      </SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <FormDescription className="sr-only">
+                    AI will match this tone when generating copy
+                  </FormDescription>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+          </div>
 
           {/* Actions */}
-          <div className="flex gap-3 pt-6">
+          <div className="flex gap-3 py-6 px-4">
             {showSecondaryButton && (
               <Button
                 type="button"
@@ -483,4 +514,3 @@ export function BrandForm({
     </div>
   );
 }
-

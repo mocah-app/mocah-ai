@@ -7,9 +7,9 @@ import { Palette, User, Bell, Shield } from 'lucide-react';
 
 export default function SettingsPage() {
   return (
-    <div className="container mx-auto max-w-6xl py-8 px-4">
-      <div className="space-y-6">
-        <div className='border border-border p-2'>
+    <div className="flex flex-1 flex-col h-full gap-4 p-1 w-full bg-dot">
+      <div className="flex bg-background/50 dark:bg-background/80 flex-1 flex-col gap-4 p-4 border border-border">
+        <div className=''>
           <h1 className="text-xl">Settings</h1>
           <p className="text-muted-foreground text-xs">
             Manage your workspace preferences and brand identity
@@ -37,7 +37,7 @@ export default function SettingsPage() {
           </TabsList>
 
           {/* Brand Settings Tab */}
-          <TabsContent value="brand">
+          <TabsContent value="brand" className='p-0'>
           <BrandSettingsForm />
           
           </TabsContent>

@@ -1,4 +1,4 @@
-import React from 'react';
+import { useId } from 'react';
 
 interface EdgeRayLoaderProps {
   /**
@@ -39,7 +39,8 @@ export default function EdgeRayLoader({
   blur = 8,
   thickness = 1
 }: EdgeRayLoaderProps) {
-  const gradientId = `rayGradient-${Math.random().toString(36).substr(2, 9)}`;
+  const id = useId();
+  const gradientId = `rayGradient-${id}`;
   
   return (
     <div className="absolute inset-0 rounded-[inherit] overflow-hidden pointer-events-none z-9999">

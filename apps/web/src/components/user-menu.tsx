@@ -32,15 +32,19 @@ export default function UserMenu() {
 
   return (
     <DropdownMenu>
-      <DropdownMenuTrigger asChild>
+      <DropdownMenuTrigger asChild className="">
         <Button variant="outline" size="icon">
           <User className="size-4" />
         </Button>
       </DropdownMenuTrigger>
-      <DropdownMenuContent className="bg-card space-y-2">
-        <DropdownMenuLabel>My Account</DropdownMenuLabel>
+      <DropdownMenuContent className="bg-card space-y-2 min-w-42">
+        <DropdownMenuLabel className="flex flex-col gap-1">
+          <span>My Account</span>
+          <span className="text-xs text-muted-foreground/70">
+            {session.user.email}
+          </span>
+        </DropdownMenuLabel>
         <DropdownMenuSeparator />
-        <DropdownMenuItem>{session.user.email}</DropdownMenuItem>
         <DropdownMenuItem asChild>
           <Link href="/dashboard/settings" className="w-full justify-start">
             <Settings className="size-4" />
@@ -67,7 +71,6 @@ export default function UserMenu() {
             Sign Out
           </Button>
         </DropdownMenuItem>
-        
       </DropdownMenuContent>
     </DropdownMenu>
   );

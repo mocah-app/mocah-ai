@@ -1,8 +1,6 @@
 "use client";
 
-import Link from "next/link";
-import { usePathname } from "next/navigation";
-import type { Route } from "next";
+import { Button } from "@/components/ui/button";
 import {
   Sidebar,
   SidebarContent,
@@ -12,17 +10,18 @@ import {
   SidebarGroupLabel,
   SidebarHeader,
   SidebarMenu,
-  SidebarMenuBadge,
   SidebarMenuButton,
   SidebarMenuItem,
   SidebarRail,
   SidebarTrigger,
   useSidebar,
 } from "@/components/ui/sidebar";
-import { Button } from "@/components/ui/button";
-import { ChevronsUpDown, HelpCircle, LogOut } from "lucide-react";
 import { navigationConfig } from "@/config/navigation";
 import { cn } from "@/lib/utils";
+import { HelpCircle } from "lucide-react";
+import type { Route } from "next";
+import Link from "next/link";
+import { usePathname } from "next/navigation";
 import UserMenu from "../user-menu";
 import { WorkspaceSwitcher } from "../workspace-switcher";
 
@@ -84,64 +83,6 @@ export function DashboardSidebar() {
           </SidebarGroup>
         ))}
 
-        {/* Favorites */}
-        <SidebarGroup>
-          <SidebarGroupLabel>
-            {navigationConfig.favorites.title}
-          </SidebarGroupLabel>
-          <SidebarGroupContent>
-            <SidebarMenu>
-              {navigationConfig.favorites.links.length === 0 ? (
-                <div className="px-2 py-1 text-xs text-muted-foreground">
-                  No favorites yet
-                </div>
-              ) : (
-                navigationConfig.favorites.links.map((link) => (
-                  <SidebarMenuItem key={link.href}>
-                    <SidebarMenuButton
-                      asChild
-                      isActive={isActive(link.href)}
-                      tooltip={link.label}
-                    >
-                      <Link href={link.href as Route}>
-                        {link.icon && <link.icon />}
-                        <span>{link.label}</span>
-                      </Link>
-                    </SidebarMenuButton>
-                  </SidebarMenuItem>
-                ))
-              )}
-            </SidebarMenu>
-          </SidebarGroupContent>
-        </SidebarGroup>
-
-        {/* Workspace */}
-        <SidebarGroup>
-          <SidebarGroupLabel>
-            {navigationConfig.workspaceNav.title}
-          </SidebarGroupLabel>
-          <SidebarGroupContent>
-            <SidebarMenu>
-              {navigationConfig.workspaceNav.links.map((link) => (
-                <SidebarMenuItem key={link.href}>
-                  <SidebarMenuButton
-                    asChild
-                    isActive={isActive(link.href)}
-                    tooltip={link.label}
-                  >
-                    <Link href={link.href as Route}>
-                      {link.icon && <link.icon />}
-                      <span>{link.label}</span>
-                      {link.badge && (
-                        <SidebarMenuBadge>{link.badge}</SidebarMenuBadge>
-                      )}
-                    </Link>
-                  </SidebarMenuButton>
-                </SidebarMenuItem>
-              ))}
-            </SidebarMenu>
-          </SidebarGroupContent>
-        </SidebarGroup>
 
         {/* Private */}
         <SidebarGroup>
