@@ -15,18 +15,6 @@ const nextConfig: NextConfig = {
         hostname: "fly.storage.tigris.dev",
       },
     ],
-  // },
-  // // Monorepo: trace from workspace root
-  // outputFileTracingRoot: path.join(__dirname, "../../"),
-  // // Ensure Prisma engine is included in serverless bundle
-  // outputFileTracingIncludes: {
-  //   "/api/**/*": [
-  //     "../../packages/db/prisma/generated/**/*",
-  //   ],
-  //   "/**/*": [
-  //     "../../packages/db/prisma/generated/**/*",
-  //   ],
-  // 
   },
 };
 
