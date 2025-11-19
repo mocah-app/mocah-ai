@@ -10,12 +10,29 @@ export interface OrganizationMetadata {
   [key: string]: any; // Allow additional fields
 }
 
+export interface BrandKit {
+  id: string;
+  organizationId: string;
+  primaryColor: string | null;
+  secondaryColor: string | null;
+  accentColor: string | null;
+  fontFamily: string | null;
+  brandVoice: string | null;
+  logo: string | null;
+  favicon: string | null;
+  customCss: string | null;
+  createdAt: Date;
+  updatedAt: Date;
+  deletedAt: Date | null;
+}
+
 export interface Organization {
   id: string;
   name: string;
   slug: string;
   logo?: string | null;
   metadata?: OrganizationMetadata;
+  brandKit?: BrandKit | null;
   createdAt: Date;
 }
 
