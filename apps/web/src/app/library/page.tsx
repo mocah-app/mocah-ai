@@ -91,12 +91,12 @@ export default function LibraryPage() {
           </h1>
 
           <div className="max-w-3xl mx-auto relative">
-            <div className="flex items-center gap-4 bg-card shadow-sm pr-2 rounded-full border border-border relative">
+            <div className="flex items-center gap-4 bg-card shadow-sm pr-2 rounded-full border border-border relative overflow-hidden dark:bg-secondary">
               {generateLoading && <EdgeRayLoader />}
               <Input
                 type="text"
                 placeholder="Describe your template idea here..."
-                className="flex-1 bg-transparent border-0 px-6 py-4 h-auto text-foreground placeholder:text-muted-foreground focus-visible:ring-0 text-base"
+                className="flex-1 dark:bg-transparent border-0 px-6 py-4 h-auto text-foreground placeholder:text-muted-foreground focus-visible:ring-0 text-base"
               />
               <Button className="relative z-10" onClick={handleGenerate}>
                 {generateLoading ? <Loader /> : "Generate"}

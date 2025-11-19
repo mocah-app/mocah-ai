@@ -130,7 +130,7 @@ export function BrandForm({
     form.reset(defaultValues);
     setLogoPreview(defaultValues.logo || "");
     setLogoFile(null);
-  }, [formKey, defaultValues.brandName, defaultValues.logo]);
+  }, [formKey, defaultValues.brandName, defaultValues.logo, defaultValues.fontFamily, defaultValues.brandVoice, defaultValues.primaryColor, defaultValues.secondaryColor]);
 
   // Watch form values for live preview
   const watchedValues = form.watch();
@@ -384,7 +384,7 @@ export function BrandForm({
                     <FormLabel>Font Family *</FormLabel>
                     <span className="text-xs text-muted-foreground">
                       Current:{" "}
-                      {defaultValues.fontFamily?.split(",")[0] || "Arial"}
+                      {field.value?.split(",")[0] || defaultValues.fontFamily?.split(",")[0] || "Arial"}
                     </span>
                   </div>
                   <Select
@@ -425,7 +425,10 @@ export function BrandForm({
                     <FormLabel>Brand Voice *</FormLabel>
                     <span className="text-xs text-muted-foreground">
                       Current:{" "}
-                      {defaultValues.brandVoice
+                      {field.value
+                        ? field.value.charAt(0).toUpperCase() +
+                          field.value.slice(1)
+                        : defaultValues.brandVoice
                         ? defaultValues.brandVoice.charAt(0).toUpperCase() +
                           defaultValues.brandVoice.slice(1)
                         : "Professional"}

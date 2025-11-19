@@ -31,34 +31,21 @@ export function BrandSettingsForm() {
   // Update form when active organization changes
   useEffect(() => {
     if (activeOrganization) {
-      // Parse metadata if it's a string from Better Auth
-      let metadata: any = {};
-      if (typeof activeOrganization.metadata === "string") {
-        try {
-          metadata = JSON.parse(activeOrganization.metadata);
-        } catch (error) {
-          logger.error(
-            "Failed to parse metadata",
-            { component: "BrandSettingsForm" },
-            error as Error
-          );
-        }
-      } else {
-        metadata = activeOrganization.metadata || {};
-      }
-
+      // Prefer brandKit data over metadata (brandKit is the source of truth)
+      const brandKit = activeOrganization.brandKit;
+      
       setDefaultValues({
         brandName: activeOrganization.name,
-        primaryColor: metadata.primaryColor || "#3B82F6",
-        secondaryColor: metadata.secondaryColor || "#10B981",
-        fontFamily: metadata.fontFamily || "Arial, sans-serif",
-        brandVoice: metadata.brandVoice || "professional",
-        logo: activeOrganization.logo || "",
+        primaryColor: brandKit?.primaryColor || "#3B82F6",
+        secondaryColor: brandKit?.secondaryColor || "#10B981",
+        fontFamily: brandKit?.fontFamily || "Arial, sans-serif",
+        brandVoice: (brandKit?.brandVoice as any) || "professional",
+        logo: brandKit?.logo || activeOrganization.logo || "",
       });
     }
   }, [
     activeOrganization?.id,
-    activeOrganization?.metadata,
+    activeOrganization?.brandKit,
     activeOrganization?.name,
     activeOrganization?.logo,
   ]);

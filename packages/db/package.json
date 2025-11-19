@@ -12,6 +12,7 @@
     }
   },
   "scripts": {
+    "prebuild": "prisma generate --schema=./prisma/schema/schema.prisma",
     "build": "tsdown",
     "db:push": "prisma db push",
     "db:studio": "prisma studio",
