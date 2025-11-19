@@ -1,14 +1,14 @@
 "use client";
 
-import Image from "next/image";
+import type { ReactNode } from "react";
+import MocahIcon from "../mocah-brand/MocahIcon";
 import {
   Card,
   CardContent,
+  CardDescription,
   CardHeader,
   CardTitle,
-  CardDescription,
 } from "../ui/card";
-import type { ReactNode } from "react";
 
 interface AuthCardProps {
   title: string;
@@ -22,7 +22,7 @@ export function AuthCard({ title, description, children }: AuthCardProps) {
       <Card className="mx-auto w-full max-w-md rounded-none relative">
         <CardHeader className="pb-2">
           <div className="flex flex-col items-center justify-center">
-            <Image src="/logoipsum.svg" alt="Logo" width={50} height={50} />
+            <MocahIcon className="h-12 w-auto" />
           </div>
           <CardTitle className="text-center text-xl md:text-2xl font-semibold">
             {title}
