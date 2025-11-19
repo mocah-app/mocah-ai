@@ -7,7 +7,6 @@
     "packages/*"
   ],
   "scripts": {
-    "postinstall": "turbo db:generate",
     "dev": "turbo dev",
     "build": "turbo build",
     "check-types": "turbo check-types",
