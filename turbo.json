@@ -57,7 +57,8 @@
 			"persistent": true
 		},
 		"db:migrate:deploy": {
-			"cache": false
+			"cache": false,
+			"env": ["DATABASE_URL"]
 		}
 	}
 }
