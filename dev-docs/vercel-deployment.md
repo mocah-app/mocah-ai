@@ -1,16 +1,40 @@
 # Vercel Deployment Guide
 
+## 🚨 Quick Fix for 404 Error
+
+If you're getting a 404 error after deployment, follow these steps:
+
+1. Go to your Vercel project → **Settings** → **General**
+2. Scroll to **Build & Development Settings**
+3. Click **Edit** next to Root Directory
+4. Set to: `apps/web`
+5. Click **Edit** next to Build Command
+6. Set to: `cd ../.. && pnpm db:migrate:deploy && turbo build --filter=web`
+7. Click **Save**
+8. Go to **Deployments** tab
+9. Click **⋯** (three dots) on latest deployment
+10. Click **Redeploy**
+
+This ensures Vercel knows where your Next.js app is located in the monorepo.
+
+---
+
 ## Project Configuration
 
 ### 1. Vercel Project Settings
 
 **Build & Development Settings:**
 - **Framework Preset:** Next.js
-- **Root Directory:** `apps/web`
-- **Build Command:** `cd ../.. && pnpm db:migrate:deploy && pnpm build --filter=web`
+- **Root Directory:** `apps/web` ⚠️ **IMPORTANT**
+- **Build Command:** `cd ../.. && pnpm db:migrate:deploy && turbo build --filter=web`
 - **Install Command:** `pnpm install`
-- **Output Directory:** Leave default (`.next`)
-- **Node Version:** 20.x (or 18.x)
+- **Output Directory:** Leave empty (auto-detected)
+- **Node Version:** 20.x (recommended)
+
+**⚠️ Critical Settings:**
+1. Root Directory MUST be set to `apps/web`
+2. Build command MUST use `cd ../..` to access workspace root
+3. Do NOT override Output Directory (let Vercel auto-detect)
 
 ### 2. Environment Variables
 
@@ -71,10 +95,11 @@ TIGRIS_BUCKET_NAME=your-bucket-name
 
 #### Deployment Process (Automatic)
 ```bash
-1. pnpm install              # Triggers postinstall → prisma generate
-2. pnpm db:migrate:deploy    # Applies migrations to production DB
-3. pnpm build --filter=web   # Builds Next.js app
-4. Deploy                    # Vercel serves the app
+1. cd apps/web               # Vercel sets root directory
+2. cd ../.. && pnpm install  # Install from workspace root (triggers postinstall)
+3. pnpm db:migrate:deploy    # Applies migrations to production DB
+4. turbo build --filter=web  # Builds Next.js app and dependencies
+5. Deploy                    # Vercel serves the app from apps/web/.next
 ```
 
 ### 4. Important Notes
