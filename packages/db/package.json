@@ -23,13 +23,13 @@
   },
   "devDependencies": {
     "@mocah/config": "workspace:*",
-    "prisma": "^6.19.0",
     "tsdown": "catalog:"
   },
   "peerDependencies": {
     "typescript": "^5"
   },
   "dependencies": {
+    "prisma": "^6.19.0",
     "@prisma/client": "catalog:",
     "dotenv": "catalog:",
     "zod": "catalog:"
