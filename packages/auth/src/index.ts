@@ -3,10 +3,10 @@ import { betterAuth, type BetterAuthOptions } from "better-auth";
 import { organization } from "better-auth/plugins";
 import { stripe } from "@better-auth/stripe";
 import { prismaAdapter } from "better-auth/adapters/prisma";
-import prisma from "@mocah/db";
 import Stripe from "stripe";
 import { subscriptionPlans } from "./subscription-plans";
 import { EmailService } from "./email-service";
+import prisma from "@mocah/db";
 
 const stripeClient = new Stripe(process.env.STRIPE_SECRET_KEY || "", {
   apiVersion: "2025-10-29.clover",
