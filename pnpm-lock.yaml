@@ -378,9 +378,6 @@ importers:
       '@mocah/config':
         specifier: workspace:*
         version: link:../config
-      tsdown:
-        specifier: 'catalog:'
-        version: 0.15.12(ms@2.1.3)(typescript@5.9.3)
 
   packages/shared:
     dependencies:
