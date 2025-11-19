@@ -7,6 +7,7 @@
     "packages/*"
   ],
   "scripts": {
+    "postinstall": "turbo db:generate",
     "dev": "turbo dev",
     "build": "turbo build",
     "check-types": "turbo check-types",
@@ -15,7 +16,8 @@
     "db:push": "turbo -F @mocah/db db:push",
     "db:studio": "turbo -F @mocah/db db:studio",
     "db:generate": "turbo -F @mocah/db db:generate",
-    "db:migrate": "turbo -F @mocah/db db:migrate"
+    "db:migrate": "turbo -F @mocah/db db:migrate",
+    "db:migrate:deploy": "turbo -F @mocah/db db:migrate:deploy"
   },
   "dependencies": {
     "dotenv": "^17.2.2",
