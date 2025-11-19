@@ -4,7 +4,19 @@ import {
   createPasswordResetEmail,
 } from "./email-templates";
 
-const resend = new Resend(process.env.RESEND_API_KEY);
+// Lazy initialization to avoid build-time errors
+let resend: Resend | null = null;
+
+const getResendClient = () => {
+  if (!resend) {
+    const apiKey = process.env.RESEND_API_KEY;
+    if (!apiKey) {
+      throw new Error("RESEND_API_KEY environment variable is not set");
+    }
+    resend = new Resend(apiKey);
+  }
+  return resend;
+};
 
 const FROM_EMAIL = `Mocah <${process.env.RESEND_FROM_EMAIL}>` || ``;
 const APP_NAME = process.env.APP_NAME || "Mocah";
@@ -25,7 +37,8 @@ export class EmailService {
    */
   static async sendEmail({ to, subject, html, text }: SendEmailOptions) {
     try {
-      const result = await resend.emails.send({
+      const resendClient = getResendClient();
+      const result = await resendClient.emails.send({
         from: FROM_EMAIL,
         to,
         subject,
