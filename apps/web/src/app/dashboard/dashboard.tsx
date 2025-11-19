@@ -1,21 +1,19 @@
 "use client";
-import { authClient } from "@/lib/auth-client";
-import { useOrganization } from "@/contexts/organization-context";
-import { useQuery } from "@tanstack/react-query";
-import { trpc } from "@/utils/trpc";
+import BrandKitSetupBanner from "@/components/brand-kit/BrandKitSetupBanner";
+import EdgeRayLoader from "@/components/EdgeLoader";
+import { Button } from "@/components/ui/button";
 import {
   Card,
-  CardHeader,
-  CardTitle,
   CardContent,
   CardDescription,
+  CardHeader,
+  CardTitle,
 } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Plus, Palette, Loader2, Settings } from "lucide-react";
+import { Skeleton } from "@/components/ui/skeleton";
+import { useOrganization } from "@/contexts/organization-context";
+import { Palette, Plus, Settings } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import EdgeRayLoader from "@/components/EdgeLoader";
-import { Skeleton } from "@/components/ui/skeleton";
 
 interface Template {
   id: number;
@@ -105,26 +103,7 @@ export default function Dashboard() {
 
       {/* Brand Kit Setup Call-to-Action */}
       {!hasBrandKit && (
-        <Card className="border-primary border border-dashed relative z-10">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0">
-            <CardTitle className="flex flex-col gap-1">
-              <div className="flex gap-2">
-                <Palette className="h-5 w-5" />
-                Complete your Brand setup
-              </div>
-              <p className="text-sm text-muted-foreground">
-                Configure to create perfectly on-brand templates automatically.
-              </p>
-            </CardTitle>
-
-            <Button
-              onClick={() => router.push("/brand-setup")}
-              className="justify-end"
-            >
-              Complete Setup
-            </Button>
-          </CardHeader>
-        </Card>
+      <BrandKitSetupBanner />
       )}
 
       {/* Stats */}

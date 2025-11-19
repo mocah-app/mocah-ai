@@ -1,0 +1,33 @@
+---
+alwaysApply: true
+---
+
+Always ensure codes are written to the right directory
+
+**Mocah** is an AI-powered email template platform built with a modern TypeScript stack. The platform enables users to generate professional, on-brand email templates using AI, with a focus on beautiful design, brand consistency, and export flexibility.
+
+### Tech Stack
+- **Framework**: Next.js 16.0.0 (App Router) with React 19.2
+- **Language**: TypeScript (strict mode)
+- **API**: tRPC for type-safe client-server communication
+- **Database**: PostgreSQL with Prisma ORM
+- **Authentication**: Better Auth with organization/team support
+- **Storage**: Tigris S3-compatible object storage (via AWS SDK)
+- **Styling**: TailwindCSS 4.x with shadcn/ui components
+- **Payments**: Stripe integration via Better Auth Stripe plugin
+- **Monorepo**: Turborepo with pnpm workspaces
+
+### Project Structure
+
+```
+mocah/
+├── apps/
+│   └── web/              # Next.js application (port 3001)
+├── packages/
+│   ├── api/              # tRPC API layer (business logic)
+│   ├── auth/             # Authentication & authorization (Better Auth)
+│   ├── db/               # Database schema & Prisma client
+│   ├── shared/           # Shared utilities & types
+│   └── config/           # Shared configuration
+└── dev-docs/             # Development documentation
+```

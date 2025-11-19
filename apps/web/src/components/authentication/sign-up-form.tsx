@@ -14,7 +14,7 @@ import { cn } from "@/lib/utils";
 import { useState } from "react";
 import { VerificationEmailSent } from "./verification-email-sent";
 import EdgeRayLoader from "../EdgeLoader";
-import Image from "next/image";
+import MocahIcon from "../mocah-brand/MocahIcon";
 
 const autofillStyles =
   "[&:-webkit-autofill]:bg-white [&:-webkit-autofill]:shadow-[0_0_0_30px_white_inset] [&:-webkit-autofill]:[-webkit-text-fill-color:black] [&:-webkit-autofill]:text-black dark:[&:-webkit-autofill]:bg-gray-900 dark:[&:-webkit-autofill]:shadow-[0_0_0_30px_rgb(17_24_39)_inset] dark:[&:-webkit-autofill]:[-webkit-text-fill-color:white] dark:[&:-webkit-autofill]:text-white";
@@ -106,7 +106,7 @@ export default function SignUpForm() {
     return (
       <Card className="mx-auto w-full max-w-md p-6 rounded-none relative">
         <div className="flex flex-col items-center justify-center">
-          <Image src="/logoipsum.svg" alt="Logo" width={50} height={50} />
+          <MocahIcon className="h-12 w-auto" />
         </div>
         <h1 className="mb-2 text-center text-xl md:text-2xl font-semibold">
           Check Your Email
@@ -124,7 +124,7 @@ export default function SignUpForm() {
     <Card className="mx-auto w-full max-w-md p-6 rounded-none relative">
       {isSubmitting && <EdgeRayLoader />}
       <div className="flex flex-col items-center justify-center">
-        <Image src="/logoipsum.svg" alt="Logo" width={50} height={50} />
+        <MocahIcon className="h-12 w-auto" />
       </div>
       <h1 className="mb-2 text-center text-xl md:text-2xl font-semibold relative z-10">
         Create Account

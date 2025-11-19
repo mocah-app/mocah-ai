@@ -11,11 +11,11 @@ import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { LiveEmailPreview } from "@/components/onboarding/live-email-preview";
 import { toast } from "sonner";
-import { BrandForm } from "@/components/brand/brand-form";
+import { BrandForm } from "@/components/brand-kit/brand-form";
 import type {
   BrandFormValues,
   BrandFormData,
-} from "@/components/brand/brand-form";
+} from "@/components/brand-kit/brand-form";
 
 export default function BrandSetupPage() {
   const router = useRouter();

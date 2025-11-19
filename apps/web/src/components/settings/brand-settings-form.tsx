@@ -13,7 +13,7 @@ import {
   BrandForm,
   type BrandFormValues,
   type BrandFormData,
-} from "@/components/brand/brand-form";
+} from "@/components/brand-kit/brand-form";
 
 export function BrandSettingsForm() {
   const { activeOrganization, refreshOrganizations } = useOrganization();
