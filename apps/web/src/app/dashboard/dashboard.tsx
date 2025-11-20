@@ -97,13 +97,15 @@ export default function Dashboard() {
 
   return (
     <div className="space-y-6 relative">
-      {orgLoading && <EdgeRayLoader />}
+      {/* {orgLoading && <EdgeRayLoader delay={2} />} */}
 
       <h1 className="sr-only">{activeOrganization?.name}</h1>
 
       {/* Brand Kit Setup Call-to-Action */}
-      {!hasBrandKit && (
-      <BrandKitSetupBanner />
+      {!orgLoading && !hasBrandKit && (
+        <div className="animate-in fade-in slide-in-from-top-4 duration-500">
+          <BrandKitSetupBanner />
+        </div>
       )}
 
       {/* Stats */}
@@ -227,8 +229,8 @@ export default function Dashboard() {
               <p>Create your first template to get started!</p>
             </div>
             <Button onClick={() => router.push("/template/new")}>
-              <Plus className="mr-2 h-4 w-4" />
               New Template
+              <Plus className="h-4 w-4" />
             </Button>
           </CardContent>
         </Card>

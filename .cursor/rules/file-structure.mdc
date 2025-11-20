@@ -31,3 +31,6 @@ mocah/
 │   └── config/           # Shared configuration
 └── dev-docs/             # Development documentation
 ```
+
+
+Other Important notes, in nextjs 16, middleware.ts is now proxy.ts

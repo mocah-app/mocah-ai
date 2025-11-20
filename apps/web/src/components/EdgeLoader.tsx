@@ -30,6 +30,12 @@ interface EdgeRayLoaderProps {
    * @default 2
    */
   thickness?: number;
+
+  /**
+   * Delay before animation starts in seconds
+   * @default 0
+   */
+  delay?: number;
 }
 
 export default function EdgeRayLoader({
@@ -37,7 +43,8 @@ export default function EdgeRayLoader({
   duration = 1.5,
   rayLength = 15,
   blur = 8,
-  thickness = 1
+  thickness = 1,
+  delay = 0
 }: EdgeRayLoaderProps) {
   const id = useId();
   const gradientId = `rayGradient-${id}`;
@@ -78,6 +85,7 @@ export default function EdgeRayLoader({
             values="-15%;100%;100%;100%;100%"
             keyTimes="0;0.25;0.5;0.75;1"
             dur={`${duration}s`}
+            begin={`${delay}s`}
             repeatCount="indefinite"
           />
         </rect>
@@ -97,6 +105,7 @@ export default function EdgeRayLoader({
             values="100%;-15%;100%;100%;100%"
             keyTimes="0;0.25;0.5;0.75;1"
             dur={`${duration}s`}
+            begin={`${delay}s`}
             repeatCount="indefinite"
           />
         </rect>
@@ -116,6 +125,7 @@ export default function EdgeRayLoader({
             values="100%;100%;115%;-15%;100%"
             keyTimes="0;0.25;0.5;0.75;1"
             dur={`${duration}s`}
+            begin={`${delay}s`}
             repeatCount="indefinite"
           />
         </rect>
@@ -134,6 +144,7 @@ export default function EdgeRayLoader({
             values="100%;100%;100%;115%;-15%"
             keyTimes="0;0.25;0.5;0.75;1"
             dur={`${duration}s`}
+            begin={`${delay}s`}
             repeatCount="indefinite"
           />
         </rect>

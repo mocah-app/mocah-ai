@@ -86,6 +86,7 @@ export function OrganizationProvider({ children }: { children: ReactNode }) {
   };
 
   const setActiveOrganization = async (orgId: string) => {
+    setIsLoading(true);
     try {
       const { error } = await authClient.organization.setActive({
         organizationId: orgId,
@@ -110,6 +111,8 @@ export function OrganizationProvider({ children }: { children: ReactNode }) {
       );
       toast.error(error.message || "Failed to switch workspace");
       throw error;
+    } finally {
+      setIsLoading(false);
     }
   };
 

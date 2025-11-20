@@ -17,7 +17,7 @@ export default function DashboardHeader() {
       <div className="flex flex-row items-center justify-between p-2 bg-secondary/15">
         <div className="flex items-center gap-2">
           {isMobile && <SidebarTrigger className="size-8" />}
-          <span className="text-xl font-base text-muted-foreground">
+          <span className="text-xl font-base text-muted-foreground hidden md:block">
             {isLoading ? (
               <Skeleton className="w-[100px] h-6" />
             ) : (
@@ -26,14 +26,14 @@ export default function DashboardHeader() {
           </span>
         </div>
 
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 relative">
           <Input
             type="text"
             placeholder="Search template..."
-            className="w-64 bg-background"
+            className="w-52 bg-background"
           />
           <Button>
-            New Template <Plus className="w-4 h-4" />
+            New Template <Plus className="w-4 h-4 hidden md:block" />
           </Button>
         </div>
       </div>
