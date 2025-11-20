@@ -9,36 +9,75 @@ export interface ContentProps {
 /**
  * Email content section with title and paragraphs
  */
-export function createEmailContent({ 
-  title, 
+export function createEmailContent({
+  title,
   paragraphs,
-  theme 
+  theme,
 }: ContentProps): string {
   const t = theme || require("../theme").defaultTheme;
-  
+
   const paragraphsHtml = paragraphs
-    .map(p => `
-      <p style="
-        font-size: 16px;
-        color: ${t.colors.text};
-        font-family: ${t.fonts.primary};
-        line-height: 1.6;
-        margin: 0 0 ${t.spacing.md} 0;
-      ">${p}</p>
-    `)
+    .map(
+      (p) => `
+      <table 
+        role="presentation" 
+        cellspacing="0" 
+        cellpadding="0" 
+        border="0" 
+        width="100%"
+        style="margin-bottom: ${t.spacing.md};"
+      >
+        <tr>
+          <td style="padding: 0;">
+            <p class="content-text" style="
+              font-size: 16px;
+              color: ${t.colors.text};
+              font-family: ${t.fonts.primary};
+              line-height: 1.6;
+              margin: 0;
+            ">${p}</p>
+          </td>
+        </tr>
+      </table>
+    `
+    )
     .join("");
-  
+
   return `
-    <div style="padding: ${t.spacing.xl} 0;">
-      <h2 style="
-        color: ${t.colors.text};
-        font-family: ${t.fonts.primary};
-        font-size: 20px;
-        font-weight: 600;
-        margin: 0 0 ${t.spacing.lg} 0;
-      ">${title}</h2>
-      ${paragraphsHtml}
-    </div>
+    <table 
+      role="presentation" 
+      cellspacing="0" 
+      cellpadding="0" 
+      border="0" 
+      width="100%"
+      style="padding: ${t.spacing.xl} 0;"
+    >
+      <tr>
+        <td style="padding: 0;">
+          <table 
+            role="presentation" 
+            cellspacing="0" 
+            cellpadding="0" 
+            border="0" 
+            width="100%"
+            style="margin-bottom: ${t.spacing.lg};"
+          >
+            <tr>
+              <td style="padding: 0;">
+                <h2 class="content-title" style="
+                  color: ${t.colors.text};
+                  font-family: ${t.fonts.primary};
+                  font-size: 20px;
+                  font-weight: 600;
+                  margin: 0;
+                  line-height: 1.3;
+                ">${title}</h2>
+              </td>
+            </tr>
+          </table>
+          ${paragraphsHtml}
+        </td>
+      </tr>
+    </table>
   `;
 }
-

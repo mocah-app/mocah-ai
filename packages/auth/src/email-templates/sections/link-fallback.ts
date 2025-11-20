@@ -9,32 +9,70 @@ export interface LinkFallbackProps {
 /**
  * Link fallback section for when buttons don't work
  */
-export function createLinkFallback({ 
-  url, 
+export function createLinkFallback({
+  url,
   theme,
-  label = "If the button doesn't work, copy and paste this link into your browser:"
+  label = "If the button doesn't work, copy and paste this link into your browser:",
 }: LinkFallbackProps): string {
   const t = theme || require("../theme").defaultTheme;
-  
+
   return `
-    <div style="margin-top: ${t.spacing.xl};">
-      <p style="
-        font-size: 14px;
-        color: ${t.colors.textSecondary};
-        font-family: ${t.fonts.primary};
-        margin: 0 0 ${t.spacing.sm} 0;
-      ">${label}</p>
-      <p style="
-        font-size: 12px;
-        color: ${t.colors.textMuted};
-        font-family: ${t.fonts.primary};
-        word-break: break-all;
-        margin: 0;
-        padding: ${t.spacing.sm};
-        background-color: ${t.colors.surface};
-        border-radius: ${t.borderRadius};
-      ">${url}</p>
-    </div>
+    <table 
+      role="presentation" 
+      cellspacing="0" 
+      cellpadding="0" 
+      border="0" 
+      width="100%"
+      style="margin-top: ${t.spacing.xl};"
+    >
+      <tr>
+        <td style="padding: 0;">
+          <table 
+            role="presentation" 
+            cellspacing="0" 
+            cellpadding="0" 
+            border="0" 
+            width="100%"
+            style="margin-bottom: ${t.spacing.sm};"
+          >
+            <tr>
+              <td style="padding: 0;">
+                <p style="
+                  font-size: 14px;
+                  color: ${t.colors.textSecondary};
+                  font-family: ${t.fonts.primary};
+                  margin: 0;
+                  line-height: 1.5;
+                ">${label}</p>
+              </td>
+            </tr>
+          </table>
+          <table 
+            role="presentation" 
+            cellspacing="0" 
+            cellpadding="0" 
+            border="0" 
+            width="100%"
+          >
+            <tr>
+              <td style="
+                padding: ${t.spacing.sm};
+                background-color: ${t.colors.surface};
+                border-radius: ${t.borderRadius};
+              ">
+                <p style="
+                  font-size: 12px;
+                  color: ${t.colors.textMuted};
+                  font-family: ${t.fonts.primary};
+                  word-break: break-all;
+                  margin: 0;
+                  line-height: 1.5;
+                ">${url}</p>
+              </td>
+            </tr>
+          </table>
+        </td>
+      </tr>
+    </table>
   `;
 }
-

@@ -11,6 +11,7 @@ export interface PasswordResetEmailProps {
   resetUrl: string;
   theme?: EmailTheme;
   expiresInHours?: number;
+  logoUrl?: string;
 }
 
 /**
@@ -22,9 +23,37 @@ export function createPasswordResetEmail({
   resetUrl,
   theme = defaultTheme,
   expiresInHours = 1,
+  logoUrl,
 }: PasswordResetEmailProps): string {
   const greeting = user.name ? `Hi ${user.name},` : "Hi there,";
-  
+
+  const expiryText = `
+    <table 
+      role="presentation" 
+      cellspacing="0" 
+      cellpadding="0" 
+      border="0" 
+      width="100%"
+      style="margin-top: ${theme.spacing.xl};"
+    >
+      <tr>
+        <td align="center" style="padding: 0;">
+          <p style="
+            font-size: 12px;
+            color: ${theme.colors.textMuted};
+            font-family: ${theme.fonts.primary};
+            margin: 0;
+            line-height: 1.5;
+          ">
+            This link will expire in ${expiresInHours} ${
+    expiresInHours === 1 ? "hour" : "hours"
+  }.
+          </p>
+        </td>
+      </tr>
+    </table>
+  `;
+
   const content = `
     ${createEmailContent({
       title: "Reset your password",
@@ -34,26 +63,16 @@ export function createPasswordResetEmail({
       ],
       theme,
     })}
-    <div style="text-align: center;">
-      ${createEmailButton({
-        text: "Reset Password",
-        url: resetUrl,
-        theme,
-      })}
-    </div>
+    ${createEmailButton({
+      text: "Reset Password",
+      url: resetUrl,
+      theme,
+    })}
     ${createLinkFallback({
       url: resetUrl,
       theme,
     })}
-    <p style="
-      font-size: 12px;
-      color: ${theme.colors.textMuted};
-      font-family: ${theme.fonts.primary};
-      text-align: center;
-      margin-top: ${theme.spacing.xl};
-    ">
-      This link will expire in ${expiresInHours} ${expiresInHours === 1 ? "hour" : "hours"}.
-    </p>
+    ${expiryText}
   `;
 
   return createBaseEmailTemplate({
@@ -61,7 +80,8 @@ export function createPasswordResetEmail({
     title: `Reset your ${appName} password`,
     content,
     theme,
-    footerText: "For security reasons, if you didn't request this password reset, please contact support immediately.",
+    footerText:
+      "For security reasons, if you didn't request this password reset, please contact support immediately.",
+    logoUrl,
   });
 }
-

@@ -2,6 +2,8 @@
 
 import { Input } from "../ui/input";
 import { Field, FieldLabel, FieldContent, FieldError } from "../ui/field";
+import { Button } from "../ui/button";
+import { Eye, EyeOff } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 const autofillStyles =
@@ -22,6 +24,8 @@ interface FormFieldProps {
   label: string;
   type?: string;
   placeholder?: string;
+  showPassword?: boolean;
+  onTogglePassword?: () => void;
 }
 
 export function FormField({
@@ -29,26 +33,49 @@ export function FormField({
   label,
   type = "text",
   placeholder,
+  showPassword,
+  onTogglePassword,
 }: FormFieldProps) {
   // Transform TanStack Form errors to match FieldError expected format
   const errors = field.state.meta.errors
     .filter((error): error is { message?: string } => error != null)
     .map((error) => (typeof error === "string" ? { message: error } : error));
 
+  const isPasswordField = type === "password";
+  const inputType = isPasswordField && showPassword ? "text" : type;
+
   return (
     <Field data-invalid={errors.length > 0}>
       <FieldLabel htmlFor={field.name}>{label}</FieldLabel>
       <FieldContent>
-        <Input
-          id={field.name}
-          name={field.name}
-          type={type}
-          placeholder={placeholder}
-          value={field.state.value}
-          onBlur={field.handleBlur}
-          onChange={(e) => field.handleChange(e.target.value)}
-          className={cn(autofillStyles)}
-        />
+        <div className="relative">
+          <Input
+            id={field.name}
+            name={field.name}
+            type={inputType}
+            placeholder={placeholder}
+            value={field.state.value}
+            onBlur={field.handleBlur}
+            onChange={(e) => field.handleChange(e.target.value)}
+            className={cn(autofillStyles, isPasswordField && onTogglePassword && "pr-10")}
+          />
+          {isPasswordField && onTogglePassword && (
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon"
+              onClick={onTogglePassword}
+              className="absolute right-1 top-1/2 -translate-y-1/2 h-7 w-7"
+              aria-label={showPassword ? "Hide password" : "Show password"}
+            >
+              {showPassword ? (
+                <EyeOff className="size-4" />
+              ) : (
+                <Eye className="size-4" />
+              )}
+            </Button>
+          )}
+        </div>
         <FieldError errors={errors} />
       </FieldContent>
     </Field>
