@@ -97,7 +97,6 @@ export default function Dashboard() {
 
   return (
     <div className="space-y-6 relative">
-      {/* {orgLoading && <EdgeRayLoader delay={2} />} */}
 
       <h1 className="sr-only">{activeOrganization?.name}</h1>
 

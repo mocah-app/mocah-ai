@@ -33,7 +33,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { useMutation } from "@tanstack/react-query";
 import { ArrowRight, Check, Loader2, Upload } from "lucide-react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { useEffect, useState } from "react";
+import { Suspense, useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
 import { toast } from "sonner";
 import { z } from "zod";
@@ -65,7 +65,7 @@ type BrandFormValues = z.infer<typeof brandSchema>;
 // Add orgId to type to fix linter error
 type WorkspaceData = WorkspaceFormValues & { slug: string; orgId?: string };
 
-export default function BrandSetupPage() {
+function BrandSetupContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const { data: session, isPending } = authClient.useSession();
@@ -814,5 +814,17 @@ export default function BrandSetupPage() {
         </div>
       </div>
     </div>
+  );
+}
+
+export default function BrandSetupPage() {
+  return (
+    <Suspense fallback={
+      <div className="h-screen flex-1 flex items-center justify-center">
+        <MocahLoadingIcon />
+      </div>
+    }>
+      <BrandSetupContent />
+    </Suspense>
   );
 }
