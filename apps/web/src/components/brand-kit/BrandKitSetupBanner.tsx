@@ -12,19 +12,18 @@ function BrandKitSetupBanner() {
       <CardHeader className="flex flex-row items-center justify-between space-y-0">
         <CardTitle className="flex flex-col gap-1">
           <div className="flex gap-2">
-            <Palette className="h-5 w-5" />
-            Complete your Brand setup
+            Complete Brand setup
           </div>
-          <p className="text-sm text-muted-foreground">
+          <p className="text-xs text-muted-foreground hidden md:block text-pretty">
             Configure to create perfectly on-brand templates automatically.
           </p>
         </CardTitle>
 
         <Button
           onClick={() => router.push("/dashboard/settings")}
-          className="justify-end"
+          className="justify-end "
         >
-          Complete Setup
+          Complete
         </Button>
       </CardHeader>
     </Card>

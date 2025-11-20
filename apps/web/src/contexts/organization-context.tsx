@@ -24,10 +24,10 @@ interface OrganizationContextValue {
   isLoading: boolean;
 
   // Actions
-  setActiveOrganization: (orgId: string) => Promise<void>;
+  setActiveOrganization: (orgId: string, silent?: boolean) => Promise<void>;
   createOrganization: (data: CreateOrgInput) => Promise<Organization | null>;
   updateOrganization: (orgId: string, data: UpdateOrgInput) => Promise<void>;
-  refreshOrganizations: () => Promise<void>;
+  refreshOrganizations: (expectedActiveOrgId?: string) => Promise<void>;
 }
 
 const OrganizationContext = createContext<OrganizationContextValue | null>(
@@ -51,7 +51,7 @@ export function OrganizationProvider({ children }: { children: ReactNode }) {
     }
   }, [session?.user?.id, sessionLoading]);
 
-  const loadOrganizations = async () => {
+  const loadOrganizations = async (expectedActiveOrgId?: string) => {
     setIsLoading(true);
     try {
       // Use tRPC to load organizations
@@ -59,15 +59,20 @@ export function OrganizationProvider({ children }: { children: ReactNode }) {
 
       setOrganizations(orgs as Organization[]);
 
-      // Get active organization from session
-      if (session?.session?.activeOrganizationId) {
+      // If we have an expected active org ID (e.g., just created), use it
+      if (expectedActiveOrgId) {
+        const activeOrg = orgs?.find((o: any) => o.id === expectedActiveOrgId);
+        setActiveOrgState((activeOrg as Organization) || null);
+      }
+      // Otherwise, get active organization from session
+      else if (session?.session?.activeOrganizationId) {
         const activeOrg = orgs?.find(
           (o: any) => o.id === session.session.activeOrganizationId
         );
         setActiveOrgState((activeOrg as Organization) || null);
       } else if (orgs && orgs.length > 0) {
-        // Auto-set first org as active if none set
-        await setActiveOrganization(orgs[0].id);
+        // Auto-set first org as active if none set (silent mode)
+        await setActiveOrganization(orgs[0].id, true);
       }
     } catch (error) {
       logger.error(
@@ -85,7 +90,7 @@ export function OrganizationProvider({ children }: { children: ReactNode }) {
     }
   };
 
-  const setActiveOrganization = async (orgId: string) => {
+  const setActiveOrganization = async (orgId: string, silent = false) => {
     setIsLoading(true);
     try {
       const { error } = await authClient.organization.setActive({
@@ -102,7 +107,9 @@ export function OrganizationProvider({ children }: { children: ReactNode }) {
       // Refresh session to get updated activeOrganizationId, but skip org reload
       await authClient.getSession();
       
-      toast.success(`Switched to ${org?.name}`);
+      if (!silent) {
+        toast.success(`Switched to ${org?.name}`);
+      }
     } catch (error: any) {
       logger.error(
         "Failed to set active organization",
@@ -113,7 +120,9 @@ export function OrganizationProvider({ children }: { children: ReactNode }) {
         },
         error
       );
-      toast.error(error.message || "Failed to switch workspace");
+      if (!silent) {
+        toast.error(error.message || "Failed to switch workspace");
+      }
       throw error;
     } finally {
       setIsLoading(false);
@@ -139,8 +148,29 @@ export function OrganizationProvider({ children }: { children: ReactNode }) {
         throw new Error("No organization returned");
       }
 
-      // Refresh list and set as active
-      await loadOrganizations();
+      // Automatically set the newly created organization as active
+      const { error: setActiveError } = await authClient.organization.setActive({
+        organizationId: newOrg.id,
+      });
+
+      if (setActiveError) {
+        logger.error(
+          "Failed to set new organization as active",
+          {
+            component: "OrganizationContext",
+            action: "createOrganization",
+            organizationId: newOrg.id,
+          },
+          new Error(setActiveError.message || "Failed to set active organization")
+        );
+        // Don't throw - organization was created successfully
+      }
+
+      // Refresh session to ensure activeOrganizationId is updated in backend
+      await authClient.getSession();
+
+      // Refresh list and explicitly set this org as active (avoids race condition with session hook)
+      await loadOrganizations(newOrg.id);
 
       toast.success(`Created ${data.name}`);
       return newOrg;
