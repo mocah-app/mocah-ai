@@ -11,6 +11,7 @@ export interface VerificationEmailProps {
   verificationUrl: string;
   theme?: EmailTheme;
   expiresInHours?: number;
+  logoUrl?: string;
 }
 
 /**
@@ -22,8 +23,34 @@ export function createVerificationEmail({
   verificationUrl,
   theme = defaultTheme,
   expiresInHours = 24,
+  logoUrl,
 }: VerificationEmailProps): string {
   const greeting = user.name ? `Hi ${user.name},` : "Hi there,";
+  
+  const expiryText = `
+    <table 
+      role="presentation" 
+      cellspacing="0" 
+      cellpadding="0" 
+      border="0" 
+      width="100%"
+      style="margin-top: ${theme.spacing.xl};"
+    >
+      <tr>
+        <td align="center" style="padding: 0;">
+          <p style="
+            font-size: 12px;
+            color: ${theme.colors.textMuted};
+            font-family: ${theme.fonts.primary};
+            margin: 0;
+            line-height: 1.5;
+          ">
+            This link will expire in ${expiresInHours} ${expiresInHours === 1 ? "hour" : "hours"}.
+          </p>
+        </td>
+      </tr>
+    </table>
+  `;
   
   const content = `
     ${createEmailContent({
@@ -34,26 +61,16 @@ export function createVerificationEmail({
       ],
       theme,
     })}
-    <div style="text-align: center;">
-      ${createEmailButton({
-        text: "Verify Email Address",
-        url: verificationUrl,
-        theme,
-      })}
-    </div>
+    ${createEmailButton({
+      text: "Verify Email Address",
+      url: verificationUrl,
+      theme,
+    })}
     ${createLinkFallback({
       url: verificationUrl,
       theme,
     })}
-    <p style="
-      font-size: 12px;
-      color: ${theme.colors.textMuted};
-      font-family: ${theme.fonts.primary};
-      text-align: center;
-      margin-top: ${theme.spacing.xl};
-    ">
-      This link will expire in ${expiresInHours} ${expiresInHours === 1 ? "hour" : "hours"}.
-    </p>
+    ${expiryText}
   `;
 
   return createBaseEmailTemplate({
@@ -62,6 +79,7 @@ export function createVerificationEmail({
     content,
     theme,
     footerText: `If you didn't create an account with ${appName}, you can safely ignore this email.`,
+    logoUrl,
   });
 }
 

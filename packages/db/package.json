@@ -24,7 +24,7 @@
   "dependencies": {
     "prisma": "^7.0.0",
     "@prisma/adapter-pg": "^7.0.0",
-    "pg": "^8.14.1",
+    "pg": "catalog:",
     "@prisma/client": "catalog:",
     "dotenv": "catalog:",
     "zod": "catalog:"

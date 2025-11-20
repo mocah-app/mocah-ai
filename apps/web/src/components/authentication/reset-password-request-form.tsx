@@ -27,10 +27,16 @@ export function ResetPasswordRequestForm({
     onSubmit: async ({ value }) => {
       setIsSubmitting(true);
       try {
-        await authClient.requestPasswordReset({
+        const { error } = await authClient.requestPasswordReset({
           email: value.email,
           redirectTo: `${window.location.origin}/reset-password`,
         });
+
+        if (error) {
+          toast.error(error.message || "Failed to send reset email");
+          return;
+        }
+
         onEmailSent();
         toast.success("Password reset email sent! Check your inbox.");
       } catch (error: any) {

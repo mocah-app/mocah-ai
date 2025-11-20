@@ -46,16 +46,15 @@ export type BrandFormValues = z.infer<typeof brandFormSchema>;
 
 export const EMAIL_SAFE_FONTS = [
   "Arial, sans-serif",
-  "Helvetica, sans-serif",
-  "Georgia, serif",
   "Times New Roman, serif",
-  "Courier New, monospace",
   "Verdana, sans-serif",
-  "Trebuchet MS, sans-serif",
-  "Impact, sans-serif",
-  "Palatino, serif",
-  "Garamond, serif",
+  "Georgia, serif",
   "Tahoma, sans-serif",
+  "Helvetica, sans-serif",
+  "Courier New, monospace",
+  "Lucida Sans, Lucida Grande, sans-serif",
+  "Trebuchet MS, sans-serif",
+  "Palatino, Book Antiqua, serif",
 ];
 
 export interface BrandFormData {
@@ -84,7 +83,6 @@ interface BrandFormProps {
   activeOrganization?: Organization | null;
   disableWhenNoOrg?: boolean; // Disable form when no organization (for settings page)
 }
-
 
 export function BrandForm({
   defaultValues = {
@@ -130,7 +128,15 @@ export function BrandForm({
     form.reset(defaultValues);
     setLogoPreview(defaultValues.logo || "");
     setLogoFile(null);
-  }, [formKey, defaultValues.brandName, defaultValues.logo, defaultValues.fontFamily, defaultValues.brandVoice, defaultValues.primaryColor, defaultValues.secondaryColor]);
+  }, [
+    formKey,
+    defaultValues.brandName,
+    defaultValues.logo,
+    defaultValues.fontFamily,
+    defaultValues.brandVoice,
+    defaultValues.primaryColor,
+    defaultValues.secondaryColor,
+  ]);
 
   // Watch form values for live preview
   const watchedValues = form.watch();
@@ -384,7 +390,9 @@ export function BrandForm({
                     <FormLabel>Font Family *</FormLabel>
                     <span className="text-xs text-muted-foreground">
                       Current:{" "}
-                      {field.value?.split(",")[0] || defaultValues.fontFamily?.split(",")[0] || "Arial"}
+                      {field.value?.split(",")[0] ||
+                        defaultValues.fontFamily?.split(",")[0] ||
+                        "Arial"}
                     </span>
                   </div>
                   <Select

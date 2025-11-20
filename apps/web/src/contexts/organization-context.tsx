@@ -42,14 +42,14 @@ export function OrganizationProvider({ children }: { children: ReactNode }) {
   const [organizations, setOrganizations] = useState<Organization[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
-  // Fetch user's organizations on mount
+  // Fetch user's organizations on mount and when user changes (not on every session change)
   useEffect(() => {
-    if (session?.user && !sessionLoading) {
+    if (session?.user && !sessionLoading && organizations.length === 0) {
       loadOrganizations();
     } else if (!sessionLoading && !session?.user) {
       setIsLoading(false);
     }
-  }, [session, sessionLoading]);
+  }, [session?.user?.id, sessionLoading]);
 
   const loadOrganizations = async () => {
     setIsLoading(true);
@@ -86,6 +86,7 @@ export function OrganizationProvider({ children }: { children: ReactNode }) {
   };
 
   const setActiveOrganization = async (orgId: string) => {
+    setIsLoading(true);
     try {
       const { error } = await authClient.organization.setActive({
         organizationId: orgId,
@@ -97,6 +98,10 @@ export function OrganizationProvider({ children }: { children: ReactNode }) {
 
       const org = organizations.find((o: Organization) => o.id === orgId);
       setActiveOrgState(org || null);
+      
+      // Refresh session to get updated activeOrganizationId, but skip org reload
+      await authClient.getSession();
+      
       toast.success(`Switched to ${org?.name}`);
     } catch (error: any) {
       logger.error(
@@ -110,6 +115,8 @@ export function OrganizationProvider({ children }: { children: ReactNode }) {
       );
       toast.error(error.message || "Failed to switch workspace");
       throw error;
+    } finally {
+      setIsLoading(false);
     }
   };
 

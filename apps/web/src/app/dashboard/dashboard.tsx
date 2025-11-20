@@ -73,17 +73,17 @@ export default function Dashboard() {
   if (!activeOrganization && !orgLoading) {
     return (
       <div className="flex items-center justify-center min-h-[400px]">
-        <Card className="max-w-md">
+        <Card className="max-w-md w-full">
           <CardHeader>
-            <CardTitle>No Workspace Selected</CardTitle>
+            <CardTitle>No Brand Selected</CardTitle>
             <CardDescription>
-              Create your first workspace to get started
+              Create your first brand to get started
             </CardDescription>
           </CardHeader>
           <CardContent>
-            <Button onClick={() => router.push("/welcome")} className="w-full">
+            <Button onClick={() => router.push("/brand-setup")} className="w-full">
               <Plus className="mr-2 h-4 w-4" />
-              Create Workspace
+              Create Brand
             </Button>
           </CardContent>
         </Card>
@@ -97,13 +97,14 @@ export default function Dashboard() {
 
   return (
     <div className="space-y-6 relative">
-      {orgLoading && <EdgeRayLoader />}
 
       <h1 className="sr-only">{activeOrganization?.name}</h1>
 
       {/* Brand Kit Setup Call-to-Action */}
-      {!hasBrandKit && (
-      <BrandKitSetupBanner />
+      {!orgLoading && !hasBrandKit && (
+        <div className="animate-in fade-in slide-in-from-top-4 duration-500">
+          <BrandKitSetupBanner />
+        </div>
       )}
 
       {/* Stats */}
@@ -227,8 +228,8 @@ export default function Dashboard() {
               <p>Create your first template to get started!</p>
             </div>
             <Button onClick={() => router.push("/template/new")}>
-              <Plus className="mr-2 h-4 w-4" />
               New Template
+              <Plus className="h-4 w-4" />
             </Button>
           </CardContent>
         </Card>

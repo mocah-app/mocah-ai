@@ -29,8 +29,8 @@ export interface EmailTheme {
 
 export const defaultTheme: EmailTheme = {
   colors: {
-    primary: "#2563eb",
-    primaryHover: "#1d4ed8",
+    primary: "#010309",
+    primaryHover: "#010309",
     background: "#ffffff",
     surface: "#f8f9fa",
     text: "#333333",

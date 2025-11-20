@@ -23,6 +23,8 @@ export function ResetPasswordForm({
 }: ResetPasswordFormProps) {
   const router = useRouter();
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
 
   const form = useForm({
     defaultValues: {
@@ -37,10 +39,16 @@ export function ResetPasswordForm({
 
       setIsSubmitting(true);
       try {
-        await authClient.resetPassword({
+        const { error } = await authClient.resetPassword({
           newPassword: value.password,
           token: token,
         });
+
+        if (error) {
+          toast.error(error.message || "Failed to reset password");
+          return;
+        }
+
         onSuccess();
         toast.success("Password reset successful!");
         setTimeout(() => {
@@ -79,6 +87,8 @@ export function ResetPasswordForm({
                 label="New Password"
                 type="password"
                 placeholder="Enter your new password"
+                showPassword={showPassword}
+                onTogglePassword={() => setShowPassword(!showPassword)}
               />
             )}
           </form.Field>
@@ -92,6 +102,8 @@ export function ResetPasswordForm({
                 label="Confirm New Password"
                 type="password"
                 placeholder="Confirm your new password"
+                showPassword={showConfirmPassword}
+                onTogglePassword={() => setShowConfirmPassword(!showConfirmPassword)}
               />
             )}
           </form.Field>

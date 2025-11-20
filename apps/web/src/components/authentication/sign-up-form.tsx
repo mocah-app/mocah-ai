@@ -15,6 +15,7 @@ import { useState } from "react";
 import { VerificationEmailSent } from "./verification-email-sent";
 import EdgeRayLoader from "../EdgeLoader";
 import MocahIcon from "../mocah-brand/MocahIcon";
+import { Eye, EyeOff } from "lucide-react";
 
 const autofillStyles =
   "[&:-webkit-autofill]:bg-white [&:-webkit-autofill]:shadow-[0_0_0_30px_white_inset] [&:-webkit-autofill]:[-webkit-text-fill-color:black] [&:-webkit-autofill]:text-black dark:[&:-webkit-autofill]:bg-gray-900 dark:[&:-webkit-autofill]:shadow-[0_0_0_30px_rgb(17_24_39)_inset] dark:[&:-webkit-autofill]:[-webkit-text-fill-color:white] dark:[&:-webkit-autofill]:text-white";
@@ -26,6 +27,7 @@ export default function SignUpForm() {
   const [userPassword, setUserPassword] = useState("");
   const [isResending, setIsResending] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
   const form = useForm({
     defaultValues: {
       email: "",
@@ -39,7 +41,7 @@ export default function SignUpForm() {
             email: value.email,
             password: value.password,
             name: value.email.split("@")[0] || "User",
-            callbackURL: "/welcome", // Redirect to welcome page after email verification
+            callbackURL: "/brand-setup", // Redirect to brand setup page after email verification
           },
           {
             onSuccess: () => {
@@ -77,7 +79,7 @@ export default function SignUpForm() {
           email: userEmail,
           password: userPassword,
           name: userEmail.split("@")[0] || "User",
-          callbackURL: "/welcome", // Redirect to welcome page after email verification
+          callbackURL: "/brand-setup", // Redirect to brand setup page after email verification
         },
         {
           onSuccess: () => {
@@ -98,7 +100,7 @@ export default function SignUpForm() {
   const handleGoogleSignUp = async () => {
     await authClient.signIn.social({
       provider: "google",
-      callbackURL: "/welcome", // Redirect to onboarding
+      callbackURL: "/brand-setup", // Redirect to onboarding
     });
   };
 
@@ -168,16 +170,32 @@ export default function SignUpForm() {
             {(field) => (
               <div className="space-y-2">
                 <Label htmlFor={field.name}>Password</Label>
-                <Input
-                  id={field.name}
-                  name={field.name}
-                  type="password"
-                  placeholder="Enter your password"
-                  value={field.state.value}
-                  onBlur={field.handleBlur}
-                  onChange={(e) => field.handleChange(e.target.value)}
-                  className={cn(autofillStyles)}
-                />
+                <div className="relative">
+                  <Input
+                    id={field.name}
+                    name={field.name}
+                    type={showPassword ? "text" : "password"}
+                    placeholder="Enter your password"
+                    value={field.state.value}
+                    onBlur={field.handleBlur}
+                    onChange={(e) => field.handleChange(e.target.value)}
+                    className={cn(autofillStyles, "pr-10")}
+                  />
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon"
+                    onClick={() => setShowPassword(!showPassword)}
+                    className="absolute right-1 top-1/2 -translate-y-1/2 h-7 w-7"
+                    aria-label={showPassword ? "Hide password" : "Show password"}
+                  >
+                    {showPassword ? (
+                      <EyeOff className="size-4" />
+                    ) : (
+                      <Eye className="size-4" />
+                    )}
+                  </Button>
+                </div>
                 {field.state.meta.errors.map((error) => (
                   <p key={error?.message} className="text-sm text-destructive">
                     {error?.message}

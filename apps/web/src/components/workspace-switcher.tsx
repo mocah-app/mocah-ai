@@ -40,7 +40,7 @@ export function WorkspaceSwitcher() {
     return (
       <Button
         variant="outline"
-        onClick={() => router.push("/welcome")}
+        onClick={() => router.push("/brand-setup")}
         className="w-[200px]"
       >
         <Plus className="mr-2 h-4 w-4" />
