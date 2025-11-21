@@ -4,8 +4,20 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { BrandSettingsForm } from '@/components/settings/brand-settings-form';
 import { Palette, User, Bell, Shield } from 'lucide-react';
+import { useAuth } from '@/lib/use-auth';
+import MocahLoadingIcon from '@/components/mocah-brand/MocahLoadingIcon';
 
 export default function SettingsPage() {
+  const { isLoading, user } = useAuth();
+
+  if (isLoading) {
+    return (
+      <div className="flex h-full items-center justify-center">
+        <MocahLoadingIcon isLoading={true} />
+      </div>
+    );
+  }
+
   return (
     <div className="flex flex-1 flex-col h-full gap-4 p-1 w-full">
       <div className="flex flex-1 flex-col gap-4 p-4 border border-border">
