@@ -44,9 +44,13 @@ export function OrganizationProvider({ children }: { children: ReactNode }) {
 
   // Fetch user's organizations on mount and when user changes (not on every session change)
   useEffect(() => {
-    if (session?.user && !sessionLoading && organizations.length === 0) {
+    if (session?.user && !sessionLoading) {
+      // Always reload organizations when user changes (including login/logout/switch)
       loadOrganizations();
     } else if (!sessionLoading && !session?.user) {
+      // Clear state when logged out
+      setActiveOrgState(null);
+      setOrganizations([]);
       setIsLoading(false);
     }
   }, [session?.user?.id, sessionLoading]);
@@ -71,8 +75,32 @@ export function OrganizationProvider({ children }: { children: ReactNode }) {
         );
         setActiveOrgState((activeOrg as Organization) || null);
       } else if (orgs && orgs.length > 0) {
-        // Auto-set first org as active if none set (silent mode)
-        await setActiveOrganization(orgs[0].id, true);
+        // Auto-set first org as active if none set
+        // Use try/catch to handle potential errors without breaking the flow
+        try {
+          await authClient.organization.setActive({
+            organizationId: orgs[0].id,
+          });
+          setActiveOrgState(orgs[0] as Organization);
+          // Refresh session in background to sync activeOrganizationId
+          authClient.getSession().catch((err) => {
+            logger.error("Failed to refresh session after auto-setting org", {
+              component: "OrganizationContext",
+              action: "loadOrganizations",
+            }, err);
+          });
+        } catch (error) {
+          logger.error(
+            "Failed to auto-set first organization",
+            {
+              component: "OrganizationContext",
+              action: "loadOrganizations",
+            },
+            error as Error
+          );
+          // Still set it locally even if backend call fails
+          setActiveOrgState(orgs[0] as Organization);
+        }
       }
     } catch (error) {
       logger.error(

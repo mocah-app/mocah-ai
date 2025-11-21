@@ -36,7 +36,10 @@ export function WorkspaceSwitcher() {
     );
   }
 
-  if (!activeOrganization && organizations.length === 0) {
+  // Show first organization if we have orgs but no active one set yet (during loading)
+  const displayOrg = activeOrganization || (organizations.length > 0 ? organizations[0] : null);
+
+  if (!displayOrg && organizations.length === 0) {
     return (
       <Button
         variant="outline"
@@ -51,9 +54,11 @@ export function WorkspaceSwitcher() {
 
   logger.debug("Active organization state", {
     component: "WorkspaceSwitcher",
-    organizationId: activeOrganization?.id,
-    organizationName: activeOrganization?.name,
-    hasLogo: !!activeOrganization?.logo,
+    organizationId: displayOrg?.id,
+    organizationName: displayOrg?.name,
+    hasLogo: !!displayOrg?.logo,
+    isActiveOrg: !!activeOrganization,
+    isFallback: !activeOrganization && !!displayOrg,
   });
 
   return (
@@ -62,12 +67,12 @@ export function WorkspaceSwitcher() {
         <Button variant="outline" className="w-[200px] justify-between">
           <span className="truncate flex items-center gap-2">
             <Avatar className="size-4">
-              <AvatarImage src={activeOrganization?.logo || undefined} />
+              <AvatarImage src={displayOrg?.logo || undefined} />
               <AvatarFallback>
-                {activeOrganization?.name?.charAt(0)}
+                {displayOrg?.name?.charAt(0)}
               </AvatarFallback>
             </Avatar>
-            {activeOrganization?.name || "Select Workspace"}
+            {displayOrg?.name || "Select Workspace"}
           </span>
           <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
         </Button>
@@ -81,7 +86,7 @@ export function WorkspaceSwitcher() {
             key={org.id}
             onClick={() => setActiveOrganization(org.id)}
             className={`cursor-pointer flex items-center justify-between gap-1 ${
-              activeOrganization?.id === org.id ? "border-primary border" : ""
+              displayOrg?.id === org.id ? "border-primary border" : ""
             }`}
           >
             <div className="flex items-center gap-2">
@@ -93,7 +98,7 @@ export function WorkspaceSwitcher() {
               )}
               <span className="truncate">{org.name}</span>
             </div>
-            {activeOrganization?.id === org.id && (
+            {displayOrg?.id === org.id && (
               <Check className="ml-2 h-4 w-4" />
             )}
           </DropdownMenuItem>
