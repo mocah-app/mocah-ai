@@ -15,21 +15,23 @@
     "build": "tsdown"
   },
   "devDependencies": {
-    "tsdown": "catalog:",
-    "@mocah/config": "workspace:*"
+    "@mocah/config": "workspace:*",
+    "tsdown": "catalog:"
   },
   "peerDependencies": {
     "typescript": "^5"
   },
   "dependencies": {
-    "@trpc/server": "catalog:",
-    "@trpc/client": "catalog:",
-    "next": "catalog:",
-    "dotenv": "catalog:",
-    "zod": "catalog:",
+    "@aws-sdk/client-s3": "catalog:",
     "@mocah/auth": "workspace:*",
     "@mocah/db": "workspace:*",
     "@mocah/shared": "workspace:*",
-    "@aws-sdk/client-s3": "catalog:"
+    "@openrouter/ai-sdk-provider": "^1.2.5",
+    "@trpc/client": "catalog:",
+    "@trpc/server": "catalog:",
+    "ai": "^5.0.98",
+    "dotenv": "catalog:",
+    "next": "catalog:",
+    "zod": "catalog:"
   }
 }

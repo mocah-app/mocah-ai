@@ -1,17 +1,62 @@
 "use client";
+
+import React, { useEffect } from "react";
+import { CanvasProvider } from "./components/providers/CanvasProvider";
+import { TemplateProvider } from "./components/providers/TemplateProvider";
+import { EditorModeProvider } from "./components/providers/EditorModeProvider";
+import { InfiniteCanvas } from "./components/canvas/InfiniteCanvas";
+import { useCanvas } from "./components/providers/CanvasProvider";
 import { useParams } from "next/navigation";
 
-const TemplatePage = () => {
+function EditorContent() {
+  const { actions } = useCanvas();
   const params = useParams();
+  const templateId = params.id as string;
+
+  // Initialize with a sample template node
+  useEffect(() => {
+    const initialNode = {
+      id: "template-v1",
+      type: "template",
+      position: { x: 250, y: 100 },
+      data: {
+        id: templateId,
+        version: 1,
+        name: "Template V1",
+        isCurrent: true,
+        template: {
+          subject: "Welcome to Mocah!",
+          previewText: "Get started with AI-powered email templates",
+          content: "",
+        },
+        metadata: {
+          createdAt: new Date(),
+          updatedAt: new Date(),
+        },
+      },
+    };
+
+    actions.addNode(initialNode);
+  }, [templateId, actions]);
+
   return (
-    <div
-      className="flex flex-1 flex-col min-h-dvh w-screen bg-dot"
-    >
-      <div className="flex items-center justify-center bg-background/40 dark:bg-background/85 flex-1 flex-col gap-4 p-4 border border-border">
-        <p className="text-2xl font-bold">Template Canvas {params.id}</p>
-      </div>
+    <div className="h-screen w-full">
+      <InfiniteCanvas />
     </div>
   );
-};
+}
 
-export default TemplatePage;
+export default function TemplatePage() {
+  const params = useParams();
+  const templateId = params.id as string;
+
+  return (
+    <CanvasProvider>
+      <TemplateProvider templateId={templateId}>
+        <EditorModeProvider>
+          <EditorContent />
+        </EditorModeProvider>
+      </TemplateProvider>
+    </CanvasProvider>
+  );
+}
