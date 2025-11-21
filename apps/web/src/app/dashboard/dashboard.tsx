@@ -68,9 +68,12 @@ const TemplateList = () => {
 };
 export default function Dashboard() {
   const router = useRouter();
-  const { activeOrganization, isLoading: orgLoading } = useOrganization();
+  const { activeOrganization, organizations, isLoading: orgLoading } = useOrganization();
 
-  if (!activeOrganization && !orgLoading) {
+  // Show first organization if we have orgs but no active one set yet
+  const displayOrg = activeOrganization || (organizations.length > 0 ? organizations[0] : null);
+
+  if (!displayOrg && !orgLoading) {
     return (
       <div className="flex items-center justify-center min-h-[400px]">
         <Card className="max-w-md w-full">
@@ -92,13 +95,13 @@ export default function Dashboard() {
   }
 
   // Check if brand kit is set up
-  const hasBrandKit = activeOrganization?.metadata?.setupCompleted;
+  const hasBrandKit = displayOrg?.metadata?.setupCompleted;
   const templateCount = 0; // TODO: Get from tRPC
 
   return (
     <div className="space-y-6 relative">
 
-      <h1 className="sr-only">{activeOrganization?.name}</h1>
+      <h1 className="sr-only">{displayOrg?.name}</h1>
 
       {/* Brand Kit Setup Call-to-Action */}
       {!orgLoading && !hasBrandKit && (

@@ -13,6 +13,7 @@ import Link from "next/link";
 import Loader from "./loader";
 import { HelpCircle, Settings, User } from "lucide-react";
 import { ModeToggle } from "./mode-toggle";
+import { queryClient } from "@/utils/trpc";
 
 export default function UserMenu() {
   const router = useRouter();
@@ -58,8 +59,11 @@ export default function UserMenu() {
           <Button
             variant="destructive"
             className="w-full"
-            onClick={() => {
-              authClient.signOut({
+            onClick={async () => {
+              // Clear all cached queries to prevent stale data on next login
+              queryClient.clear();
+              
+              await authClient.signOut({
                 fetchOptions: {
                   onSuccess: () => {
                     router.push("/");

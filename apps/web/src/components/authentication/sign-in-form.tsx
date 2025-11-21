@@ -36,22 +36,28 @@ function SignInFormContent({ callbackUrl }: { callbackUrl: string }) {
     onSubmit: async ({ value }) => {
       setIsSubmitting(true);
       try {
-        await authClient.signIn.email(
+        const { data, error } = await authClient.signIn.email(
           {
             email: value.email,
             password: value.password,
+            callbackURL: callbackUrl, // Use Better Auth's built-in redirect
           },
           {
             onSuccess: () => {
-              router.push(callbackUrl as Route);
               toast.success("Sign in successful");
             },
             onError: (error) => {
               toast.error(error.error.message || error.error.statusText);
+              setIsSubmitting(false);
             },
           }
         );
-      } finally {
+        
+        // If there's an error, don't redirect
+        if (error) {
+          setIsSubmitting(false);
+        }
+      } catch (error) {
         setIsSubmitting(false);
       }
     },
