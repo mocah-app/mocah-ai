@@ -16,16 +16,15 @@ import {
 } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
 import { Upload, Loader2, X } from "lucide-react";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import { cn } from "@/lib/utils";
 import type { Organization } from "@/types/organization";
+import Loader from "../loader";
 
 export const brandFormSchema = z.object({
   brandName: z
@@ -95,8 +94,8 @@ export function BrandForm({
   onSubmit,
   onFormChange,
   isLoading = false,
-  submitButtonText = "Save Changes",
-  submitButtonLoadingText = "Saving...",
+  submitButtonText = "Update Brand",
+  submitButtonLoadingText = "Updating...",
   showSecondaryButton = false,
   secondaryButtonText = "Reset",
   secondaryButtonVariant = "outline",
@@ -121,22 +120,18 @@ export function BrandForm({
   const form = useForm<BrandFormValues>({
     resolver: zodResolver(brandFormSchema),
     defaultValues,
+    values: defaultValues as BrandFormValues, // Use values prop to update form when defaultValues change
   });
 
-  // Update form when defaultValues or formKey changes (for settings page prefill)
+  // Update logo preview and reset form when defaultValues or formKey changes
   useEffect(() => {
-    form.reset(defaultValues);
     setLogoPreview(defaultValues.logo || "");
     setLogoFile(null);
-  }, [
-    formKey,
-    defaultValues.brandName,
-    defaultValues.logo,
-    defaultValues.fontFamily,
-    defaultValues.brandVoice,
-    defaultValues.primaryColor,
-    defaultValues.secondaryColor,
-  ]);
+    // Reset form to defaultValues when formKey changes (triggered by reset button)
+    if (formKey) {
+      form.reset(defaultValues);
+    }
+  }, [defaultValues, formKey, form]);
 
   // Watch form values for live preview
   const watchedValues = form.watch();
@@ -232,10 +227,10 @@ export function BrandForm({
           <FormItem className="border-b pb-4 px-4">
             <FormLabel>Logo {!showAvatar && "(Optional)"}</FormLabel>
             <FormControl>
-              <div className="space-y-4">
+              <div className="flex items-center justify-between gap-4 border rounded-lg">
                 {logoPreview && showAvatar && (
-                  <div className="flex items-center gap-4 p-4 border rounded-lg">
-                    <Avatar className="h-16 w-16">
+                  <div className="flex items-center gap-4 border-r pr-4 p-2">
+                    <Avatar className="h-12 w-12">
                       <AvatarImage src={logoPreview} />
                       <AvatarFallback>
                         {organizationName?.charAt(0) ||
@@ -244,10 +239,10 @@ export function BrandForm({
                       </AvatarFallback>
                     </Avatar>
                     <div className="flex-1">
-                      <p className="text-sm font-medium">Current Logo</p>
+                      <p className="text-xs text-muted-foreground">Current Logo</p>
                       {logoFile && (
-                        <p className="text-xs text-muted-foreground">
-                          {logoFile.name}
+                        <p className="text-sm truncate text-foreground font-medium">
+                          {logoFile.name.length > 20 ? logoFile.name.slice(0, 20) + "..." : logoFile.name}
                         </p>
                       )}
                     </div>
@@ -280,7 +275,7 @@ export function BrandForm({
                     </Button>
                   </div>
                 )}
-                <div className="flex items-center gap-4">
+                <div className="flex items-center gap-4 p-2">
                   <Button
                     type="button"
                     variant="outline"
@@ -290,7 +285,7 @@ export function BrandForm({
                     disabled={isFormDisabled}
                   >
                     <Upload className="mr-2 h-4 w-4" />
-                    {logoPreview ? "Change Logo" : "Upload Logo"}
+                    {logoPreview ? "Change" : "Upload Logo"}
                   </Button>
                   {!showAvatar && logoFile && (
                     <span className="text-sm text-muted-foreground">
@@ -385,37 +380,64 @@ export function BrandForm({
               control={form.control}
               name="fontFamily"
               render={({ field }) => (
-                <FormItem className="">
-                  <div className="flex items-center gap-2">
-                    <FormLabel>Font Family *</FormLabel>
-                    <span className="text-xs text-muted-foreground">
-                      Current:{" "}
-                      {field.value?.split(",")[0] ||
-                        defaultValues.fontFamily?.split(",")[0] ||
-                        "Arial"}
-                    </span>
-                  </div>
-                  <Select
-                    onValueChange={field.onChange}
-                    value={field.value}
-                    disabled={isLoading}
-                  >
-                    <FormControl>
-                      <SelectTrigger className="w-full">
-                        <SelectValue placeholder="Change font" />
-                      </SelectTrigger>
-                    </FormControl>
-                    <SelectContent>
-                      {EMAIL_SAFE_FONTS.map((font) => (
-                        <SelectItem key={font} value={font}>
-                          <span style={{ fontFamily: font }}>
-                            {font.split(",")[0]}
-                          </span>
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  <FormDescription className="sr-only">
+                <FormItem>
+                  <FormLabel>Font Family *</FormLabel>
+                  <FormControl>
+                    <div className="space-y-4">
+                      {field.value && (
+                        <div className="flex items-center gap-3 p-3 border rounded-lg bg-muted/50">
+                          <div className="flex-1">
+                            <p
+                              className="text-lg font-bold"
+                              style={{ fontFamily: field.value }}
+                            >
+                              {field.value.split(",")[0]}
+                            </p>
+                            
+                          </div>
+                          <Popover>
+                            <PopoverTrigger asChild>
+                              <Button
+                                type="button"
+                                variant="outline"
+                                size="sm"
+                                disabled={isFormDisabled}
+                              >
+                                Change
+                              </Button>
+                            </PopoverTrigger>
+                            <PopoverContent className="w-80" align="end">
+                              <div className="space-y-2">
+                                <h4 className="font-medium text-sm">
+                                  Select Font
+                                </h4>
+                                <div className="space-y-1 max-h-[300px] overflow-y-auto">
+                                  {EMAIL_SAFE_FONTS.map((font) => (
+                                    <Button
+                                      key={font}
+                                      type="button"
+                                      variant={
+                                        field.value === font
+                                          ? "secondary"
+                                          : "ghost"
+                                      }
+                                      className="w-full justify-start"
+                                      onClick={() => field.onChange(font)}
+                                    >
+                                      <span style={{ fontFamily: font }}>
+                                        {font.split(",")[0]}
+                                      </span>
+                                    </Button>
+                                  ))}
+                                </div>
+                              </div>
+                            </PopoverContent>
+                          </Popover>
+                        </div>
+                      )}
+                    </div>
+                  </FormControl>
+                  <FormDescription className="text-xs text-pretty text-muted-foreground">
                     Email-safe fonts that work across all email clients
                   </FormDescription>
                   <FormMessage />
@@ -427,72 +449,101 @@ export function BrandForm({
             <FormField
               control={form.control}
               name="brandVoice"
-              render={({ field }) => (
-                <FormItem className="">
-                  <div className="flex items-center gap-2">
+              render={({ field }) => {
+                const voiceOptions = [
+                  {
+                    value: "professional",
+                    label: "Professional",
+                    description: "Formal and authoritative",
+                  },
+                  {
+                    value: "casual",
+                    label: "Casual",
+                    description: "Friendly and conversational",
+                  },
+                  {
+                    value: "playful",
+                    label: "Playful",
+                    description: "Fun and energetic",
+                  },
+                  {
+                    value: "luxury",
+                    label: "Luxury",
+                    description: "Elegant and sophisticated",
+                  },
+                ];
+                const currentVoice = voiceOptions.find(
+                  (v) => v.value === field.value
+                );
+
+                return (
+                  <FormItem>
                     <FormLabel>Brand Voice *</FormLabel>
-                    <span className="text-xs text-muted-foreground">
-                      Current:{" "}
-                      {field.value
-                        ? field.value.charAt(0).toUpperCase() +
-                          field.value.slice(1)
-                        : defaultValues.brandVoice
-                        ? defaultValues.brandVoice.charAt(0).toUpperCase() +
-                          defaultValues.brandVoice.slice(1)
-                        : "Professional"}
-                    </span>
-                  </div>
-                  <Select
-                    onValueChange={field.onChange}
-                    value={field.value}
-                    disabled={isLoading}
-                  >
                     <FormControl>
-                      <SelectTrigger className="w-full">
-                        <SelectValue placeholder="Change brand voice" />
-                      </SelectTrigger>
+                      <div className="space-y-4">
+                        {field.value && currentVoice && (
+                          <div className="flex items-center gap-3 p-3 border rounded-lg bg-muted/50">
+                            <div className="flex-1">
+                              <p className="text-lg font-bold">
+                                {currentVoice.label}
+                              </p>
+                            </div>
+                            <Popover>
+                              <PopoverTrigger asChild>
+                                <Button
+                                  type="button"
+                                  variant="outline"
+                                  size="sm"
+                                  disabled={isFormDisabled}
+                                >
+                                  Change
+                                </Button>
+                              </PopoverTrigger>
+                              <PopoverContent className="w-80" align="end">
+                                <div className="space-y-2">
+                                  <h4 className="font-medium text-sm">
+                                    Select Brand Voice
+                                  </h4>
+                                  <div className="space-y-1">
+                                    {voiceOptions.map((voice) => (
+                                      <Button
+                                        key={voice.value}
+                                        type="button"
+                                        variant={
+                                          field.value === voice.value
+                                            ? "secondary"
+                                            : "ghost"
+                                        }
+                                        className="w-full justify-start h-auto py-3"
+                                        onClick={() =>
+                                          field.onChange(voice.value)
+                                        }
+                                      >
+                                        <div className="text-left">
+                                          <div className="font-semibold">
+                                            {voice.label}
+                                          </div>
+                                          <div className="text-xs text-pretty text-muted-foreground">
+                                            {voice.description}
+                                          </div>
+                                        </div>
+                                      </Button>
+                                    ))}
+                                  </div>
+                                </div>
+                              </PopoverContent>
+                            </Popover>
+                          </div>
+                        )}
+                      </div>
                     </FormControl>
-                    <SelectContent>
-                      <SelectItem value="professional">
-                        <div className="space-y-1">
-                          <div className="font-semibold">Professional</div>
-                          <div className="text-xs text-muted-foreground">
-                            Formal and authoritative
-                          </div>
-                        </div>
-                      </SelectItem>
-                      <SelectItem value="casual">
-                        <div className="space-y-1">
-                          <div className="font-semibold">Casual</div>
-                          <div className="text-xs text-muted-foreground">
-                            Friendly and conversational
-                          </div>
-                        </div>
-                      </SelectItem>
-                      <SelectItem value="playful">
-                        <div className="space-y-1">
-                          <div className="font-semibold">Playful</div>
-                          <div className="text-xs text-muted-foreground">
-                            Fun and energetic
-                          </div>
-                        </div>
-                      </SelectItem>
-                      <SelectItem value="luxury">
-                        <div className="space-y-1">
-                          <div className="font-semibold">Luxury</div>
-                          <div className="text-xs text-muted-foreground">
-                            Elegant and sophisticated
-                          </div>
-                        </div>
-                      </SelectItem>
-                    </SelectContent>
-                  </Select>
-                  <FormDescription className="sr-only">
-                    AI will match this tone when generating copy
-                  </FormDescription>
-                  <FormMessage />
-                </FormItem>
-              )}
+                    <FormDescription className="text-xs text-pretty text-muted-foreground">
+                      AI will match this tone when generating copy
+                    </FormDescription>
+                    <FormMessage />
+                  </FormItem>
+                );
+              }}
             />
           </div>
 
@@ -512,7 +563,7 @@ export function BrandForm({
             <Button type="submit" disabled={isLoading} className="flex-1">
               {isLoading ? (
                 <>
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  <Loader />
                   {submitButtonLoadingText}
                 </>
               ) : (

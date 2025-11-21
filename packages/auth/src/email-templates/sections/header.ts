@@ -19,7 +19,7 @@ export function createEmailHeader({ appName, theme, logoUrl }: HeaderProps): str
       cellpadding="0" 
       border="0" 
       width="100%"
-      style="margin-bottom: ${t.spacing.md};"
+      style="margin-bottom: ${t.spacing.sm};"
     >
       <tr>
         <td align="center" style="padding: 0;">
@@ -28,7 +28,7 @@ export function createEmailHeader({ appName, theme, logoUrl }: HeaderProps): str
             alt="${appName} Logo" 
             class="logo-img"
             style="
-              max-width: 200px;
+              max-width: 150px;
               width: auto;
               height: auto;
               display: block;
@@ -40,6 +40,30 @@ export function createEmailHeader({ appName, theme, logoUrl }: HeaderProps): str
     </table>
   ` : "";
   
+  const appNameSection = !logoUrl ? `
+    <table 
+      role="presentation" 
+      cellspacing="0" 
+      cellpadding="0" 
+      border="0"
+      style="width: 100%;"
+    >
+      <tr>
+        <td align="center" style="padding: 0;">
+          <h1 style="
+            color: ${t.colors.primary};
+            font-family: ${t.fonts.primary};
+            font-size: 20px;
+            font-weight: 600;
+            margin: 0;
+            padding: 0;
+            line-height: 1.2;
+          ">${appName}</h1>
+        </td>
+      </tr>
+    </table>
+  ` : "";
+
   return `
     <table 
       role="presentation" 
@@ -49,35 +73,14 @@ export function createEmailHeader({ appName, theme, logoUrl }: HeaderProps): str
       width="100%"
       class="email-header"
       style="
-        border-bottom: 1px solid ${t.colors.border};
-        padding-bottom: ${t.spacing.xl};
-        margin-bottom: ${t.spacing.xl};
+        padding-bottom: ${t.spacing.md};
+        margin-bottom: ${t.spacing.md};
       "
     >
       <tr>
         <td align="center" style="padding: 0;">
           ${logoSection}
-          <table 
-            role="presentation" 
-            cellspacing="0" 
-            cellpadding="0" 
-            border="0"
-            style="width: 100%;"
-          >
-            <tr>
-              <td align="center" style="padding: 0;">
-                <h1 style="
-                  color: ${t.colors.primary};
-                  font-family: ${t.fonts.primary};
-                  font-size: 24px;
-                  font-weight: 600;
-                  margin: 0;
-                  padding: 0;
-                  line-height: 1.2;
-                ">${appName}</h1>
-              </td>
-            </tr>
-          </table>
+          ${appNameSection}
         </td>
       </tr>
     </table>

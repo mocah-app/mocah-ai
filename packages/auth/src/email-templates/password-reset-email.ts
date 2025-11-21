@@ -34,16 +34,16 @@ export function createPasswordResetEmail({
       cellpadding="0" 
       border="0" 
       width="100%"
-      style="margin-top: ${theme.spacing.xl};"
+      style="margin-top: ${theme.spacing.md};"
     >
       <tr>
         <td align="center" style="padding: 0;">
           <p style="
-            font-size: 12px;
+            font-size: 11px;
             color: ${theme.colors.textMuted};
             font-family: ${theme.fonts.primary};
             margin: 0;
-            line-height: 1.5;
+            line-height: 1.4;
           ">
             This link will expire in ${expiresInHours} ${
     expiresInHours === 1 ? "hour" : "hours"

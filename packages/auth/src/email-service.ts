@@ -18,16 +18,15 @@ const getResendClient = () => {
   return resend;
 };
 
-const FROM_EMAIL = `Mocah <${process.env.RESEND_FROM_EMAIL}>` || ``;
-const APP_NAME = process.env.APP_NAME || "Mocah";
-const BASE_URL = process.env.NEXT_PUBLIC_APP_URL || process.env.BASE_URL || "";
+const FROM_EMAIL = `Mocah AI <${process.env.RESEND_FROM_EMAIL}>` || ``;
+const APP_NAME = process.env.APP_NAME || "Mocah AI";
 
 /**
  * Get the logo URL for email templates
  * Uses the dark logo by default, can be overridden via environment variable
  */
 const getLogoUrl = (): string | undefined => {
-  const logoPath = process.env.EMAIL_LOGO_URL || `${BASE_URL}/mocah-logo-dark.svg`;
+  const logoPath = process.env.EMAIL_LOGO_URL || `https://nmh1ggfgcamqailu.public.blob.vercel-storage.com/mocah-logo.png`;
   return logoPath;
 };
 

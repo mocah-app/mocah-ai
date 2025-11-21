@@ -19,7 +19,16 @@ export function BrandSettingsForm() {
   const { activeOrganization, refreshOrganizations } = useOrganization();
   const [isLoading, setIsLoading] = useState(false);
   const [formData, setFormData] = useState<BrandFormData | null>(null);
+  const [resetCounter, setResetCounter] = useState(0);
   const [defaultValues, setDefaultValues] = useState<Partial<BrandFormValues>>({
+    brandName: "",
+    primaryColor: "#3B82F6",
+    secondaryColor: "#10B981",
+    fontFamily: "Arial, sans-serif",
+    brandVoice: "professional",
+    logo: "",
+  });
+  const [originalValues, setOriginalValues] = useState<Partial<BrandFormValues>>({
     brandName: "",
     primaryColor: "#3B82F6",
     secondaryColor: "#10B981",
@@ -34,14 +43,17 @@ export function BrandSettingsForm() {
       // Prefer brandKit data over metadata (brandKit is the source of truth)
       const brandKit = activeOrganization.brandKit;
       
-      setDefaultValues({
+      const values = {
         brandName: activeOrganization.name,
         primaryColor: brandKit?.primaryColor || "#3B82F6",
         secondaryColor: brandKit?.secondaryColor || "#10B981",
         fontFamily: brandKit?.fontFamily || "Arial, sans-serif",
         brandVoice: (brandKit?.brandVoice as any) || "professional",
         logo: brandKit?.logo || activeOrganization.logo || "",
-      });
+      };
+      
+      setDefaultValues(values);
+      setOriginalValues(values);
     }
   }, [
     activeOrganization?.id,
@@ -197,6 +209,16 @@ export function BrandSettingsForm() {
         },
       });
 
+      // Update originalValues to the newly saved values
+      setOriginalValues({
+        brandName: values.brandName,
+        primaryColor: values.primaryColor,
+        secondaryColor: values.secondaryColor,
+        fontFamily: values.fontFamily,
+        brandVoice: values.brandVoice,
+        logo: logoUrl,
+      });
+
       // Refresh organizations list to get updated data
       await refreshOrganizations();
     } catch (error: any) {
@@ -222,16 +244,19 @@ export function BrandSettingsForm() {
         onSubmit={onSubmit}
         onFormChange={setFormData}
         isLoading={isLoading}
-        submitButtonText="Save Changes"
-        submitButtonLoadingText="Saving..."
+        submitButtonText="Update Brand"
+        submitButtonLoadingText="Updating..."
         showSecondaryButton={true}
         secondaryButtonText="Reset"
-        onSecondaryButtonClick={() => setDefaultValues({ ...defaultValues })}
+        onSecondaryButtonClick={() => {
+          setDefaultValues({ ...originalValues });
+          setResetCounter((prev) => prev + 1);
+        }}
         title="Brand Settings"
         description="Customize your brand identity."
         showAvatar={true}
         organizationName={activeOrganization?.name}
-        formKey={activeOrganization?.id}
+        formKey={`${activeOrganization?.id}-${resetCounter}`}
         activeOrganization={activeOrganization}
         disableWhenNoOrg={true}
       />
@@ -254,9 +279,9 @@ export function BrandSettingsForm() {
               defaultValues.fontFamily ||
               "Arial, sans-serif",
             logo:
-              formData?.logoPreview ||
-              activeOrganization?.logo ||
-              undefined,
+              formData !== null
+                ? formData.logoPreview || undefined
+                : activeOrganization?.logo || undefined,
             brandVoice:
               formData?.values.brandVoice ||
               defaultValues.brandVoice ||
