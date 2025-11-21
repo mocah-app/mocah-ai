@@ -23,16 +23,16 @@ export function createEmailFooter({
       cellpadding="0" 
       border="0" 
       width="100%"
-      style="margin-bottom: ${t.spacing.md};"
+      style="margin-bottom: ${t.spacing.sm};"
     >
       <tr>
         <td align="center" style="padding: 0;">
           <p style="
-            font-size: 12px;
+            font-size: 11px;
             color: ${t.colors.textMuted};
             font-family: ${t.fonts.primary};
             margin: 0;
-            line-height: 1.5;
+            line-height: 1.4;
           ">${additionalText}</p>
         </td>
       </tr>
@@ -47,8 +47,8 @@ export function createEmailFooter({
       border="0" 
       width="100%"
       style="
-        margin-top: ${t.spacing.xl};
-        padding-top: ${t.spacing.lg};
+        margin-top: ${t.spacing.lg};
+        padding-top: ${t.spacing.md};
         border-top: 1px solid ${t.colors.border};
       "
     >
@@ -65,11 +65,11 @@ export function createEmailFooter({
             <tr>
               <td align="center" style="padding: 0;">
                 <p style="
-                  font-size: 12px;
+                  font-size: 11px;
                   color: ${t.colors.textMuted};
                   font-family: ${t.fonts.primary};
                   margin: 0;
-                  line-height: 1.5;
+                  line-height: 1.4;
                 ">
                   © ${new Date().getFullYear()} ${appName}. All rights reserved.
                 </p>

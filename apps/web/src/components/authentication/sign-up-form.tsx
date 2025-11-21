@@ -24,7 +24,6 @@ export default function SignUpForm() {
   const { isPending } = authClient.useSession();
   const [emailSent, setEmailSent] = useState(false);
   const [userEmail, setUserEmail] = useState("");
-  const [userPassword, setUserPassword] = useState("");
   const [isResending, setIsResending] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
@@ -46,7 +45,6 @@ export default function SignUpForm() {
           {
             onSuccess: () => {
               setUserEmail(value.email);
-              setUserPassword(value.password);
               setEmailSent(true);
               toast.success(
                 "Verification email sent! Please check your inbox."
@@ -70,16 +68,14 @@ export default function SignUpForm() {
   });
 
   const handleResend = async () => {
-    if (!userEmail || !userPassword) return;
+    if (!userEmail) return;
 
     setIsResending(true);
     try {
-      await authClient.signUp.email(
+      await authClient.sendVerificationEmail(
         {
           email: userEmail,
-          password: userPassword,
-          name: userEmail.split("@")[0] || "User",
-          callbackURL: "/brand-setup", // Redirect to brand setup page after email verification
+          callbackURL: "/brand-setup",
         },
         {
           onSuccess: () => {

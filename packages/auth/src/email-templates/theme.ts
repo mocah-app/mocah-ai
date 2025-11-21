@@ -32,7 +32,7 @@ export const defaultTheme: EmailTheme = {
     primary: "#010309",
     primaryHover: "#010309",
     background: "#ffffff",
-    surface: "#f8f9fa",
+    surface: "#ffffff",
     text: "#333333",
     textSecondary: "#666666",
     textMuted: "#999999",
@@ -43,13 +43,13 @@ export const defaultTheme: EmailTheme = {
     fallback: ["Arial", "sans-serif"],
   },
   spacing: {
-    xs: "8px",
-    sm: "12px",
-    md: "16px",
-    lg: "20px",
-    xl: "30px",
+    xs: "4px",
+    sm: "8px",
+    md: "12px",
+    lg: "16px",
+    xl: "24px",
   },
-  borderRadius: "8px",
+  borderRadius: "4px",
   maxWidth: "600px",
 };
 

@@ -69,7 +69,7 @@ function BrandSetupContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const { data: session, isPending } = authClient.useSession();
-  const { createOrganization } = useOrganization();
+  const { createOrganization, refreshOrganizations } = useOrganization();
 
   // Get step from URL, default to 1
   const urlStep = searchParams.get("step");
@@ -329,6 +329,11 @@ function BrandSetupContent() {
         
         await trpc.organization.update.mutate(updateData);
         
+        // Refresh organizations if logo changed to update the UI
+        if (logoChanged) {
+          await refreshOrganizations(workspaceData.orgId);
+        }
+        
         // Ensure localStorage still has this org ID
         localStorage.setItem(ONBOARDING_ORG_KEY, workspaceData.orgId);
       } else {
@@ -357,6 +362,15 @@ function BrandSetupContent() {
           });
           logoUrl = uploadResult.url;
           setLogoUploaded(true);
+
+          // Update organization with the logo immediately so the UI can reflect it
+          await trpc.organization.update.mutate({
+            organizationId: newOrg.id,
+            logo: logoUrl,
+          });
+
+          // Refresh organizations to get the updated logo in context state
+          await refreshOrganizations(newOrg.id);
         }
       }
 
@@ -405,6 +419,10 @@ function BrandSetupContent() {
       localStorage.removeItem(ONBOARDING_ORG_KEY);
 
       toast.success("Workspace setup complete!");
+      
+      // Refresh organization data to reflect the updated logo and brand kit
+      await refreshOrganizations(orgId);
+      
       router.push("/dashboard");
     } catch (error: any) {
       toast.error(error.message || "Failed to complete setup");

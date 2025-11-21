@@ -23,7 +23,7 @@ export function createLinkFallback({
       cellpadding="0" 
       border="0" 
       width="100%"
-      style="margin-top: ${t.spacing.xl};"
+      style="margin-top: ${t.spacing.md};"
     >
       <tr>
         <td style="padding: 0;">
@@ -33,16 +33,16 @@ export function createLinkFallback({
             cellpadding="0" 
             border="0" 
             width="100%"
-            style="margin-bottom: ${t.spacing.sm};"
+            style="margin-bottom: ${t.spacing.xs};"
           >
             <tr>
               <td style="padding: 0;">
                 <p style="
-                  font-size: 14px;
+                  font-size: 13px;
                   color: ${t.colors.textSecondary};
                   font-family: ${t.fonts.primary};
                   margin: 0;
-                  line-height: 1.5;
+                  line-height: 1.4;
                 ">${label}</p>
               </td>
             </tr>
@@ -56,17 +56,17 @@ export function createLinkFallback({
           >
             <tr>
               <td style="
-                padding: ${t.spacing.sm};
-                background-color: ${t.colors.surface};
+                padding: ${t.spacing.xs} ${t.spacing.sm};
+                border: 1px solid ${t.colors.border};
                 border-radius: ${t.borderRadius};
               ">
                 <p style="
-                  font-size: 12px;
+                  font-size: 11px;
                   color: ${t.colors.textMuted};
                   font-family: ${t.fonts.primary};
                   word-break: break-all;
                   margin: 0;
-                  line-height: 1.5;
+                  line-height: 1.4;
                 ">${url}</p>
               </td>
             </tr>

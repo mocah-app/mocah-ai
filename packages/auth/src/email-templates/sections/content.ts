@@ -25,15 +25,15 @@ export function createEmailContent({
         cellpadding="0" 
         border="0" 
         width="100%"
-        style="margin-bottom: ${t.spacing.md};"
+        style="margin-bottom: ${t.spacing.sm};"
       >
         <tr>
           <td style="padding: 0;">
             <p class="content-text" style="
-              font-size: 16px;
+              font-size: 15px;
               color: ${t.colors.text};
               font-family: ${t.fonts.primary};
-              line-height: 1.6;
+              line-height: 1.5;
               margin: 0;
             ">${p}</p>
           </td>
@@ -50,7 +50,7 @@ export function createEmailContent({
       cellpadding="0" 
       border="0" 
       width="100%"
-      style="padding: ${t.spacing.xl} 0;"
+      style="padding: ${t.spacing.md} 0;"
     >
       <tr>
         <td style="padding: 0;">
@@ -60,14 +60,14 @@ export function createEmailContent({
             cellpadding="0" 
             border="0" 
             width="100%"
-            style="margin-bottom: ${t.spacing.lg};"
+            style="margin-bottom: ${t.spacing.md};"
           >
             <tr>
               <td style="padding: 0;">
                 <h2 class="content-title" style="
                   color: ${t.colors.text};
                   font-family: ${t.fonts.primary};
-                  font-size: 20px;
+                  font-size: 18px;
                   font-weight: 600;
                   margin: 0;
                   line-height: 1.3;

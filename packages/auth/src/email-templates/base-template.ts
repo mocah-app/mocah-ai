@@ -64,7 +64,7 @@ export function createBaseEmailTemplate({
               padding: ${theme.spacing.md} !important;
             }
             .email-header {
-              padding: ${theme.spacing.md} 0 !important;
+              padding: ${theme.spacing.sm} 0 !important;
             }
             .logo-img {
               max-width: 150px !important;
@@ -78,25 +78,16 @@ export function createBaseEmailTemplate({
             }
             .button-link {
               font-size: 14px !important;
-              padding: ${theme.spacing.sm} ${theme.spacing.md} !important;
+              padding: ${theme.spacing.xs} ${theme.spacing.md} !important;
             }
             .content-title {
-              font-size: 18px !important;
+              font-size: 16px !important;
             }
             .content-text {
               font-size: 14px !important;
             }
           }
           
-          /* Dark mode support */
-          @media (prefers-color-scheme: dark) {
-            .email-body {
-              background-color: #1a1a1a !important;
-            }
-            .email-surface {
-              background-color: #2a2a2a !important;
-            }
-          }
         </style>
       </head>
       <body style="
@@ -129,7 +120,7 @@ export function createBaseEmailTemplate({
           "
         >
           <tr>
-            <td align="center" style="padding: ${theme.spacing.xl} ${theme.spacing.md};">
+            <td align="center" style="padding: ${theme.spacing.lg} ${theme.spacing.md};">
               <!-- Main content table -->
               <table 
                 role="presentation" 
@@ -142,16 +133,14 @@ export function createBaseEmailTemplate({
                   max-width: ${theme.maxWidth};
                   width: 100%;
                   background-color: ${theme.colors.background};
-                  border-radius: ${theme.borderRadius};
                 "
               >
                 <tr>
                   <td 
-                    class="email-content email-surface"
+                    class="email-content"
                     style="
                       background-color: ${theme.colors.surface};
-                      padding: ${theme.spacing.xl};
-                      border-radius: ${theme.borderRadius};
+                      padding: ${theme.spacing.lg};
                     "
                   >
                     ${header}

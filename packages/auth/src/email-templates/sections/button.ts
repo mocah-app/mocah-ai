@@ -30,10 +30,10 @@ export function createEmailButton({
       border="0" 
       width="100%"
       class="button-table"
-      style="margin: ${t.spacing.lg} 0;"
+      style="margin: ${t.spacing.md} 0;"
     >
       <tr>
-        <td align="center" class="button-cell" style="padding: ${t.spacing.md} 0;">
+        <td align="center" class="button-cell" style="padding: ${t.spacing.sm} 0;">
           <table 
             role="presentation" 
             cellspacing="0" 
@@ -57,12 +57,12 @@ export function createEmailButton({
                     display: inline-block;
                     background-color: ${backgroundColor};
                     color: ${textColor};
-                    padding: ${t.spacing.sm} ${t.spacing.xl};
+                    padding: ${t.spacing.sm} ${t.spacing.lg};
                     text-decoration: none;
                     border-radius: ${t.borderRadius};
                     font-weight: 600;
                     font-family: ${t.fonts.primary};
-                    font-size: 16px;
+                    font-size: 15px;
                     border: ${border};
                     text-align: center;
                     width: 100%;
