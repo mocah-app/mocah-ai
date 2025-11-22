@@ -2,6 +2,11 @@ import { z } from "zod";
 import { TRPCError } from "@trpc/server";
 import { protectedProcedure, router } from "../index";
 import { organizationProcedure } from "../middleware";
+import { aiClient } from "../lib/ai";
+import {
+  buildTemplateGenerationPrompt,
+  templateGenerationSchema,
+} from "../lib/prompts";
 
 export const templateRouter = router({
   /**
@@ -120,6 +125,189 @@ export const templateRouter = router({
             ? templates[templates.length - 1]?.id
             : undefined,
       };
+    }),
+
+  /**
+   * Generate a new template using AI
+   */
+  generate: organizationProcedure
+    .input(
+      z.object({
+        prompt: z.string(),
+      })
+    )
+    .mutation(async ({ ctx, input }) => {
+      // 1. Get organization brand kit
+      const organization = await ctx.db.organization.findUnique({
+        where: { id: ctx.organizationId },
+        select: { brandKit: true },
+      });
+
+      // 2. Generate template structure
+      const prompt = buildTemplateGenerationPrompt(
+        input.prompt,
+        organization?.brandKit as any
+      );
+
+      const result = await aiClient.generateStructured(
+        templateGenerationSchema,
+        prompt,
+        "google/gemini-flash-1.5"
+      );
+
+      // 3. Transform sections (flatten content)
+      const sections = result.sections.map((section: any) => ({
+        type: section.type,
+        styles: section.styles,
+        ...section.content,
+      }));
+
+      const templateData = {
+        subject: result.subject,
+        previewText: result.previewText,
+        sections,
+      };
+
+      const contentString = JSON.stringify(templateData);
+
+      // 4. Create template
+      const template = await ctx.db.template.create({
+        data: {
+          organizationId: ctx.organizationId,
+          name: result.subject || "AI Generated Template",
+          subject: result.subject,
+          content: contentString,
+          description: `Generated from prompt: ${input.prompt}`,
+        },
+      });
+
+      // 5. Create initial version
+      const version = await ctx.db.templateVersion.create({
+        data: {
+          templateId: template.id,
+          version: 1,
+          name: "V1",
+          content: contentString,
+          subject: result.subject,
+          isCurrent: true,
+          createdBy: ctx.session?.user?.id,
+          metadata: {
+            generatedFrom: "ai",
+            prompt: input.prompt,
+          },
+        },
+      });
+
+      // 6. Update template with current version
+      await ctx.db.template.update({
+        where: { id: template.id },
+        data: { currentVersionId: version.id },
+      });
+
+      return template;
+    }),
+
+  /**
+   * Regenerate template content using AI (creates new version)
+   */
+  regenerate: protectedProcedure
+    .input(
+      z.object({
+        templateId: z.string(),
+        prompt: z.string(),
+      })
+    )
+    .mutation(async ({ ctx, input }) => {
+      // Verify access
+      const template = await ctx.db.template.findUnique({
+        where: { id: input.templateId },
+        include: { organization: { select: { brandKit: true } } },
+      });
+
+      if (!template) {
+        throw new TRPCError({
+          code: "NOT_FOUND",
+          message: "Template not found",
+        });
+      }
+
+      const membership = await ctx.db.member.findFirst({
+        where: {
+          userId: ctx.session.user.id,
+          organizationId: template.organizationId,
+        },
+      });
+
+      if (!membership) {
+        throw new TRPCError({
+          code: "FORBIDDEN",
+          message: "You do not have access to this template",
+        });
+      }
+
+      // Generate template structure
+      const prompt = buildTemplateGenerationPrompt(
+        input.prompt,
+        template.organization.brandKit as any
+      );
+
+      const result = await aiClient.generateStructured(
+        templateGenerationSchema,
+        prompt,
+        "google/gemini-flash-1.5"
+      );
+
+      // Transform sections
+      const sections = result.sections.map((section: any) => ({
+        type: section.type,
+        styles: section.styles,
+        ...section.content,
+      }));
+
+      const templateData = {
+        subject: result.subject,
+        previewText: result.previewText,
+        sections,
+      };
+
+      const contentString = JSON.stringify(templateData);
+
+      // Get latest version number
+      const latestVersion = await ctx.db.templateVersion.findFirst({
+        where: { templateId: input.templateId },
+        orderBy: { version: "desc" },
+      });
+
+      const newVersionNumber = (latestVersion?.version || 0) + 1;
+
+      // Create new version
+      const version = await ctx.db.templateVersion.create({
+        data: {
+          templateId: input.templateId,
+          version: newVersionNumber,
+          name: `AI Generated V${newVersionNumber}`,
+          content: contentString,
+          subject: result.subject,
+          isCurrent: true,
+          createdBy: ctx.session.user.id,
+          metadata: {
+            generatedFrom: "ai",
+            prompt: input.prompt,
+          },
+        },
+      });
+
+      // Update template with current version
+      await ctx.db.template.update({
+        where: { id: input.templateId },
+        data: {
+          currentVersionId: version.id,
+          subject: result.subject,
+          content: contentString,
+        },
+      });
+
+      return version;
     }),
 
   /**

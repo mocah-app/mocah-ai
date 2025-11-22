@@ -23,8 +23,8 @@ interface CanvasActions {
   updateNode: (nodeId: string, data: any) => void;
   deleteNode: (nodeId: string) => void;
   connectNodes: (connection: Connection) => void;
-  setNodes: (nodes: Node<TemplateNodeData>[]) => void;
-  setEdges: (edges: Edge[]) => void;
+  setNodes: React.Dispatch<React.SetStateAction<Node<TemplateNodeData>[]>>;
+  setEdges: React.Dispatch<React.SetStateAction<Edge[]>>;
   onNodesChange: any;
   onEdgesChange: any;
   onConnect: any;

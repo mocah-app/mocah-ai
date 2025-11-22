@@ -1,29 +1,28 @@
 "use client";
 
-import React, { useCallback, useEffect } from "react";
 import {
-  ReactFlow,
   Background,
-  Controls,
-  MiniMap,
   BackgroundVariant,
-  Panel,
+  Controls,
+  ReactFlow
 } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
-import { useCanvas } from "../providers/CanvasProvider";
+import { useEffect, useState } from "react";
 import { TemplateNode } from "../nodes/TemplateNode";
+import { useCanvas } from "../providers/CanvasProvider";
+import { CustomCanvasControl } from "./CustomCanvasControl";
 
 // Register custom node types
 const nodeTypes = {
   template: TemplateNode,
-}
+};
 
 export function InfiniteCanvas() {
   const { state, actions } = useCanvas();
+  // const [isHandMode, setIsHandMode] = useState(false);
 
   // Fit view on mount
   useEffect(() => {
-    // Small delay to ensure nodes are rendered
     const timer = setTimeout(() => {
       // fitView will be called via React Flow's useReactFlow hook if needed
     }, 100);
@@ -39,32 +38,35 @@ export function InfiniteCanvas() {
         onEdgesChange={actions.onEdgesChange}
         onConnect={actions.onConnect}
         nodeTypes={nodeTypes}
+        proOptions={{ hideAttribution: true }}
         fitView
         minZoom={0.1}
         maxZoom={2}
-        defaultViewport={{ x: 0, y: 0, zoom: 0.8 }}
-        className="bg-gray-50 dark:bg-gray-950"
+        defaultViewport={{ x: -8, y: 0, zoom: 0.8 }}
       >
         <Background
           variant={BackgroundVariant.Dots}
-          gap={16}
-          size={1}
-          className="bg-gray-50 dark:bg-gray-950"
+          gap={42}
+          size={2}
+          bgColor="var(--background)"
         />
         <Controls
-          className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-lg shadow-sm"
+          position="bottom-center"
+          orientation="horizontal"
+          showZoom={false}
+          showFitView={false}
           showInteractive={false}
-        />
-        <MiniMap
-          className="bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-lg"
-          maskColor="rgba(0, 0, 0, 0.1)"
-          nodeColor={(node) => {
-            if (node.data?.isCurrent) {
-              return "#10b981"; // Green for current version
-            }
-            return "#6b7280"; // Gray for other versions
+          style={{
+            border: "none",
+            borderRadius: "var(--radius)",
+            backdropFilter: "blur(10px)",
           }}
-        />
+        >
+          <CustomCanvasControl 
+            // isHandMode={isHandMode} 
+            // setIsHandMode={setIsHandMode} 
+          />
+        </Controls>
       </ReactFlow>
     </div>
   );

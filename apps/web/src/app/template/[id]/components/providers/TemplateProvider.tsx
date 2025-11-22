@@ -51,6 +51,7 @@ interface TemplateActions {
   deleteVersion: (versionId: string) => Promise<void>;
   updateElement: (elementPath: string, data: any) => void;
   regenerateElement: (elementPath: string, prompt: string) => Promise<void>;
+  regenerateTemplate: (prompt: string) => Promise<void>;
   setIsDirty: (dirty: boolean) => void;
 }
 
@@ -94,7 +95,7 @@ export function TemplateProvider({
       // Placeholder - will be replaced with actual tRPC call
       // const template = await api.template.get.query({ id });
       console.log("Loading template:", id);
-      
+
       // Mock data for now
       setState((prev) => ({
         ...prev,
@@ -116,7 +117,7 @@ export function TemplateProvider({
 
   const saveTemplate = useCallback(async () => {
     if (!state.currentTemplate) return;
-    
+
     try {
       // Placeholder - will be replaced with actual tRPC call
       // await api.template.update.mutate({ id: state.currentTemplate.id, ... });
@@ -127,17 +128,20 @@ export function TemplateProvider({
     }
   }, [state.currentTemplate]);
 
-  const createVersion = useCallback(async (name?: string) => {
-    if (!state.currentTemplate) return;
-    
-    try {
-      // Placeholder - will be replaced with actual tRPC call
-      // const newVersion = await api.template.createVersion.mutate({ templateId: state.currentTemplate.id, name });
-      console.log("Creating version:", name);
-    } catch (error) {
-      console.error("Failed to create version:", error);
-    }
-  }, [state.currentTemplate]);
+  const createVersion = useCallback(
+    async (name?: string) => {
+      if (!state.currentTemplate) return;
+
+      try {
+        // Placeholder - will be replaced with actual tRPC call
+        // const newVersion = await api.template.createVersion.mutate({ templateId: state.currentTemplate.id, name });
+        console.log("Creating version:", name);
+      } catch (error) {
+        console.error("Failed to create version:", error);
+      }
+    },
+    [state.currentTemplate]
+  );
 
   const switchVersion = useCallback((versionId: string) => {
     setState((prev) => ({ ...prev, currentVersion: versionId }));
@@ -171,6 +175,27 @@ export function TemplateProvider({
     []
   );
 
+  const regenerateTemplate = useCallback(
+    async (prompt: string) => {
+      if (!state.currentTemplate) return;
+      setState((prev) => ({ ...prev, isLoading: true }));
+      try {
+        // Placeholder - will be replaced with actual tRPC call
+        // await api.template.regenerate.mutate({ templateId: state.currentTemplate.id, prompt });
+        console.log("Regenerating template:", prompt);
+
+        // Mock delay
+        await new Promise((resolve) => setTimeout(resolve, 2000));
+
+        setState((prev) => ({ ...prev, isLoading: false }));
+      } catch (error) {
+        console.error("Failed to regenerate template:", error);
+        setState((prev) => ({ ...prev, isLoading: false }));
+      }
+    },
+    [state.currentTemplate]
+  );
+
   const setIsDirty = useCallback((dirty: boolean) => {
     setState((prev) => ({ ...prev, isDirty: dirty }));
   }, []);
@@ -183,6 +208,7 @@ export function TemplateProvider({
     deleteVersion,
     updateElement,
     regenerateElement,
+    regenerateTemplate,
     setIsDirty,
   };
 

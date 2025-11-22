@@ -4,6 +4,8 @@ import React from "react";
 import { Code, Eye, Copy, Trash2 } from "lucide-react";
 import { useEditorMode } from "../providers/EditorModeProvider";
 import { useCanvas } from "../providers/CanvasProvider";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 
 interface NodeHeaderProps {
   version: number;
@@ -40,64 +42,55 @@ export function NodeHeader({
   };
 
   return (
-    <div className="px-4 py-3 bg-gradient-to-r from-gray-50 to-gray-100 dark:from-gray-800 dark:to-gray-900 border-b border-gray-200 dark:border-gray-700 flex items-center justify-between">
+    <div className="px-4 py-1 bg-muted border-b border-border rounded-t-lg flex items-center justify-between">
       <div className="flex items-center gap-3">
         {/* Version Badge */}
-        <div
-          className={`px-2 py-1 rounded-md text-xs font-semibold ${
-            isCurrent
-              ? "bg-green-100 text-green-700 dark:bg-green-900 dark:text-green-300"
-              : "bg-gray-200 text-gray-700 dark:bg-gray-700 dark:text-gray-300"
-          }`}
-        >
-          V{version}
-        </div>
 
         {/* Node Title */}
-        <h3 className="text-sm font-semibold text-gray-900 dark:text-gray-100">
-          {name}
-        </h3>
+        <h3 className="text-sm font-semibold text-muted-foreground">{name}</h3>
 
         {/* Current Indicator */}
-        {isCurrent && (
-          <span className="px-2 py-0.5 bg-green-500 text-white text-xs rounded-full">
-            Current
-          </span>
-        )}
+        {isCurrent && <Badge variant="success">Current</Badge>}
+        <Badge variant="outline" className="text-xs px-1">
+          v{version}
+        </Badge>
       </div>
 
       {/* Actions */}
       <div className="flex items-center gap-2">
         {/* View/Code Toggle */}
-        <button
+        <Button
+          variant="ghost"
+          size="icon"
           onClick={handleToggleMode}
-          className="p-1.5 rounded hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors"
           title={currentMode === "view" ? "Switch to Code" : "Switch to View"}
         >
           {currentMode === "view" ? (
-            <Code className="w-4 h-4 text-gray-600 dark:text-gray-400" />
+            <Code className="size-4 text-muted-foreground" />
           ) : (
-            <Eye className="w-4 h-4 text-gray-600 dark:text-gray-400" />
+            <Eye className="size-4 text-muted-foreground" />
           )}
-        </button>
+        </Button>
 
         {/* Duplicate */}
-        <button
+        <Button
+          variant="ghost"
+          size="icon"
           onClick={handleDuplicate}
-          className="p-1.5 rounded hover:bg-gray-200 dark:hover:bg-gray-700 transition-colors"
           title="Duplicate"
         >
-          <Copy className="w-4 h-4 text-gray-600 dark:text-gray-400" />
-        </button>
+          <Copy className="size-4 text-muted-foreground" />
+        </Button>
 
         {/* Delete */}
-        <button
+        <Button
+          variant="ghost"
+          size="icon"
           onClick={handleDelete}
-          className="p-1.5 rounded hover:bg-red-100 dark:hover:bg-red-900 transition-colors"
           title="Delete"
         >
-          <Trash2 className="w-4 h-4 text-red-600 dark:text-red-400" />
-        </button>
+          <Trash2 className="size-4 text-destructive" />
+        </Button>
       </div>
     </div>
   );

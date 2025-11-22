@@ -6,6 +6,8 @@ import { NodeHeader } from "./NodeHeader";
 import { ViewModeContent } from "./ViewModeContent";
 import { CodeModeContent } from "./CodeModeContent";
 import { useEditorMode } from "../providers/EditorModeProvider";
+import { Button } from "@/components/ui/button";
+import { ChevronRight, Plus } from "lucide-react";
 
 // Custom data type for template nodes
 // Includes index signature to satisfy React Flow's Record<string, unknown> constraint
@@ -16,7 +18,8 @@ export interface TemplateNodeData {
   template: {
     subject?: string;
     previewText?: string;
-    content: string;
+    content?: string;
+    sections: any[]; // TODO: should we have a proper type for this?
   };
   metadata?: {
     createdAt: Date;
@@ -38,18 +41,23 @@ export function TemplateNode({ data, id }: TemplateNodeProps) {
   const mode = actions.getNodeMode(nodeId);
 
   return (
-    <div className="bg-white dark:bg-gray-900 rounded-lg shadow-lg border border-gray-200 dark:border-gray-800 w-[800px] overflow-hidden">
+    <div className="bg-background rounded-lg shadow-lg border border-border w-[600px] relative">
       {/* Connection handles */}
-      <Handle
-        type="target"
-        position={Position.Left}
-        className="w-3 h-3 !bg-blue-500"
-      />
       <Handle
         type="source"
         position={Position.Right}
-        className="w-3 h-3 !bg-blue-500"
-      />
+        className="flex items-center justify-center"
+        style={{
+          position: "absolute",
+          right: "-20px",
+
+        }}
+      >
+
+        <div className="bg-ring rounded-full p-1">
+          <Plus className="size-3 text-white" />
+        </div>
+      </Handle>
 
       {/* Node Header */}
       <NodeHeader
@@ -65,20 +73,20 @@ export function TemplateNode({ data, id }: TemplateNodeProps) {
         {mode === "view" ? (
           <ViewModeContent template={data.template} />
         ) : (
-          <CodeModeContent template={data.template} />
+          <CodeModeContent template={data.template} nodeId={nodeId} />
         )}
       </div>
 
       {/* Node Footer */}
-      <div className="px-4 py-3 bg-gray-50 dark:bg-gray-800 border-t border-gray-200 dark:border-gray-700 flex items-center justify-between text-sm text-gray-600 dark:text-gray-400">
+      <div className="px-2 py-1 bg-muted border-t border-border flex items-center justify-between text-xs text-muted-foreground">
         <span>
           {data.metadata?.updatedAt
             ? `Saved ${new Date(data.metadata.updatedAt).toLocaleTimeString()}`
             : "Not saved"}
         </span>
-        <button className="text-blue-600 dark:text-blue-400 hover:underline">
-          Export
-        </button>
+        <Button variant="link" className="text-primary hover:underline text-xs">
+          Branch Out
+        </Button>
       </div>
     </div>
   );
