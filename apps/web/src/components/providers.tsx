@@ -2,29 +2,34 @@
 
 import { QueryClientProvider } from "@tanstack/react-query";
 import { ReactQueryDevtools } from "@tanstack/react-query-devtools";
-import { queryClient } from "@/utils/trpc";
+import { queryClient, trpc, trpcClient } from "@/utils/trpc";
 import { ThemeProvider } from "./theme-provider";
 import { Toaster } from "./ui/sonner";
 import { SidebarProvider } from "./ui/sidebar";
 import { OrganizationProvider } from "@/contexts/organization-context";
+import { useState } from "react";
 
 export default function Providers({ children }: { children: React.ReactNode }) {
-	return (
-		<ThemeProvider
-			attribute="class"
-			defaultTheme="system"
-			enableSystem
-			disableTransitionOnChange
-		>
-			<SidebarProvider>
-				<QueryClientProvider client={queryClient}>
-					<OrganizationProvider>
-						{children}
-						<ReactQueryDevtools />
-					</OrganizationProvider>
-				</QueryClientProvider>
-				<Toaster richColors />
-			</SidebarProvider>
-		</ThemeProvider>
-	);
+  const [trpcClientInstance] = useState(() => trpcClient);
+
+  return (
+    <ThemeProvider
+      attribute="class"
+      defaultTheme="system"
+      enableSystem
+      disableTransitionOnChange
+    >
+      <SidebarProvider>
+        <trpc.Provider client={trpcClientInstance} queryClient={queryClient}>
+          <QueryClientProvider client={queryClient}>
+            <OrganizationProvider>
+              {children}
+              <ReactQueryDevtools />
+            </OrganizationProvider>
+          </QueryClientProvider>
+        </trpc.Provider>
+        <Toaster richColors />
+      </SidebarProvider>
+    </ThemeProvider>
+  );
 }

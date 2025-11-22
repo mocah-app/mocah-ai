@@ -16,7 +16,7 @@ export function ButtonEditor({
   return (
     <div className="space-y-4">
       <div className="space-y-2">
-        <Label className="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+        <Label className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
           Button Text
         </Label>
         <Input
@@ -27,7 +27,7 @@ export function ButtonEditor({
       </div>
 
       <div className="space-y-2">
-        <Label className="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+        <Label className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
           Button URL
         </Label>
         <Input

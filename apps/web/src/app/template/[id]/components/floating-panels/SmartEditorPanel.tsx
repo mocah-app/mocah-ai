@@ -1,11 +1,19 @@
-import React from "react";
-import { X, Sparkles } from "lucide-react";
+import React, { useState, useEffect } from "react";
+import {
+  X,
+  Sparkles,
+  Type,
+  Image as ImageIcon,
+  MousePointer,
+  Layout,
+} from "lucide-react";
 import { useEditorMode } from "../providers/EditorModeProvider";
 import { useTemplate } from "../providers/TemplateProvider";
 import { useCanvas } from "../providers/CanvasProvider";
 import { TextEditor } from "../view-mode/element-editors/TextEditor";
 import { ImageEditor } from "../view-mode/element-editors/ImageEditor";
 import { ButtonEditor } from "../view-mode/element-editors/ButtonEditor";
+import { LayoutEditor } from "../view-mode/element-editors/LayoutEditor";
 import type { TemplateNodeData } from "../nodes/TemplateNode";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -16,6 +24,8 @@ export const SmartEditorPanel = () => {
   const { actions: templateActions } = useTemplate();
   const { state: canvasState, actions: canvasActions } = useCanvas();
   const { selectedElement } = editorState;
+  const [aiPrompt, setAiPrompt] = useState("");
+  const [isRegenerating, setIsRegenerating] = useState(false);
 
   // Helper to get value from path
   const getValue = (data: TemplateNodeData, path: string) => {
@@ -58,8 +68,37 @@ export const SmartEditorPanel = () => {
       })
     );
 
-    // TODO: Call templateActions.updateElement to persist to DB (debounced)
+    // TODO: Debounced auto-save to DB
+    templateActions.updateElement(selectedElement, value);
   };
+
+  // Handle AI regeneration
+  const handleAIRegenerate = async () => {
+    if (!aiPrompt.trim() || !selectedElement) return;
+
+    setIsRegenerating(true);
+    try {
+      // TODO: Call templateActions.regenerateElement
+      await templateActions.regenerateElement(selectedElement, aiPrompt);
+      setAiPrompt("");
+    } catch (error) {
+      console.error("Failed to regenerate element:", error);
+    } finally {
+      setIsRegenerating(false);
+    }
+  };
+
+  // Handle ESC key to close panel
+  useEffect(() => {
+    const handleEscape = (e: KeyboardEvent) => {
+      if (e.key === "Escape" && selectedElement) {
+        editorActions.selectElement(null);
+      }
+    };
+
+    document.addEventListener("keydown", handleEscape);
+    return () => document.removeEventListener("keydown", handleEscape);
+  }, [selectedElement, editorActions]);
 
   if (!selectedElement) return null;
 
@@ -76,6 +115,31 @@ export const SmartEditorPanel = () => {
     selectedElement
   );
   const property = selectedElement.split(".").pop();
+
+  // Determine element type and icon
+  const getElementInfo = () => {
+    if (
+      property === "image" ||
+      property === "logo" ||
+      property === "imageUrl"
+    ) {
+      return { type: "Image", icon: ImageIcon };
+    }
+    if (
+      property === "buttonText" ||
+      property === "ctaText" ||
+      property === "buttonUrl"
+    ) {
+      return { type: "Button", icon: MousePointer };
+    }
+    if (property === "styles" || selectedElement.split(".").length === 2) {
+      return { type: "Section Layout", icon: Layout };
+    }
+    return { type: "Text", icon: Type };
+  };
+
+  const elementInfo = getElementInfo();
+  const ElementIcon = elementInfo.icon;
 
   const renderEditor = () => {
     if (
@@ -107,6 +171,43 @@ export const SmartEditorPanel = () => {
       );
     }
 
+    // Check if editing section styles
+    if (property === "styles" || selectedElement.split(".").length === 2) {
+      // Editing a section itself (e.g., "sections.0")
+      const sectionPath = selectedElement.split(".").slice(0, 2).join(".");
+      const section = getValue(
+        activeNode.data as TemplateNodeData,
+        sectionPath
+      );
+
+      if (section && typeof section === "object") {
+        return (
+          <LayoutEditor
+            styles={section.styles || {}}
+            onChange={(newStyles) => {
+              const updatedSection = {
+                ...section,
+                styles: { ...section.styles, ...newStyles },
+              };
+              canvasActions.setNodes((nds) =>
+                nds.map((node) => {
+                  if (node.data.isCurrent || node.type === "template") {
+                    const newData = setValue(
+                      node.data as TemplateNodeData,
+                      sectionPath,
+                      updatedSection
+                    );
+                    return { ...node, data: newData };
+                  }
+                  return node;
+                })
+              );
+            }}
+          />
+        );
+      }
+    }
+
     // Default to TextEditor for strings
     if (typeof currentValue === "string") {
       return (
@@ -130,9 +231,9 @@ export const SmartEditorPanel = () => {
       {/* Header */}
       <div className="p-4 border-b border-border flex justify-between items-center bg-muted">
         <div className="flex items-center gap-2">
-          <div className="w-2 h-2 rounded-full bg-foreground" />
-          <h3 className="font-semibold text-sm text-muted-foreground">
-            Edit Element
+          <ElementIcon className="w-4 h-4 text-primary" />
+          <h3 className="font-semibold text-sm text-foreground">
+            {elementInfo.type}
           </h3>
         </div>
         <Button
@@ -159,19 +260,36 @@ export const SmartEditorPanel = () => {
       </div>
 
       {/* AI Footer */}
-      <div className="p-2 bg-muted border-t border-border">
-        <div className="relative">
-          <Sparkles
-            className="absolute left-3 top-3 text-muted-foreground"
-            size={14}
-          />
-          <Textarea
-            placeholder="Refine with AI..."
-            className="w-full pl-9 pr-3 py-2 text-sm bg-transparent border border-border rounded-lg focus:ring-2 focus:ring-primary outline-none shadow-sm resize-none"
-            rows={3}
-            maxLength={1000}
-            
-          />
+      <div className="p-3 bg-muted border-t border-border">
+        <div className="space-y-2">
+          <div className="relative">
+            <Sparkles
+              className="absolute left-3 top-3 text-muted-foreground"
+              size={14}
+            />
+            <Textarea
+              value={aiPrompt}
+              onChange={(e) => setAiPrompt(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) {
+                  handleAIRegenerate();
+                }
+              }}
+              placeholder="Refine this element with AI..."
+              className="w-full pl-9 pr-3 py-2 text-sm bg-background border border-border rounded-lg focus:ring-2 focus:ring-primary outline-none shadow-sm resize-none"
+              rows={2}
+              maxLength={500}
+              disabled={isRegenerating}
+            />
+          </div>
+          <Button
+            onClick={handleAIRegenerate}
+            disabled={!aiPrompt.trim() || isRegenerating}
+            size="sm"
+            className="w-full"
+          >
+            {isRegenerating ? "Regenerating..." : "Regenerate"}
+          </Button>
         </div>
       </div>
     </div>

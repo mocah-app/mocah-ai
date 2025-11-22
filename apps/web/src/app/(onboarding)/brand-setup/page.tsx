@@ -28,7 +28,7 @@ import { useOrganization } from "@/contexts/organization-context";
 import { authClient } from "@/lib/auth-client";
 import { fileToApiFormat, validateImageFile } from "@/lib/file-utils";
 import { cn } from "@/lib/utils";
-import { trpc } from "@/utils/trpc";
+import { trpcClient } from "@/utils/trpc";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useMutation } from "@tanstack/react-query";
 import { ArrowRight, Check, Loader2, Upload } from "lucide-react";
@@ -73,9 +73,7 @@ function BrandSetupContent() {
 
   // Get step from URL, default to 1
   const urlStep = searchParams.get("step");
-  const [step, setStep] = useState<1 | 2>(
-    urlStep === "2" ? 2 : 1
-  );
+  const [step, setStep] = useState<1 | 2>(urlStep === "2" ? 2 : 1);
   const [isLoading, setIsLoading] = useState(false);
   const [isRecovering, setIsRecovering] = useState(false); // Track if we're recovering data
 
@@ -113,12 +111,12 @@ function BrandSetupContent() {
     const initializeOnboarding = async () => {
       if (step === 1 && !workspaceData && !isRecovering && session?.user) {
         const onboardingOrgId = localStorage.getItem(ONBOARDING_ORG_KEY);
-        
+
         if (onboardingOrgId) {
           // There's an existing onboarding session, try to recover it
           setIsRecovering(true);
           try {
-            const org = await trpc.organization.getById.query({
+            const org = await trpcClient.organization.getById.query({
               organizationId: onboardingOrgId,
             });
 
@@ -130,7 +128,7 @@ function BrandSetupContent() {
                 logo: org.logo || undefined,
                 orgId: org.id,
               });
-              
+
               // Pre-fill form
               workspaceForm.setValue("name", org.name);
               if (org.logo) {
@@ -143,7 +141,10 @@ function BrandSetupContent() {
                   primaryColor: org.brandKit.primaryColor || "#3B82F6",
                   secondaryColor: org.brandKit.secondaryColor || "#10B981",
                   fontFamily: org.brandKit.fontFamily || "Arial, sans-serif",
-                  brandVoice: (org.brandKit.brandVoice as BrandFormValues["brandVoice"]) || "professional",
+                  brandVoice:
+                    (org.brandKit
+                      .brandVoice as BrandFormValues["brandVoice"]) ||
+                    "professional",
                 });
               }
             } else {
@@ -151,7 +152,10 @@ function BrandSetupContent() {
               localStorage.removeItem(ONBOARDING_ORG_KEY);
             }
           } catch (error) {
-            console.error("Failed to recover previous onboarding session:", error);
+            console.error(
+              "Failed to recover previous onboarding session:",
+              error
+            );
             // Clear invalid localStorage entry
             localStorage.removeItem(ONBOARDING_ORG_KEY);
           } finally {
@@ -170,7 +174,7 @@ function BrandSetupContent() {
       if (step === 2 && !workspaceData && !isRecovering) {
         // Check if there's an onboarding org ID in localStorage
         const onboardingOrgId = localStorage.getItem(ONBOARDING_ORG_KEY);
-        
+
         if (!onboardingOrgId) {
           // No onboarding in progress, redirect back to step 1
           toast.error("Please complete step 1 first");
@@ -181,7 +185,7 @@ function BrandSetupContent() {
         setIsRecovering(true);
         try {
           // Fetch the organization created in step 1
-          const org = await trpc.organization.getById.query({
+          const org = await trpcClient.organization.getById.query({
             organizationId: onboardingOrgId,
           });
 
@@ -199,7 +203,9 @@ function BrandSetupContent() {
                 primaryColor: org.brandKit.primaryColor || "#3B82F6",
                 secondaryColor: org.brandKit.secondaryColor || "#10B981",
                 fontFamily: org.brandKit.fontFamily || "Arial, sans-serif",
-                brandVoice: (org.brandKit.brandVoice as BrandFormValues["brandVoice"]) || "professional",
+                brandVoice:
+                  (org.brandKit.brandVoice as BrandFormValues["brandVoice"]) ||
+                  "professional",
               });
             }
           } else {
@@ -226,7 +232,7 @@ function BrandSetupContent() {
   // tRPC mutation for logo upload
   const uploadLogoMutation = useMutation({
     mutationFn: (data: { file: any; organizationId: string }) =>
-      trpc.storage.uploadLogo.mutate(data),
+      trpcClient.storage.uploadLogo.mutate(data),
   });
 
   // --- Step 1: Workspace ---
@@ -326,14 +332,14 @@ function BrandSetupContent() {
         if (logoChanged) {
           updateData.logo = logoUrl;
         }
-        
-        await trpc.organization.update.mutate(updateData);
-        
+
+        await trpcClient.organization.update.mutate(updateData);
+
         // Refresh organizations if logo changed to update the UI
         if (logoChanged) {
           await refreshOrganizations(workspaceData.orgId);
         }
-        
+
         // Ensure localStorage still has this org ID
         localStorage.setItem(ONBOARDING_ORG_KEY, workspaceData.orgId);
       } else {
@@ -364,7 +370,7 @@ function BrandSetupContent() {
           setLogoUploaded(true);
 
           // Update organization with the logo immediately so the UI can reflect it
-          await trpc.organization.update.mutate({
+          await trpcClient.organization.update.mutate({
             organizationId: newOrg.id,
             logo: logoUrl,
           });
@@ -397,7 +403,7 @@ function BrandSetupContent() {
 
     try {
       // 3. Update Organization with Brand Kit and mark complete
-      await trpc.organization.updateWithBrandKit.mutate({
+      await trpcClient.organization.updateWithBrandKit.mutate({
         organizationId: orgId,
         organization: {
           logo: workspaceData.logo || undefined, // Use the uploaded URL or undefined if explicitly empty
@@ -419,10 +425,10 @@ function BrandSetupContent() {
       localStorage.removeItem(ONBOARDING_ORG_KEY);
 
       toast.success("Workspace setup complete!");
-      
+
       // Refresh organization data to reflect the updated logo and brand kit
       await refreshOrganizations(orgId);
-      
+
       router.push("/dashboard");
     } catch (error: any) {
       toast.error(error.message || "Failed to complete setup");
@@ -483,7 +489,7 @@ function BrandSetupContent() {
   if (isPending || isRecovering) {
     return (
       <div className="h-screen flex-1 flex items-center justify-center">
-       <MocahLoadingIcon />
+        <MocahLoadingIcon />
       </div>
     );
   }
@@ -648,11 +654,15 @@ function BrandSetupContent() {
                         {isLoading ? (
                           <>
                             <Loader />
-                            {workspaceData?.orgId ? "Updating..." : "Creating brand..."}
+                            {workspaceData?.orgId
+                              ? "Updating..."
+                              : "Creating brand..."}
                           </>
                         ) : (
                           <>
-                            {workspaceData?.orgId ? "Save and continue" : "Create and continue"}{" "}
+                            {workspaceData?.orgId
+                              ? "Save and continue"
+                              : "Create and continue"}{" "}
                             <ArrowRight className="ml-2 h-4 w-4" />
                           </>
                         )}
@@ -837,11 +847,13 @@ function BrandSetupContent() {
 
 export default function BrandSetupPage() {
   return (
-    <Suspense fallback={
-      <div className="h-screen flex-1 flex items-center justify-center">
-        <MocahLoadingIcon />
-      </div>
-    }>
+    <Suspense
+      fallback={
+        <div className="h-screen flex-1 flex items-center justify-center">
+          <MocahLoadingIcon />
+        </div>
+      }
+    >
       <BrandSetupContent />
     </Suspense>
   );

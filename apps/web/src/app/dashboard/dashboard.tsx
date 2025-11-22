@@ -11,56 +11,93 @@ import {
 } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useOrganization } from "@/contexts/organization-context";
-import { Palette, Plus, Settings } from "lucide-react";
+import { FileText, Palette, Plus, Settings } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { formatDistanceToNow } from "date-fns";
+import { trpc } from "@/utils/trpc";
 
-interface Template {
-  id: number;
-  name: string;
+interface TemplateCardProps {
+  template: {
+    id: string;
+    name: string;
+    subject: string | null;
+    category: string | null;
+    updatedAt: string | Date;
+    isFavorite: boolean;
+    _count: {
+      versions: number;
+      sections: number;
+    };
+  };
 }
 
-const TEMPLATES: Template[] = [
-  {
-    id: 1,
-    name: "Template 1",
-  },
-  {
-    id: 2,
-    name: "Template 2",
-  },
-  {
-    id: 3,
-    name: "Template 3",
-  },
-  {
-    id: 4,
-    name: "Template 4",
-  },
-];
-
-const TemplateCard = ({
-  template,
-}: {
-  template: (typeof TEMPLATES)[number];
-}) => {
+const TemplateCard = ({ template }: TemplateCardProps) => {
   return (
     <Link href={`/template/${template.id}`}>
-      <Card className="gap-0">
+      <Card className="gap-0 hover:shadow-md transition-all duration-300 group">
         <CardHeader>
-          <CardTitle className="group-hover:text-primary transition-all duration-300">
-            {template.name}
-          </CardTitle>
+          <div className="flex items-start justify-between">
+            <div className="flex-1">
+              <CardTitle className="group-hover:text-primary transition-colors duration-300 line-clamp-1">
+                {template.name}
+              </CardTitle>
+              {template.subject && (
+                <CardDescription className="mt-1 line-clamp-1">
+                  {template.subject}
+                </CardDescription>
+              )}
+            </div>
+            {template.isFavorite && (
+              <span className="text-yellow-500 text-sm">★</span>
+            )}
+          </div>
+          <div className="flex items-center justify-between text-xs text-muted-foreground mt-2">
+            <div className="flex items-center gap-2">
+              <FileText className="h-3 w-3" />
+              <span>{template._count.versions} versions</span>
+            </div>
+            <span>
+              {formatDistanceToNow(new Date(template.updatedAt), {
+                addSuffix: true,
+              })}
+            </span>
+          </div>
         </CardHeader>
       </Card>
     </Link>
   );
 };
 
-const TemplateList = () => {
+const TemplateList = ({ organizationId }: { organizationId: string }) => {
+  const { data, isLoading } = trpc.template.list.useQuery(
+    { limit: 6 },
+    { enabled: !!organizationId }
+  );
+
+  if (isLoading) {
+    return (
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+        {[1, 2, 3].map((i) => (
+          <Card key={i}>
+            <CardHeader>
+              <Skeleton className="h-6 w-3/4 mb-2" />
+              <Skeleton className="h-4 w-full" />
+              <Skeleton className="h-3 w-1/2 mt-2" />
+            </CardHeader>
+          </Card>
+        ))}
+      </div>
+    );
+  }
+
+  if (!data?.templates || data.templates.length === 0) {
+    return null;
+  }
+
   return (
     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-      {TEMPLATES.map((template) => (
+      {data.templates.map((template) => (
         <TemplateCard key={template.id} template={template} />
       ))}
     </div>
@@ -96,7 +133,13 @@ export default function Dashboard() {
 
   // Check if brand kit is set up
   const hasBrandKit = displayOrg?.metadata?.setupCompleted;
-  const templateCount = 0; // TODO: Get from tRPC
+  
+  // Fetch templates count
+  const { data: templatesData } = trpc.template.list.useQuery(
+    { limit: 100 },
+    { enabled: !!displayOrg?.id }
+  );
+  const templateCount = templatesData?.templates.length || 0;
 
   return (
     <div className="space-y-6 relative">
@@ -216,11 +259,18 @@ export default function Dashboard() {
       {/* Recent Templates */}
       {templateCount > 0 ? (
         <Card className="relative z-10">
-          <CardHeader>
+          <CardHeader className="flex flex-row items-center justify-between">
             <CardTitle>Recent Templates</CardTitle>
+            {/* <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => router.push("/templates")}
+            >
+              View all
+            </Button> */}
           </CardHeader>
           <CardContent>
-            <TemplateList />
+            {displayOrg?.id && <TemplateList organizationId={displayOrg.id} />}
           </CardContent>
         </Card>
       ) : (
@@ -231,8 +281,8 @@ export default function Dashboard() {
               <p>Create your first template to get started!</p>
             </div>
             <Button onClick={() => router.push("/template/new")}>
+              <Plus className="mr-2 h-4 w-4" />
               New Template
-              <Plus className="h-4 w-4" />
             </Button>
           </CardContent>
         </Card>

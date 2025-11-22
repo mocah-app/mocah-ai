@@ -1,6 +1,7 @@
 import { createOpenRouter } from "@openrouter/ai-sdk-provider";
 import { generateObject, generateText } from "ai";
 import { z } from "zod";
+import { logger } from "@mocah/shared/logger";
 
 // Initialize OpenRouter provider
 const openrouter = createOpenRouter({
@@ -8,8 +9,12 @@ const openrouter = createOpenRouter({
 });
 
 // Default model from environment or fallback
-const DEFAULT_MODEL =
+export const DEFAULT_MODEL =
   process.env.OPENROUTER_DEFAULT_MODEL || "anthropic/claude-3.5-sonnet";
+
+// Template generation model (optional, falls back to DEFAULT_MODEL)
+export const TEMPLATE_GENERATION_MODEL =
+  process.env.OPENROUTER_TEMPLATE_MODEL || DEFAULT_MODEL;
 
 /**
  * AI Client wrapper for OpenRouter integration
@@ -27,16 +32,28 @@ export const aiClient = {
     prompt: string,
     model?: string
   ): Promise<z.infer<T>> {
+    const modelName = model || DEFAULT_MODEL;
     try {
       const { object } = await generateObject({
-        model: openrouter(model || DEFAULT_MODEL),
+        model: openrouter(modelName),
         schema,
         prompt,
       });
 
-      return object;
+      logger.info("AI structured response generated", {
+        component: "ai",
+        action: "generateStructured",
+        model: modelName,
+        response: JSON.stringify(object, null, 2),
+      });
+
+      return object as z.infer<T>;
     } catch (error) {
-      console.error("AI generation error:", error);
+      logger.error("AI generation error", {
+        component: "ai",
+        action: "generateStructured",
+        model: modelName,
+      }, error as Error);
       throw new Error("Failed to generate structured output");
     }
   },
@@ -47,35 +64,32 @@ export const aiClient = {
    * @param model - Optional model override
    */
   async generateText(prompt: string, model?: string): Promise<string> {
+    const modelName = model || DEFAULT_MODEL;
     try {
       const { text } = await generateText({
-        model: openrouter(model || DEFAULT_MODEL),
+        model: openrouter(modelName),
         prompt,
+      });
+
+      logger.info("AI text response generated", {
+        component: "ai",
+        action: "generateText",
+        model: modelName,
+        response: text,
       });
 
       return text;
     } catch (error) {
-      console.error("AI generation error:", error);
+      logger.error("AI generation error", {
+        component: "ai",
+        action: "generateText",
+        model: modelName,
+      }, error as Error);
       throw new Error("Failed to generate text");
     }
   },
 
-  /**
-   * Test connection to OpenRouter
-   */
-  async testConnection(): Promise<boolean> {
-    try {
-      await generateText({
-        model: openrouter(DEFAULT_MODEL),
-        prompt: "Say 'OK' if you can read this.",
-        maxTokens: 10,
-      });
-      return true;
-    } catch (error) {
-      console.error("OpenRouter connection test failed:", error);
-      return false;
-    }
-  },
+
 };
 
 /**

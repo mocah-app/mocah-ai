@@ -18,7 +18,7 @@ export function ImageEditor({
   return (
     <div className="space-y-4">
       <div className="space-y-2">
-        <Label className="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+        <Label className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
           Image URL
         </Label>
         <div className="flex gap-2">
@@ -34,7 +34,7 @@ export function ImageEditor({
       </div>
 
       <div className="space-y-2">
-        <Label className="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+        <Label className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
           Alt Text
         </Label>
         <Input
@@ -45,7 +45,7 @@ export function ImageEditor({
       </div>
 
       {src && (
-        <div className="relative aspect-video rounded-md overflow-hidden border border-gray-200 dark:border-gray-700 bg-gray-100 dark:bg-gray-800">
+        <div className="relative aspect-video rounded-md overflow-hidden border border-border bg-muted">
           <img src={src} alt={alt} className="object-cover w-full h-full" />
         </div>
       )}

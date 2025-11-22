@@ -16,7 +16,7 @@ export function TextEditor({
 }: TextEditorProps) {
   return (
     <div className="space-y-2">
-      <Label className="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">
+      <Label className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
         {label}
       </Label>
       {value && value.length > 50 ? (

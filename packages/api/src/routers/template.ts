@@ -2,7 +2,7 @@ import { z } from "zod";
 import { TRPCError } from "@trpc/server";
 import { protectedProcedure, router } from "../index";
 import { organizationProcedure } from "../middleware";
-import { aiClient } from "../lib/ai";
+import { aiClient, TEMPLATE_GENERATION_MODEL } from "../lib/ai";
 import {
   buildTemplateGenerationPrompt,
   templateGenerationSchema,
@@ -152,7 +152,7 @@ export const templateRouter = router({
       const result = await aiClient.generateStructured(
         templateGenerationSchema,
         prompt,
-        "google/gemini-flash-1.5"
+        TEMPLATE_GENERATION_MODEL
       );
 
       // 3. Transform sections (flatten content)
@@ -254,7 +254,7 @@ export const templateRouter = router({
       const result = await aiClient.generateStructured(
         templateGenerationSchema,
         prompt,
-        "google/gemini-flash-1.5"
+        TEMPLATE_GENERATION_MODEL
       );
 
       // Transform sections
