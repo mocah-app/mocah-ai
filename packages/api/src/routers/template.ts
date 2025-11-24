@@ -339,6 +339,7 @@ export const templateRouter = router({
   create: organizationProcedure
     .input(
       z.object({
+        id: z.uuid().optional(), // Allow client-provided UUID
         name: z.string().min(1),
         description: z.string().optional(),
         subject: z.string().optional(),
@@ -348,8 +349,23 @@ export const templateRouter = router({
       })
     )
     .mutation(async ({ ctx, input }) => {
+      // Check if ID already exists (collision detection)
+      if (input.id) {
+        const existing = await ctx.db.template.findUnique({
+          where: { id: input.id },
+        });
+        
+        if (existing) {
+          throw new TRPCError({
+            code: "CONFLICT",
+            message: "Template ID already exists",
+          });
+        }
+      }
+
       const template = await ctx.db.template.create({
         data: {
+          ...(input.id && { id: input.id }), // Use client ID if provided
           organizationId: ctx.organizationId,
           name: input.name,
           description: input.description,

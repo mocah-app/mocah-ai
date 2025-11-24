@@ -43,53 +43,6 @@ export function TemplateNode({ data, id }: TemplateNodeProps) {
 
   // Show loading state if isLoading is true
   if (data.isLoading) {
-    return (
-      <div className="bg-background rounded-lg shadow-lg border border-border w-[600px] relative">
-        {/* Connection handles - hidden during loading */}
-        <Handle
-          type="source"
-          position={Position.Right}
-          className="opacity-0 pointer-events-none"
-          style={{
-            position: "absolute",
-            right: "-20px",
-          }}
-        />
-
-        {/* Loading Content */}
-        <div className="min-h-[500px] flex flex-col items-center justify-center p-12">
-          {/* Animated Gradient Orb */}
-          <div className="relative mb-8">
-            <div className="w-48 h-48 rounded-full bg-linear-to-br from-blue-500 via-purple-500 to-pink-500 animate-pulse opacity-80" />
-            <div className="absolute inset-0 w-48 h-48 rounded-full bg-linear-to-tr from-purple-600 via-pink-600 to-orange-500 animate-pulse opacity-60 blur-xl" />
-          </div>
-
-          {/* Text */}
-          <h3 className="text-2xl font-semibold text-foreground mb-2">
-            Breathing life into your email
-          </h3>
-          <p className="text-muted-foreground text-sm">
-            Mocah is doing its magic...
-          </p>
-
-          {/* Animated Dots */}
-          <div className="flex gap-2 mt-6">
-            <div
-              className="w-2 h-2 bg-primary rounded-full animate-bounce"
-              style={{ animationDelay: "0ms" }}
-            />
-            <div
-              className="w-2 h-2 bg-primary rounded-full animate-bounce"
-              style={{ animationDelay: "150ms" }}
-            />
-            <div
-              className="w-2 h-2 bg-primary rounded-full animate-bounce"
-              style={{ animationDelay: "300ms" }}
-            />
-          </div>
-        </div>
-      </div>
-    );
   }
 
   return (
@@ -119,13 +72,17 @@ export function TemplateNode({ data, id }: TemplateNodeProps) {
       />
 
       {/* Node Body */}
-      <div className="min-h-[400px] max-h-[600px] overflow-auto">
-        {mode === "view" ? (
-          <ViewModeContent template={data.template} />
-        ) : (
-          <CodeModeContent template={data.template} nodeId={nodeId} />
-        )}
-      </div>
+      {data.isLoading && !data.template ? (
+        <LoadingState />
+      ) : (
+        <div className={`min-h-[400px] max-h-[600px] overflow-auto`}>
+          {mode === "view" ? (
+            <ViewModeContent template={data.template} />
+          ) : (
+            <CodeModeContent template={data.template} nodeId={nodeId} />
+          )}
+        </div>
+      )}
 
       {/* Node Footer */}
       <div className="px-2 py-1 bg-muted border-t border-border flex items-center justify-between text-xs text-muted-foreground">
@@ -137,6 +94,45 @@ export function TemplateNode({ data, id }: TemplateNodeProps) {
         <Button variant="link" className="text-primary hover:underline text-xs">
           Branch Out
         </Button>
+      </div>
+    </div>
+  );
+}
+
+function LoadingState() {
+  return (
+    <div className="bg-background rounded-lg shadow-lg border border-border w-[600px] relative">
+      {/* Loading Content */}
+      <div className="min-h-[500px] flex flex-col items-center justify-center p-12">
+        {/* Animated Gradient Orb */}
+        <div className="relative mb-8 blur-3xl">
+          <div className="w-48 h-48 rounded-full bg-linear-to-br from-blue-500 via-purple-500 to-pink-500 animate-pulse opacity-80" />
+          <div className="absolute inset-0 w-48 h-48 rounded-full bg-linear-to-tr from-purple-600 via-pink-600 to-orange-500 animate-pulse opacity-60 blur-xl" />
+        </div>
+
+        {/* Text */}
+        <h3 className="text-2xl font-semibold text-foreground mb-2">
+          Breathing life into your email
+        </h3>
+        <p className="text-muted-foreground text-sm">
+          Mocah is doing its magic...
+        </p>
+
+        {/* Animated Dots */}
+        <div className="flex gap-2 mt-6">
+          <div
+            className="w-2 h-2 bg-primary rounded-full animate-bounce"
+            style={{ animationDelay: "0ms" }}
+          />
+          <div
+            className="w-2 h-2 bg-primary rounded-full animate-bounce"
+            style={{ animationDelay: "150ms" }}
+          />
+          <div
+            className="w-2 h-2 bg-primary rounded-full animate-bounce"
+            style={{ animationDelay: "300ms" }}
+          />
+        </div>
       </div>
     </div>
   );

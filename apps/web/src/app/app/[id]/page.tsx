@@ -21,22 +21,26 @@ function EditorContent() {
   const { getPrompt, clearPrompt } = useTemplateCreation();
   const params = useParams();
   const templateId = params.id as string;
-  const isNewTemplate = templateId === "new" || templateId === "new-draft";
-  const [activePanel, setActivePanel] = React.useState<string | null>(isNewTemplate ? "chat" : null);
+  const [activePanel, setActivePanel] = React.useState<string | null>(null);
   const [initialPrompt, setInitialPrompt] = React.useState<string | null>(null);
 
-  // Read prompt from sessionStorage on mount
+  // Read prompt from sessionStorage on mount and auto-open chat if present
   useEffect(() => {
     const prompt = getPrompt();
     if (prompt) {
       setInitialPrompt(prompt);
+      setActivePanel("chat"); // Auto-open chat panel
     }
   }, [getPrompt]);
 
   // Initialize template node - either loading or with data
   useEffect(() => {
     // If we already have a template node, don't create another
-    if (canvasState.nodes.some(n => n.id === 'template-node' || n.id.startsWith('template-'))) {
+    if (
+      canvasState.nodes.some(
+        (n) => n.id === "template-node" || n.id.startsWith("template-")
+      )
+    ) {
       return;
     }
 
@@ -93,43 +97,59 @@ function EditorContent() {
 
       canvasActions.addNode(initialNode);
     }
-  }, [templateState.isStreaming, templateState.currentTemplate, canvasState.nodes, canvasActions]);
+  }, [
+    templateState.isStreaming,
+    templateState.currentTemplate,
+    canvasState.nodes,
+    canvasActions,
+  ]);
 
-  // Update existing node when streaming completes or template changes
+  // Update existing node when template content changes
   useEffect(() => {
-    const existingNode = canvasState.nodes.find(n => n.id === 'template-node');
-    if (!existingNode) return;
+    const existingNode = canvasState.nodes.find(
+      (n) => n.id === "template-node"
+    );
+    if (!existingNode || !templateState.currentTemplate) return;
 
-    // Update node from loading to loaded state
-    if (!templateState.isStreaming && templateState.currentTemplate && existingNode.data.isLoading) {
-      const template = templateState.currentTemplate;
+    const template = templateState.currentTemplate;
 
-      let templateContent = { sections: [] };
-      if (typeof template.content === "string") {
-        try {
-          templateContent = JSON.parse(template.content);
-        } catch (e) {
-          console.error("Failed to parse template content", e);
-        }
-      } else if (typeof template.content === "object") {
-        templateContent = template.content;
+    let templateContent = { sections: [] };
+    if (typeof template.content === "string") {
+      try {
+        templateContent = JSON.parse(template.content);
+      } catch (e) {
+        console.error("Failed to parse template content", e);
       }
-
-      canvasActions.updateNode(existingNode.id, {
-        data: {
-          id: template.id,
-          version: 1,
-          name: template.name,
-          isCurrent: true,
-          isLoading: false,
-          template: templateContent,
-          metadata: {
-            createdAt: template.createdAt,
-            updatedAt: template.updatedAt,
-          },
-        },
-      });
+    } else if (typeof template.content === "object") {
+      templateContent = template.content;
     }
+
+    // Check if content actually changed (avoid infinite updates)
+    const currentContent = JSON.stringify(existingNode.data.template);
+    const newContent = JSON.stringify(templateContent);
+
+    if (
+      currentContent === newContent &&
+      existingNode.data.name === template.name
+    ) {
+      return; // No changes, skip update
+    }
+
+    // Update node with latest content
+    canvasActions.updateNode(existingNode.id, {
+      data: {
+        id: template.id,
+        version: 1,
+        name: template.name,
+        isCurrent: true,
+        isLoading: templateState.isStreaming,
+        template: templateContent,
+        metadata: {
+          createdAt: template.createdAt,
+          updatedAt: template.updatedAt,
+        },
+      },
+    });
   }, [
     templateState.isStreaming,
     templateState.currentTemplate,

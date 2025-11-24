@@ -54,15 +54,18 @@ export function NodeHeader({
         {/* Version Badge */}
 
         {/* Node Title */}
-        <h3 className="text-sm font-semibold text-muted-foreground line-clamp-1 max-w-[200px]">
-          {name}
-        </h3>
+        <h3 className="sr-only">{name}</h3>
 
-        {/* Current Indicator */}
-        {isCurrent && <Badge variant="success">Current</Badge>}
-        <Badge variant="outline" className="text-xs px-1">
-          v{version}
-        </Badge>
+        {/* Indicator */}
+       {isCurrent ? (
+        <Badge variant="success" className="text-xs px-1">
+            V {version} - current
+          </Badge>
+        ) : (
+          <Badge variant="outline" className="text-xs px-1">
+            V {version}
+          </Badge>
+        )}
       </div>
 
       {/* Actions */}
@@ -70,27 +73,23 @@ export function NodeHeader({
         {/* View/Code Toggle */}
 
         <div className="flex items-center gap-2 bg-card rounded-md">
-
-        <Button
-          variant="ghost"
-          size="icon"
-          
-          onClick={handleToggleMode}
-          className={currentMode === "view" ? "bg-accent" : ""}
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={handleToggleMode}
+            className={currentMode === "view" ? "bg-accent" : ""}
           >
             <Eye className="size-4 text-muted-foreground" />
-
           </Button>
-        <Button
-          variant="ghost"
-          size="icon"
-          onClick={handleToggleMode}
-          className={currentMode === "code" ? "bg-accent" : ""}
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={handleToggleMode}
+            className={currentMode === "code" ? "bg-accent" : ""}
           >
             <Code className="size-4 text-muted-foreground" />
-
           </Button>
-          </div>
+        </div>
 
         <DropdownMenu>
           <DropdownMenuTrigger>

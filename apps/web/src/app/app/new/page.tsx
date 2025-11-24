@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { useOrganization } from "@/contexts/organization-context";
 import { useTemplateCreation } from "@/utils/store-prompt-in-session";
+import { trpc } from "@/utils/trpc";
 import { CircleChevronUp, Loader, Plus, Send } from "lucide-react";
 import { useRouter } from "next/navigation";
 import React, { useState } from "react";
@@ -14,6 +15,8 @@ export default function NewTemplatePage() {
   const { activeOrganization } = useOrganization();
   const { setPrompt: setCreationPrompt } = useTemplateCreation();
   const [prompt, setPrompt] = useState("");
+
+  const createSkeletonMutation = trpc.template.create.useMutation();
 
   const handleGenerate = () => {
     if (!prompt.trim()) {
@@ -26,11 +29,33 @@ export default function NewTemplatePage() {
       return;
     }
 
-    // Store prompt in sessionStorage
+    // Generate UUID client-side for instant navigation
+    const templateId = crypto.randomUUID();
+
+    // Store prompt for the streaming process
     setCreationPrompt(prompt.trim());
-    
-    // Navigate
-    router.push("/app/new-draft");
+
+    // Navigate immediately (optimistic UI)
+    router.push(`/app/${templateId}`);
+
+    // Create skeleton in background (fire-and-forget)
+    createSkeletonMutation.mutate(
+      {
+        id: templateId, // Use pre-generated ID
+        name: "Empty Template",
+        description: "This is an empty template",
+        subject: prompt.trim().slice(0, 100),
+        content: JSON.stringify({ sections: [] }),
+        isPublic: false,
+      },
+      {
+        onError: (error) => {
+          console.error("Failed to create skeleton template:", error);
+          // User already navigated, show toast but don't block
+          toast.error("Failed to initialize template");
+        },
+      }
+    );
   };
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
@@ -43,19 +68,31 @@ export default function NewTemplatePage() {
   // Suggested prompts
   const suggestedPrompts = [
     {
-      title: "Create a welcome email for new subscribers with a coupon code",
+      label: "Welcome Email",
+      prompt: "Create a welcome email for new subscribers with a coupon code",
     },
     {
-      title: "Write a Black Friday sales announcement with bold product highlights",
+      label: "Black Friday Sales",
+      prompt:
+        "Write a Black Friday sales announcement with bold product highlights",
     },
     {
-      title: "Generate a monthly newsletter for a SaaS business with feature updates",
+      label: "Monthly Newsletter",
+      prompt:
+        "Generate a monthly newsletter for a SaaS business with feature updates",
     },
     {
-      title: "Draft an abandoned cart reminder email for an online store",
+      label: "Abandoned Cart Reminder",
+      prompt: "Draft an abandoned cart reminder email for an online store",
     },
     {
-      title: "Design a feedback request email post-purchase with a discount for reviews",
+      label: "Feedback Request",
+      prompt:
+        "Design a feedback request email post-purchase with a discount for reviews",
+    },
+    {
+      label: "Product Launch",
+      prompt: "Create a product launch email for a new product with a discount",
     },
   ];
 
@@ -113,15 +150,15 @@ export default function NewTemplatePage() {
           <h3 className="text-sm font-medium text-muted-foreground">
             Suggested prompts
           </h3>
-          <div className="grid grid-cols-1 gap-3">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
             {suggestedPrompts.map((suggestion, index) => (
               <Button
                 variant="outline"
                 key={index}
-                onClick={() => setPrompt(suggestion.title)}
-                className="w-full justify-between h-auto group/item overflow-clip"
+                onClick={() => setPrompt(suggestion.prompt)}
+                className="w-full justify-between h-auto group/item overflow-clip hover:border-primary/50"
               >
-                <span className="text-wrap text-left">{suggestion.title}</span>
+                <span className="text-wrap text-left">{suggestion.label}</span>
                 <CircleChevronUp className="size-4 text-muted-foreground invisible group-hover/item:visible transition-all duration-200 translate-y-8 group-hover/item:translate-y-0" />
               </Button>
             ))}

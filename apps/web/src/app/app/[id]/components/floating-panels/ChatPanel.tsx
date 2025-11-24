@@ -28,7 +28,22 @@ export const ChatPanel = ({
   const { state: templateState, actions: templateActions } = useTemplate();
   const params = useParams();
   const templateId = params.id as string;
-  const isNewTemplate = templateId === "new" || templateId === "new-draft";
+  
+  // Check if template is a skeleton (needs generation)
+  const isNewTemplate = React.useMemo(() => {
+    if (!templateState.currentTemplate) return true;
+    
+    // Check if content is empty or just has empty sections
+    try {
+      const content = typeof templateState.currentTemplate.content === 'string'
+        ? JSON.parse(templateState.currentTemplate.content)
+        : templateState.currentTemplate.content;
+      
+      return !content.sections || content.sections.length === 0;
+    } catch {
+      return true;
+    }
+  }, [templateState.currentTemplate]);
 
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState("");
@@ -90,14 +105,25 @@ export const ChatPanel = ({
     ]);
 
     try {
-      // Check if we're creating a new template or updating existing one
-      const isCreatingNew =
-        templateId === "new" ||
-        templateId === "new-draft" ||
-        !templateState.currentTemplate;
+      // Check if we're generating for the first time (skeleton template) or updating
+      // A skeleton template has empty sections
+      let isGeneratingFirstTime = false;
+      if (templateState.currentTemplate) {
+        try {
+          const content = typeof templateState.currentTemplate.content === 'string'
+            ? JSON.parse(templateState.currentTemplate.content)
+            : templateState.currentTemplate.content;
+          
+          isGeneratingFirstTime = !content.sections || content.sections.length === 0;
+        } catch {
+          isGeneratingFirstTime = true;
+        }
+      } else {
+        isGeneratingFirstTime = true;
+      }
 
-      if (isCreatingNew) {
-        // Use streaming for new templates
+      if (isGeneratingFirstTime) {
+        // Use streaming for first-time generation
         console.log('Calling generateTemplateStream with prompt:', promptText);
         await templateActions.generateTemplateStream(promptText);
 
