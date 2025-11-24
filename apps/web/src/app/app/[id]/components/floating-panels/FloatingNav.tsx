@@ -6,7 +6,7 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
-import { Download, FileSliders, History, LibraryBig, MessageSquare } from "lucide-react";
+import { Download, FileSliders, History, LibraryBig, MessageCircle } from "lucide-react";
 
 interface FloatingNavProps {
   activePanel: string | null;
@@ -14,7 +14,7 @@ interface FloatingNavProps {
 }
 
 const NAV_ITEMS = [
-  { id: "chat", icon: MessageSquare, label: "Chat" },
+  { id: "chat", icon: MessageCircle, label: "Chat" },
   { id: "editor", icon: FileSliders, label: "Editor" },
   { id: "library", icon: LibraryBig, label: "Library" },
   { id: "versions", icon: History, label: "Versions" },

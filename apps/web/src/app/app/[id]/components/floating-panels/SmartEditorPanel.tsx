@@ -6,6 +6,7 @@ import {
   Image as ImageIcon,
   MousePointer,
   Layout,
+  FileSliders,
 } from "lucide-react";
 import { useEditorMode } from "../providers/EditorModeProvider";
 import { useTemplate } from "../providers/TemplateProvider";
@@ -19,6 +20,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
+import Loader from "@/components/loader";
 
 export const SmartEditorPanel = ({
   isOpen,
@@ -127,18 +129,14 @@ export const SmartEditorPanel = ({
       {!selectedElement ? (
         <>
           {/* Header */}
-          <div className="p-4 border-b border-border flex justify-between items-center bg-muted">
+          <div className="p-2 border-b border-border flex justify-between items-center bg-muted">
             <div className="flex items-center gap-2">
-              <Layout className="w-4 h-4 text-primary" />
-              <h3 className="font-semibold text-sm text-foreground">
-                Smart Editor
+              <FileSliders className="size-3 text-primary" />
+              <h3 className="font-semibold text-sm">
+                Editor
               </h3>
             </div>
-            <Button
-              onClick={onClose}
-              variant="ghost"
-              size="icon"
-            >
+            <Button onClick={onClose} variant="outline" size="icon">
               <X size={16} />
             </Button>
           </div>
@@ -154,174 +152,183 @@ export const SmartEditorPanel = ({
                   No Element Selected
                 </p>
                 <p className="text-xs text-muted-foreground max-w-[200px]">
-                  Click on any text, image, button, or section in your template to edit it here
+                  Click on any text, image, button, or section in your template
+                  to edit it here
                 </p>
               </div>
             </div>
           </div>
         </>
       ) : (
-        selectedElement && activeNode && (() => {
-        const currentValue = getValue(
-          activeNode.data as TemplateNodeData,
-          selectedElement
-        );
-        const property = selectedElement.split(".").pop();
+        selectedElement &&
+        activeNode &&
+        (() => {
+          const currentValue = getValue(
+            activeNode.data as TemplateNodeData,
+            selectedElement
+          );
+          const property = selectedElement.split(".").pop();
 
-        // Determine element type and icon
-        const getElementInfo = () => {
-          if (
-            property === "image" ||
-            property === "logo" ||
-            property === "imageUrl"
-          ) {
-            return { type: "Image", icon: ImageIcon };
-          }
-          if (
-            property === "buttonText" ||
-            property === "ctaText" ||
-            property === "buttonUrl"
-          ) {
-            return { type: "Button", icon: MousePointer };
-          }
-          if (property === "styles" || selectedElement.split(".").length === 2) {
-            return { type: "Section Layout", icon: Layout };
-          }
-          return { type: "Text", icon: Type };
-        };
+          // Determine element type and icon
+          const getElementInfo = () => {
+            if (
+              property === "image" ||
+              property === "logo" ||
+              property === "imageUrl"
+            ) {
+              return { type: "Image", icon: ImageIcon };
+            }
+            if (
+              property === "buttonText" ||
+              property === "ctaText" ||
+              property === "buttonUrl"
+            ) {
+              return { type: "Button", icon: MousePointer };
+            }
+            if (
+              property === "styles" ||
+              selectedElement.split(".").length === 2
+            ) {
+              return { type: "Section Layout", icon: Layout };
+            }
+            return { type: "Text", icon: Type };
+          };
 
-        const elementInfo = getElementInfo();
-        const ElementIcon = elementInfo.icon;
+          const elementInfo = getElementInfo();
+          const ElementIcon = elementInfo.icon;
 
-        const renderEditor = () => {
-    if (
-      property === "image" ||
-      property === "logo" ||
-      property === "imageUrl"
-    ) {
-      return (
-        <ImageEditor src={currentValue} onChange={(v) => handleUpdate(v.src)} />
-      );
-    }
-
-    if (property === "buttonText" || property === "ctaText") {
-      return (
-        <TextEditor
-          value={currentValue}
-          onChange={handleUpdate}
-          label="Button Text"
-        />
-      );
-    }
-
-    if (property === "buttonUrl") {
-      return (
-        <ButtonEditor
-          url={currentValue}
-          onChange={(v) => handleUpdate(v.url)}
-        />
-      );
-    }
-
-    // Check if editing section styles
-    if (property === "styles" || selectedElement.split(".").length === 2) {
-      // Editing a section itself (e.g., "sections.0")
-      const sectionPath = selectedElement.split(".").slice(0, 2).join(".");
-      const section = getValue(
-        activeNode.data as TemplateNodeData,
-        sectionPath
-      );
-
-      if (section && typeof section === "object") {
-        return (
-          <LayoutEditor
-            styles={section.styles || {}}
-            onChange={(newStyles) => {
-              const updatedSection = {
-                ...section,
-                styles: { ...section.styles, ...newStyles },
-              };
-              canvasActions.setNodes((nds) =>
-                nds.map((node) => {
-                  if (node.data.isCurrent || node.type === "template") {
-                    const newData = setValue(
-                      node.data as TemplateNodeData,
-                      sectionPath,
-                      updatedSection
-                    );
-                    return { ...node, data: newData };
-                  }
-                  return node;
-                })
+          const renderEditor = () => {
+            if (
+              property === "image" ||
+              property === "logo" ||
+              property === "imageUrl"
+            ) {
+              return (
+                <ImageEditor
+                  src={currentValue}
+                  onChange={(v) => handleUpdate(v.src)}
+                />
               );
-            }}
-          />
-        );
-      }
-    }
+            }
 
-    // Default to TextEditor for strings
-    if (typeof currentValue === "string") {
-      return (
-        <TextEditor
-          value={currentValue}
-          onChange={handleUpdate}
-          label={property}
-        />
-      );
-    }
+            if (property === "buttonText" || property === "ctaText") {
+              return (
+                <TextEditor
+                  value={currentValue}
+                  onChange={handleUpdate}
+                  label="Button Text"
+                />
+              );
+            }
 
-    return (
-      <div className="text-sm text-muted-foreground">
-        No editor available for this element type.
-      </div>
-    );
-  };
+            if (property === "buttonUrl") {
+              return (
+                <ButtonEditor
+                  url={currentValue}
+                  onChange={(v) => handleUpdate(v.url)}
+                />
+              );
+            }
 
-        return (
-          <>
-            {/* Header */}
-            <div className="p-4 border-b border-border flex justify-between items-center bg-muted">
-              <div className="flex items-center gap-2">
-                <ElementIcon className="w-4 h-4 text-primary" />
-                <h3 className="font-semibold text-sm text-foreground">
-                  {elementInfo.type}
-                </h3>
-              </div>
-              <Button
-                onClick={() => {
-                  editorActions.selectElement(null);
-                  onClose();
-                }}
-                variant="ghost"
-                size="icon"
-              >
-                <X size={16} />
-              </Button>
-            </div>
+            // Check if editing section styles
+            if (
+              property === "styles" ||
+              selectedElement.split(".").length === 2
+            ) {
+              // Editing a section itself (e.g., "sections.0")
+              const sectionPath = selectedElement
+                .split(".")
+                .slice(0, 2)
+                .join(".");
+              const section = getValue(
+                activeNode.data as TemplateNodeData,
+                sectionPath
+              );
 
-            {/* Content */}
-            <div className="p-4 flex-1 overflow-y-auto">
-              <div className="mb-4">
-                <label className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-1 block">
-                  Element Path
-                </label>
-                <code className="text-xs bg-muted px-2 py-1 rounded text-muted-foreground block truncate">
-                  {selectedElement}
-                </code>
-              </div>
-
-              {renderEditor()}
-            </div>
-
-            {/* AI Footer */}
-            <div className="p-3 bg-card border-t border-border">
-              <div className="space-y-2">
-                <div className="relative">
-                  <Sparkles
-                    className="absolute left-3 top-3 text-muted-foreground"
-                    size={14}
+              if (section && typeof section === "object") {
+                return (
+                  <LayoutEditor
+                    styles={section.styles || {}}
+                    onChange={(newStyles) => {
+                      const updatedSection = {
+                        ...section,
+                        styles: { ...section.styles, ...newStyles },
+                      };
+                      canvasActions.setNodes((nds) =>
+                        nds.map((node) => {
+                          if (node.data.isCurrent || node.type === "template") {
+                            const newData = setValue(
+                              node.data as TemplateNodeData,
+                              sectionPath,
+                              updatedSection
+                            );
+                            return { ...node, data: newData };
+                          }
+                          return node;
+                        })
+                      );
+                    }}
                   />
+                );
+              }
+            }
+
+            // Default to TextEditor for strings
+            if (typeof currentValue === "string") {
+              return (
+                <TextEditor
+                  value={currentValue}
+                  onChange={handleUpdate}
+                  label={property}
+                />
+              );
+            }
+
+            return (
+              <div className="text-sm text-muted-foreground">
+                No editor available for this element type.
+              </div>
+            );
+          };
+
+          return (
+            <>
+              {/* Header */}
+              <div className="p-2 border-b border-border flex justify-between items-center bg-muted">
+                <div className="flex items-center gap-2">
+                  <ElementIcon className="w-4 h-4 text-primary" />
+                  <h3 className="font-semibold text-sm text-foreground">
+                    {elementInfo.type}
+                  </h3>
+                </div>
+                <Button
+                  onClick={() => {
+                    editorActions.selectElement(null);
+                    onClose();
+                  }}
+                  variant="outline"
+                  size="icon"
+                >
+                  <X size={16} />
+                </Button>
+              </div>
+
+              {/* Content */}
+              <div className="p-4 flex-1 overflow-y-auto">
+                <div className="mb-4">
+                  <label className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-1 block">
+                    Element Path
+                  </label>
+                  <code className="text-xs bg-muted px-2 py-1 rounded text-muted-foreground block truncate">
+                    {selectedElement}
+                  </code>
+                </div>
+
+                {renderEditor()}
+              </div>
+
+              {/* AI Footer */}
+                <div className="space-y-2 relative px-2 pb-2">
                   <Textarea
                     value={aiPrompt}
                     onChange={(e) => setAiPrompt(e.target.value)}
@@ -331,25 +338,28 @@ export const SmartEditorPanel = ({
                       }
                     }}
                     placeholder="Refine this element with AI..."
-                    className="w-full pl-9 pr-3 py-2 text-sm bg-background border border-border rounded-lg focus:ring-2 focus:ring-primary outline-none shadow-sm resize-none"
-                    rows={2}
+                    className="focus:outline-none focus:ring-[0.2px] rounded-none focus:ring-teal-500 focus:ring-offset-0 focus:ring-offset-transparent resize-none max-h-[180px]"
+                    rows={3}
                     maxLength={500}
                     disabled={isRegenerating}
                   />
+                  <Button
+                    onClick={handleAIRegenerate}
+                    disabled={!aiPrompt.trim() || isRegenerating}
+                    size="icon"
+                    className="absolute bottom-2 right-1 w-8 h-8"
+                    aria-label="Regenerate"
+                  >
+                    {isRegenerating ? (
+                      <Loader />
+                    ) : (
+                      <Sparkles className="size-3" />
+                    )}
+                  </Button>
                 </div>
-                <Button
-                  onClick={handleAIRegenerate}
-                  disabled={!aiPrompt.trim() || isRegenerating}
-                  size="sm"
-                  className="w-full"
-                >
-                  {isRegenerating ? "Regenerating..." : "Regenerate"}
-                </Button>
-              </div>
-            </div>
-          </>
-        );
-      })()
+            </>
+          );
+        })()
       )}
     </div>
   );

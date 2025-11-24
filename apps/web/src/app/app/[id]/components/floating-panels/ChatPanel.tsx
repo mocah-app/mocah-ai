@@ -1,11 +1,12 @@
 import React, { useState, useEffect, useCallback, useRef } from "react";
-import { Send, X, Bot, User, Loader2, Sparkles } from "lucide-react";
+import { Send, X, Bot, User, Loader2, Sparkles, StopCircleIcon, MessageCircle } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useTemplate } from "../providers/TemplateProvider";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent } from "@/components/ui/card";
 import { useParams } from "next/navigation";
+import Loader from "@/components/loader";
 
 interface Message {
   id: string;
@@ -255,9 +256,10 @@ export const ChatPanel = ({
       {/* Header */}
       <div className="p-2 border-b border-border flex justify-between items-center bg-muted">
         <div className="flex items-center gap-2">
-          <h3 className="font-semibold text-sm text-muted-foreground">
-            Mocah AI
-          </h3>
+          <MessageCircle className="size-3 text-primary" />
+          <h3 className="font-semibold text-sm">
+            Chat
+            </h3>
         </div>
         <Button onClick={onClose} variant="outline" size="icon">
           <X size={16} />
@@ -321,7 +323,7 @@ export const ChatPanel = ({
           transitionDelay: isOpen ? "150ms" : "0ms",
         }}
       >
-        <div className="relative">
+        <div className="relative px-2 pb-2">
           <Textarea
             value={input}
             onChange={(e) => setInput(e.currentTarget.value)}
@@ -335,19 +337,15 @@ export const ChatPanel = ({
             maxLength={1000}
             rows={3}
             disabled={isLoading}
-            className="w-full bg-card rounded-none focus:ring-0 focus-visible:ring-0 focus-visible:ring-offset-0 focus:outline-none focus-visible:border-none outline-none resize-none max-h-[180px] disabled:opacity-50"
+            className="focus:outline-none focus:ring-[0.2px] rounded-none focus:ring-teal-500 focus:ring-offset-0 focus:ring-offset-transparent resize-none max-h-[180px] disabled:opacity-50"
           />
           <Button
             onClick={handleSend}
             size="icon"
             disabled={isLoading || !input.trim()}
-            className="absolute right-2 bottom-0 -translate-y-1/4"
+            className="absolute right-2 bottom-2 w-8 h-8"
           >
-            {isLoading ? (
-              <div className="animate-spin h-4 w-4 border-2 border-current border-t-transparent rounded-full" />
-            ) : (
-              <Send size={14} />
-            )}
+            {isLoading ? <StopCircleIcon /> : <Send size={14} />}
           </Button>
         </div>
       </div>
