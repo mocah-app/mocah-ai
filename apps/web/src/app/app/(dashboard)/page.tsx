@@ -1,18 +1,19 @@
 "use client";
 import { authClient } from "@/lib/auth-client";
-import { redirect } from "next/navigation";
+import { useRouter } from "next/navigation";
 import { useEffect } from "react";
 import Dashboard from "./dashboard";
 import MocahLoadingIcon from "@/components/mocah-brand/MocahLoadingIcon";
 
 export default function DashboardPage() {
   const { data: session, isPending } = authClient.useSession();
+  const router = useRouter();
 
   useEffect(() => {
     if (!isPending && !session?.user) {
-      redirect("/login");
+      router.replace("/login");
     }
-  }, [session, isPending]);
+  }, [session, isPending, router]);
 
   if (isPending) {
     return (

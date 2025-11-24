@@ -27,7 +27,7 @@ export const FloatingNav = ({
 }: FloatingNavProps) => {
   return (
     <TooltipProvider delayDuration={300}>
-      <nav className="absolute top-0 bg-card shadow-lg border p-2 flex flex-col gap-1 z-50 h-dvh pt-8">
+      <nav className="bg-card shadow-lg border p-2 flex flex-col gap-1 z-50 h-dvh pt-8">
         {NAV_ITEMS.map((item) => {
           const isActive = activePanel === item.id;
           const Icon = item.icon;
@@ -38,7 +38,7 @@ export const FloatingNav = ({
                 <Button
                   variant={isActive ? "default" : "ghost"}
                   size="icon"
-                  onClick={() => onTogglePanel(isActive ? "" : item.id)}
+                  onClick={() => onTogglePanel(item.id)}
                   className={cn(
                     "h-10 w-10 rounded-xl transition-colors",
                     isActive && "shadow-md"

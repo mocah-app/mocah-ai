@@ -12,26 +12,57 @@ import { SmartEditorPanel } from "./components/floating-panels/SmartEditorPanel"
 import { ChatPanel } from "./components/floating-panels/ChatPanel";
 import { FloatingNav } from "./components/floating-panels/FloatingNav";
 import { useCanvas } from "./components/providers/CanvasProvider";
+import { useEditorMode } from "./components/providers/EditorModeProvider";
 import { useParams } from "next/navigation";
 import { useTemplateCreation } from "@/utils/store-prompt-in-session";
 
 function EditorContent() {
   const { state: templateState, actions: templateActions } = useTemplate();
   const { state: canvasState, actions: canvasActions } = useCanvas();
+  const { state: editorState, actions: editorActions } = useEditorMode();
   const { getPrompt, clearPrompt } = useTemplateCreation();
   const params = useParams();
   const templateId = params.id as string;
+  
+  // Read prompt immediately on first render for ChatPanel prop
+  const promptFromStorage = React.useMemo(() => getPrompt(), []);
   const [activePanel, setActivePanel] = React.useState<string | null>(null);
-  const [initialPrompt, setInitialPrompt] = React.useState<string | null>(null);
+  const [initialPrompt] = React.useState<string | null>(promptFromStorage);
 
-  // Read prompt from sessionStorage on mount and auto-open chat if present
+  // Auto-open chat if we have a prompt
   useEffect(() => {
-    const prompt = getPrompt();
-    if (prompt) {
-      setInitialPrompt(prompt);
-      setActivePanel("chat"); // Auto-open chat panel
+    if (promptFromStorage) {
+      setActivePanel("chat");
     }
-  }, [getPrompt]);
+  }, [promptFromStorage]);
+
+  // Auto-open editor panel when an element is selected
+  useEffect(() => {
+    if (editorState.selectedElement) {
+      setActivePanel("editor");
+    }
+    // Note: Don't auto-close editor when element is deselected
+    // User should be able to keep editor open to see instructions
+  }, [editorState.selectedElement]);
+
+  // Handle panel toggle with mutual exclusivity
+  const handlePanelToggle = (panel: string) => {
+    if (activePanel === panel) {
+      // Close the currently open panel
+      setActivePanel(null);
+      // If closing editor, also deselect element
+      if (panel === "editor") {
+        editorActions.selectElement(null);
+      }
+    } else {
+      // Open the new panel and close any other
+      setActivePanel(panel);
+      // If opening chat, close editor and deselect element
+      if (panel === "chat" && editorState.selectedElement) {
+        editorActions.selectElement(null);
+      }
+    }
+  };
 
   // Initialize template node - either loading or with data
   useEffect(() => {
@@ -158,16 +189,26 @@ function EditorContent() {
   ]);
 
   return (
-    <div className="h-screen w-full relative overflow-hidden">
+    <div className="h-screen w-full relative overflow-hidden flex">
+      <div className="flex h-dvh">
+        <FloatingNav activePanel={activePanel} onTogglePanel={handlePanelToggle} />
+        <ChatPanel
+          isOpen={activePanel === "chat"}
+          onClose={() => {
+            setActivePanel(null);
+          }}
+          initialPrompt={initialPrompt || undefined}
+          onPromptConsumed={clearPrompt}
+        />
+        <SmartEditorPanel
+          isOpen={activePanel === "editor"}
+          onClose={() => {
+            setActivePanel(null);
+            editorActions.selectElement(null);
+          }}
+        />
+      </div>
       <InfiniteCanvas />
-      <SmartEditorPanel />
-      <FloatingNav activePanel={activePanel} onTogglePanel={setActivePanel} />
-      <ChatPanel
-        isOpen={activePanel === "chat"}
-        onClose={() => setActivePanel(null)}
-        initialPrompt={initialPrompt || undefined}
-        onPromptConsumed={clearPrompt}
-      />
     </div>
   );
 }

@@ -41,10 +41,6 @@ export function TemplateNode({ data, id }: TemplateNodeProps) {
   const { actions, state } = useEditorMode();
   const mode = actions.getNodeMode(nodeId);
 
-  // Show loading state if isLoading is true
-  if (data.isLoading) {
-  }
-
   return (
     <div className="bg-background rounded-lg shadow-lg border border-border w-[600px] relative">
       {/* Connection handles */}
@@ -72,7 +68,7 @@ export function TemplateNode({ data, id }: TemplateNodeProps) {
       />
 
       {/* Node Body */}
-      {data.isLoading && !data.template ? (
+      {data.isLoading ? (
         <LoadingState />
       ) : (
         <div className={`min-h-[400px] max-h-[600px] overflow-auto`}>

@@ -35,7 +35,7 @@ interface TemplateCardProps {
 
 const TemplateCard = ({ template }: TemplateCardProps) => {
   return (
-    <Link href={`/app/[id]${template.id}`}>
+    <Link href={`/app/${template.id}`}>
       <Card className="gap-0 hover:shadow-md transition-all duration-300 group p-0 h-full overflow-hidden">
         <CardHeader className="p-0">
           <div className="flex items-start justify-between">

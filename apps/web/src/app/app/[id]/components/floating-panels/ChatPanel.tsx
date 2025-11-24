@@ -28,17 +28,37 @@ export const ChatPanel = ({
   const { state: templateState, actions: templateActions } = useTemplate();
   const params = useParams();
   const templateId = params.id as string;
-  
+
+  // Track if this is the first time opening with an initial prompt
+  // If so, we skip the transition to make it appear instantly
+  const [enableTransition, setEnableTransition] = React.useState(
+    () => !initialPrompt
+  );
+
+  // Use layoutEffect + RAF for frame-synchronized transition enabling
+  React.useLayoutEffect(() => {
+    // If we started without transition (had initialPrompt), enable it after paint
+    if (!enableTransition) {
+      // Double RAF ensures the transition class is added after the initial render is painted
+      requestAnimationFrame(() => {
+        requestAnimationFrame(() => {
+          setEnableTransition(true);
+        });
+      });
+    }
+  }, [enableTransition]);
+
   // Check if template is a skeleton (needs generation)
   const isNewTemplate = React.useMemo(() => {
     if (!templateState.currentTemplate) return true;
-    
+
     // Check if content is empty or just has empty sections
     try {
-      const content = typeof templateState.currentTemplate.content === 'string'
-        ? JSON.parse(templateState.currentTemplate.content)
-        : templateState.currentTemplate.content;
-      
+      const content =
+        typeof templateState.currentTemplate.content === "string"
+          ? JSON.parse(templateState.currentTemplate.content)
+          : templateState.currentTemplate.content;
+
       return !content.sections || content.sections.length === 0;
     } catch {
       return true;
@@ -65,113 +85,126 @@ export const ChatPanel = ({
     }
   }, [isNewTemplate, messages.length]);
 
-  const handleSendWithPrompt = useCallback(async (promptText: string) => {
-    if (!promptText.trim() || isLoading) {
-      console.log('handleSendWithPrompt: Invalid prompt or already loading', { promptText, isLoading });
-      return;
-    }
-
-    console.log('handleSendWithPrompt: Starting to send', promptText);
-
-    const newMessage: Message = {
-      id: Date.now().toString(),
-      role: "user",
-      content: promptText,
-    };
-    
-    // Use functional update to avoid dependency on messages
-    setMessages((prev) => {
-      // Check for duplicates using current state
-      if (prev.some((m) => m.content === promptText && m.role === "user")) {
-        console.log('handleSendWithPrompt: Duplicate message found, skipping');
-        return prev;
+  const handleSendWithPrompt = useCallback(
+    async (promptText: string) => {
+      if (!promptText.trim() || isLoading) {
+        console.log("handleSendWithPrompt: Invalid prompt or already loading", {
+          promptText,
+          isLoading,
+        });
+        return;
       }
-      return [...prev, newMessage];
-    });
-    
-    setInput("");
-    setIsLoading(true);
 
-    // Add streaming message placeholder
-    const streamingMessageId = (Date.now() + 1).toString();
-    setMessages((prev) => [
-      ...prev,
-      {
-        id: streamingMessageId,
-        role: "assistant",
-        content: "Generating your template...",
-        isStreaming: true,
-      },
-    ]);
+      console.log("handleSendWithPrompt: Starting to send", promptText);
 
-    try {
-      // Check if we're generating for the first time (skeleton template) or updating
-      // A skeleton template has empty sections
-      let isGeneratingFirstTime = false;
-      if (templateState.currentTemplate) {
-        try {
-          const content = typeof templateState.currentTemplate.content === 'string'
-            ? JSON.parse(templateState.currentTemplate.content)
-            : templateState.currentTemplate.content;
-          
-          isGeneratingFirstTime = !content.sections || content.sections.length === 0;
-        } catch {
+      const newMessage: Message = {
+        id: Date.now().toString(),
+        role: "user",
+        content: promptText,
+      };
+
+      // Use functional update to avoid dependency on messages
+      setMessages((prev) => {
+        // Check for duplicates using current state
+        if (prev.some((m) => m.content === promptText && m.role === "user")) {
+          console.log(
+            "handleSendWithPrompt: Duplicate message found, skipping"
+          );
+          return prev;
+        }
+        return [...prev, newMessage];
+      });
+
+      setInput("");
+      setIsLoading(true);
+
+      // Add streaming message placeholder
+      const streamingMessageId = (Date.now() + 1).toString();
+      setMessages((prev) => [
+        ...prev,
+        {
+          id: streamingMessageId,
+          role: "assistant",
+          content: "Generating your template...",
+          isStreaming: true,
+        },
+      ]);
+
+      try {
+        // Check if we're generating for the first time (skeleton template) or updating
+        // A skeleton template has empty sections
+        let isGeneratingFirstTime = false;
+        if (templateState.currentTemplate) {
+          try {
+            const content =
+              typeof templateState.currentTemplate.content === "string"
+                ? JSON.parse(templateState.currentTemplate.content)
+                : templateState.currentTemplate.content;
+
+            isGeneratingFirstTime =
+              !content.sections || content.sections.length === 0;
+          } catch {
+            isGeneratingFirstTime = true;
+          }
+        } else {
           isGeneratingFirstTime = true;
         }
-      } else {
-        isGeneratingFirstTime = true;
-      }
 
-      if (isGeneratingFirstTime) {
-        // Use streaming for first-time generation
-        console.log('Calling generateTemplateStream with prompt:', promptText);
-        await templateActions.generateTemplateStream(promptText);
+        if (isGeneratingFirstTime) {
+          // Use streaming for first-time generation
+          console.log(
+            "Calling generateTemplateStream with prompt:",
+            promptText
+          );
+          await templateActions.generateTemplateStream(promptText);
 
-        // Update message when streaming completes
+          // Update message when streaming completes
+          setMessages((prev) =>
+            prev.map((msg) =>
+              msg.id === streamingMessageId
+                ? {
+                    ...msg,
+                    content:
+                      "I've created a new template based on your request. You can now edit it in the canvas!",
+                    isStreaming: false,
+                  }
+                : msg
+            )
+          );
+        } else {
+          // Use regenerate for existing templates (non-streaming for now)
+          await templateActions.regenerateTemplate(promptText);
+          setMessages((prev) =>
+            prev.map((msg) =>
+              msg.id === streamingMessageId
+                ? {
+                    ...msg,
+                    content: "I've updated the template based on your request.",
+                    isStreaming: false,
+                  }
+                : msg
+            )
+          );
+        }
+      } catch (error) {
+        console.error("Chat error:", error);
         setMessages((prev) =>
           prev.map((msg) =>
             msg.id === streamingMessageId
               ? {
                   ...msg,
-                  content:
-                    "I've created a new template based on your request. You can now edit it in the canvas!",
+                  content: "Sorry, I encountered an error. Please try again.",
                   isStreaming: false,
                 }
               : msg
           )
         );
-      } else {
-        // Use regenerate for existing templates (non-streaming for now)
-        await templateActions.regenerateTemplate(promptText);
-        setMessages((prev) =>
-          prev.map((msg) =>
-            msg.id === streamingMessageId
-              ? {
-                  ...msg,
-                  content: "I've updated the template based on your request.",
-                  isStreaming: false,
-                }
-              : msg
-          )
-        );
+      } finally {
+        setIsLoading(false);
       }
-    } catch (error) {
-      console.error("Chat error:", error);
-      setMessages((prev) =>
-        prev.map((msg) =>
-          msg.id === streamingMessageId
-            ? {
-                ...msg,
-                content: "Sorry, I encountered an error. Please try again.",
-                isStreaming: false,
-              }
-            : msg
-        )
-      );
-    } finally {
-      setIsLoading(false);
-    }
-  }, [templateId, templateState.currentTemplate, templateActions, isLoading]);
+    },
+    [templateId, templateState.currentTemplate, templateActions, isLoading]
+  );
 
   // Auto-send initial prompt if provided
   useEffect(() => {
@@ -180,22 +213,26 @@ export const ChatPanel = ({
       return;
     }
 
-    console.log('Auto-send triggered:', { isOpen, initialPrompt, hasAutoSent: hasAutoSentRef.current });
+    console.log("Auto-send triggered:", {
+      isOpen,
+      initialPrompt,
+      hasAutoSent: hasAutoSentRef.current,
+    });
 
     // Mark as sent immediately to prevent double-send
     hasAutoSentRef.current = true;
-    console.log('Sending prompt:', initialPrompt);
-    
+    console.log("Sending prompt:", initialPrompt);
+
     // Trigger send after a small delay to ensure UI is ready
     const timeoutId = setTimeout(async () => {
-      console.log('Timeout fired, calling handleSendWithPrompt');
+      console.log("Timeout fired, calling handleSendWithPrompt");
       await handleSendWithPrompt(initialPrompt);
       // Clear the prompt from context after it's been sent
       onPromptConsumed?.();
     }, 500);
 
     return () => {
-      console.log('Cleaning up auto-send timeout');
+      console.log("Cleaning up auto-send timeout");
       clearTimeout(timeoutId);
     };
   }, [isOpen, initialPrompt, handleSendWithPrompt, onPromptConsumed]);
@@ -207,11 +244,12 @@ export const ChatPanel = ({
   return (
     <div
       className={cn(
-        "absolute top-0 left-14 w-96 bg-background rounded-r-xl shadow-2xl border border-border overflow-hidden flex flex-col z-40 h-dvh",
-        "transition-all duration-300 ease-in-out",
+        "bg-card rounded-r-xl shadow-2xl border border-border overflow-hidden flex flex-col z-40 h-dvh",
+        // Skip transition on first render if opening with initialPrompt
+        enableTransition && "transition-all duration-300 ease-in-out",
         isOpen
-          ? "translate-x-0 opacity-100"
-          : "-translate-x-full opacity-0 pointer-events-none"
+          ? "translate-x-0 opacity-100 w-80"
+          : "-translate-x-full opacity-0 pointer-events-none w-0"
       )}
     >
       {/* Header */}

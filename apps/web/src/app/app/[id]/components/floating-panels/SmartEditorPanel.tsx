@@ -18,8 +18,15 @@ import type { TemplateNodeData } from "../nodes/TemplateNode";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
+import { cn } from "@/lib/utils";
 
-export const SmartEditorPanel = () => {
+export const SmartEditorPanel = ({
+  isOpen,
+  onClose,
+}: {
+  isOpen: boolean;
+  onClose: () => void;
+}) => {
   const { state: editorState, actions: editorActions } = useEditorMode();
   const { actions: templateActions } = useTemplate();
   const { state: canvasState, actions: canvasActions } = useCanvas();
@@ -93,14 +100,13 @@ export const SmartEditorPanel = () => {
     const handleEscape = (e: KeyboardEvent) => {
       if (e.key === "Escape" && selectedElement) {
         editorActions.selectElement(null);
+        onClose();
       }
     };
 
     document.addEventListener("keydown", handleEscape);
     return () => document.removeEventListener("keydown", handleEscape);
-  }, [selectedElement, editorActions]);
-
-  if (!selectedElement) return null;
+  }, [selectedElement, editorActions, onClose]);
 
   // Get current value to render
   const nodes = canvasState.nodes;
@@ -108,40 +114,86 @@ export const SmartEditorPanel = () => {
     nodes.find((n) => n.data.isCurrent) ||
     nodes.find((n) => n.type === "template");
 
-  if (!activeNode) return null;
+  return (
+    <div
+      className={cn(
+        "bg-card rounded-r-xl shadow-2xl border border-border overflow-hidden flex flex-col z-40 h-dvh",
+        "transition-all duration-300 ease-in-out",
+        isOpen
+          ? "translate-x-0 opacity-100 w-80"
+          : "-translate-x-full opacity-0 pointer-events-none w-0"
+      )}
+    >
+      {!selectedElement ? (
+        <>
+          {/* Header */}
+          <div className="p-4 border-b border-border flex justify-between items-center bg-muted">
+            <div className="flex items-center gap-2">
+              <Layout className="w-4 h-4 text-primary" />
+              <h3 className="font-semibold text-sm text-foreground">
+                Smart Editor
+              </h3>
+            </div>
+            <Button
+              onClick={onClose}
+              variant="ghost"
+              size="icon"
+            >
+              <X size={16} />
+            </Button>
+          </div>
 
-  const currentValue = getValue(
-    activeNode.data as TemplateNodeData,
-    selectedElement
-  );
-  const property = selectedElement.split(".").pop();
+          {/* Empty State */}
+          <div className="flex-1 flex items-center justify-center p-6">
+            <div className="text-center space-y-3">
+              <div className="w-12 h-12 rounded-full bg-muted/50 flex items-center justify-center mx-auto">
+                <MousePointer className="w-6 h-6 text-muted-foreground" />
+              </div>
+              <div className="space-y-1">
+                <p className="text-sm font-medium text-foreground">
+                  No Element Selected
+                </p>
+                <p className="text-xs text-muted-foreground max-w-[200px]">
+                  Click on any text, image, button, or section in your template to edit it here
+                </p>
+              </div>
+            </div>
+          </div>
+        </>
+      ) : (
+        selectedElement && activeNode && (() => {
+        const currentValue = getValue(
+          activeNode.data as TemplateNodeData,
+          selectedElement
+        );
+        const property = selectedElement.split(".").pop();
 
-  // Determine element type and icon
-  const getElementInfo = () => {
-    if (
-      property === "image" ||
-      property === "logo" ||
-      property === "imageUrl"
-    ) {
-      return { type: "Image", icon: ImageIcon };
-    }
-    if (
-      property === "buttonText" ||
-      property === "ctaText" ||
-      property === "buttonUrl"
-    ) {
-      return { type: "Button", icon: MousePointer };
-    }
-    if (property === "styles" || selectedElement.split(".").length === 2) {
-      return { type: "Section Layout", icon: Layout };
-    }
-    return { type: "Text", icon: Type };
-  };
+        // Determine element type and icon
+        const getElementInfo = () => {
+          if (
+            property === "image" ||
+            property === "logo" ||
+            property === "imageUrl"
+          ) {
+            return { type: "Image", icon: ImageIcon };
+          }
+          if (
+            property === "buttonText" ||
+            property === "ctaText" ||
+            property === "buttonUrl"
+          ) {
+            return { type: "Button", icon: MousePointer };
+          }
+          if (property === "styles" || selectedElement.split(".").length === 2) {
+            return { type: "Section Layout", icon: Layout };
+          }
+          return { type: "Text", icon: Type };
+        };
 
-  const elementInfo = getElementInfo();
-  const ElementIcon = elementInfo.icon;
+        const elementInfo = getElementInfo();
+        const ElementIcon = elementInfo.icon;
 
-  const renderEditor = () => {
+        const renderEditor = () => {
     if (
       property === "image" ||
       property === "logo" ||
@@ -226,72 +278,79 @@ export const SmartEditorPanel = () => {
     );
   };
 
-  return (
-    <div className="absolute top-20 right-4 w-80 bg-card rounded-xl shadow-2xl border border-border overflow-hidden flex flex-col animate-in slide-in-from-right-10 fade-in duration-200 z-50 max-h-[calc(100vh-8rem)]">
-      {/* Header */}
-      <div className="p-4 border-b border-border flex justify-between items-center bg-muted">
-        <div className="flex items-center gap-2">
-          <ElementIcon className="w-4 h-4 text-primary" />
-          <h3 className="font-semibold text-sm text-foreground">
-            {elementInfo.type}
-          </h3>
-        </div>
-        <Button
-          onClick={() => editorActions.selectElement(null)}
-          variant="ghost"
-          size="icon"
-        >
-          <X size={16} />
-        </Button>
-      </div>
+        return (
+          <>
+            {/* Header */}
+            <div className="p-4 border-b border-border flex justify-between items-center bg-muted">
+              <div className="flex items-center gap-2">
+                <ElementIcon className="w-4 h-4 text-primary" />
+                <h3 className="font-semibold text-sm text-foreground">
+                  {elementInfo.type}
+                </h3>
+              </div>
+              <Button
+                onClick={() => {
+                  editorActions.selectElement(null);
+                  onClose();
+                }}
+                variant="ghost"
+                size="icon"
+              >
+                <X size={16} />
+              </Button>
+            </div>
 
-      {/* Content */}
-      <div className="p-4 flex-1 overflow-y-auto">
-        <div className="mb-4">
-          <label className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-1 block">
-            Element Path
-          </label>
-          <code className="text-xs bg-muted px-2 py-1 rounded text-muted-foreground block truncate">
-            {selectedElement}
-          </code>
-        </div>
+            {/* Content */}
+            <div className="p-4 flex-1 overflow-y-auto">
+              <div className="mb-4">
+                <label className="text-xs font-medium text-muted-foreground uppercase tracking-wider mb-1 block">
+                  Element Path
+                </label>
+                <code className="text-xs bg-muted px-2 py-1 rounded text-muted-foreground block truncate">
+                  {selectedElement}
+                </code>
+              </div>
 
-        {renderEditor()}
-      </div>
+              {renderEditor()}
+            </div>
 
-      {/* AI Footer */}
-      <div className="p-3 bg-muted border-t border-border">
-        <div className="space-y-2">
-          <div className="relative">
-            <Sparkles
-              className="absolute left-3 top-3 text-muted-foreground"
-              size={14}
-            />
-            <Textarea
-              value={aiPrompt}
-              onChange={(e) => setAiPrompt(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) {
-                  handleAIRegenerate();
-                }
-              }}
-              placeholder="Refine this element with AI..."
-              className="w-full pl-9 pr-3 py-2 text-sm bg-background border border-border rounded-lg focus:ring-2 focus:ring-primary outline-none shadow-sm resize-none"
-              rows={2}
-              maxLength={500}
-              disabled={isRegenerating}
-            />
-          </div>
-          <Button
-            onClick={handleAIRegenerate}
-            disabled={!aiPrompt.trim() || isRegenerating}
-            size="sm"
-            className="w-full"
-          >
-            {isRegenerating ? "Regenerating..." : "Regenerate"}
-          </Button>
-        </div>
-      </div>
+            {/* AI Footer */}
+            <div className="p-3 bg-card border-t border-border">
+              <div className="space-y-2">
+                <div className="relative">
+                  <Sparkles
+                    className="absolute left-3 top-3 text-muted-foreground"
+                    size={14}
+                  />
+                  <Textarea
+                    value={aiPrompt}
+                    onChange={(e) => setAiPrompt(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) {
+                        handleAIRegenerate();
+                      }
+                    }}
+                    placeholder="Refine this element with AI..."
+                    className="w-full pl-9 pr-3 py-2 text-sm bg-background border border-border rounded-lg focus:ring-2 focus:ring-primary outline-none shadow-sm resize-none"
+                    rows={2}
+                    maxLength={500}
+                    disabled={isRegenerating}
+                  />
+                </div>
+                <Button
+                  onClick={handleAIRegenerate}
+                  disabled={!aiPrompt.trim() || isRegenerating}
+                  size="sm"
+                  className="w-full"
+                >
+                  {isRegenerating ? "Regenerating..." : "Regenerate"}
+                </Button>
+              </div>
+            </div>
+          </>
+        );
+      })()
+      )}
     </div>
   );
 };
