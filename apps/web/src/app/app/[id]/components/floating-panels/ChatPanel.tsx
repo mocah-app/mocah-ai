@@ -343,7 +343,7 @@ export const ChatPanel = ({
             onClick={handleSend}
             size="icon"
             disabled={isLoading || !input.trim()}
-            className="absolute right-2 bottom-2 w-8 h-8"
+            className="absolute right-3 bottom-3 w-8 h-8"
           >
             {isLoading ? <StopCircleIcon /> : <Send size={14} />}
           </Button>

@@ -328,7 +328,7 @@ export const SmartEditorPanel = ({
               </div>
 
               {/* AI Footer */}
-                <div className="space-y-2 relative px-2 pb-2">
+                <div className="relative px-2 pb-2">
                   <Textarea
                     value={aiPrompt}
                     onChange={(e) => setAiPrompt(e.target.value)}
@@ -347,7 +347,7 @@ export const SmartEditorPanel = ({
                     onClick={handleAIRegenerate}
                     disabled={!aiPrompt.trim() || isRegenerating}
                     size="icon"
-                    className="absolute bottom-2 right-1 w-8 h-8"
+                    className="absolute bottom-3 right-3 w-8 h-8"
                     aria-label="Regenerate"
                   >
                     {isRegenerating ? (

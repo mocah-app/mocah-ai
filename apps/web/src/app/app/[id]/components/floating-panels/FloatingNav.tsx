@@ -6,7 +6,15 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
-import { Download, FileSliders, History, LibraryBig, MessageCircle } from "lucide-react";
+import {
+  Download,
+  FileSliders,
+  History,
+  Home,
+  LibraryBig,
+  MessageCircle,
+} from "lucide-react";
+import Link from "next/link";
 
 interface FloatingNavProps {
   activePanel: string | null;
@@ -55,6 +63,21 @@ export const FloatingNav = ({
             </Tooltip>
           );
         })}
+
+        <div className="flex items-center gap-2 mt-auto">
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button asChild variant="ghost" size="icon">
+                <Link href="/app" aria-label="go to dashboard">
+                  <Home className="size-5" />
+                </Link>
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent side="right" sideOffset={8}>
+              Go to dashboard
+            </TooltipContent>
+          </Tooltip>
+        </div>
       </nav>
     </TooltipProvider>
   );
