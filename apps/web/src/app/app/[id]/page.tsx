@@ -12,26 +12,26 @@ import { SmartEditorPanel } from "./components/floating-panels/SmartEditorPanel"
 import { ChatPanel } from "./components/floating-panels/ChatPanel";
 import { FloatingNav } from "./components/floating-panels/FloatingNav";
 import { useCanvas } from "./components/providers/CanvasProvider";
-import { useParams, useSearchParams } from "next/navigation";
+import { useParams } from "next/navigation";
+import { useTemplateCreation } from "@/utils/store-prompt-in-session";
 
 function EditorContent() {
   const { state: templateState, actions: templateActions } = useTemplate();
   const { state: canvasState, actions: canvasActions } = useCanvas();
+  const { getPrompt, clearPrompt } = useTemplateCreation();
   const params = useParams();
-  const searchParams = useSearchParams();
   const templateId = params.id as string;
-  const promptFromUrl = searchParams.get("prompt");
   const isNewTemplate = templateId === "new" || templateId === "new-draft";
   const [activePanel, setActivePanel] = React.useState<string | null>(isNewTemplate ? "chat" : null);
+  const [initialPrompt, setInitialPrompt] = React.useState<string | null>(null);
 
-  // Debug logging
+  // Read prompt from sessionStorage on mount
   useEffect(() => {
-    console.log('[EditorContent] Mount:', { templateId, promptFromUrl, activePanel });
-  }, []);
-
-  useEffect(() => {
-    console.log('[EditorContent] promptFromUrl changed:', promptFromUrl);
-  }, [promptFromUrl]);
+    const prompt = getPrompt();
+    if (prompt) {
+      setInitialPrompt(prompt);
+    }
+  }, [getPrompt]);
 
   // Initialize template node - either loading or with data
   useEffect(() => {
@@ -145,7 +145,8 @@ function EditorContent() {
       <ChatPanel
         isOpen={activePanel === "chat"}
         onClose={() => setActivePanel(null)}
-        initialPrompt={promptFromUrl || undefined}
+        initialPrompt={initialPrompt || undefined}
+        onPromptConsumed={clearPrompt}
       />
     </div>
   );

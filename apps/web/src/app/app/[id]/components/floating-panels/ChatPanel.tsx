@@ -18,10 +18,12 @@ export const ChatPanel = ({
   isOpen,
   onClose,
   initialPrompt,
+  onPromptConsumed,
 }: {
   isOpen: boolean;
   onClose: () => void;
   initialPrompt?: string;
+  onPromptConsumed?: () => void;
 }) => {
   const { state: templateState, actions: templateActions } = useTemplate();
   const params = useParams();
@@ -159,16 +161,18 @@ export const ChatPanel = ({
     console.log('Sending prompt:', initialPrompt);
     
     // Trigger send after a small delay to ensure UI is ready
-    const timeoutId = setTimeout(() => {
+    const timeoutId = setTimeout(async () => {
       console.log('Timeout fired, calling handleSendWithPrompt');
-      handleSendWithPrompt(initialPrompt);
+      await handleSendWithPrompt(initialPrompt);
+      // Clear the prompt from context after it's been sent
+      onPromptConsumed?.();
     }, 500);
 
     return () => {
       console.log('Cleaning up auto-send timeout');
       clearTimeout(timeoutId);
     };
-  }, [isOpen, initialPrompt, handleSendWithPrompt]);
+  }, [isOpen, initialPrompt, handleSendWithPrompt, onPromptConsumed]);
 
   const handleSend = async () => {
     await handleSendWithPrompt(input);

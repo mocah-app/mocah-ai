@@ -3,7 +3,8 @@
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { useOrganization } from "@/contexts/organization-context";
-import { CircleChevronUp, Plus, Send } from "lucide-react";
+import { useTemplateCreation } from "@/utils/store-prompt-in-session";
+import { CircleChevronUp, Loader, Plus, Send } from "lucide-react";
 import { useRouter } from "next/navigation";
 import React, { useState } from "react";
 import { toast } from "sonner";
@@ -11,6 +12,7 @@ import { toast } from "sonner";
 export default function NewTemplatePage() {
   const router = useRouter();
   const { activeOrganization } = useOrganization();
+  const { setPrompt: setCreationPrompt } = useTemplateCreation();
   const [prompt, setPrompt] = useState("");
 
   const handleGenerate = () => {
@@ -24,9 +26,11 @@ export default function NewTemplatePage() {
       return;
     }
 
-    // Redirect to canvas with prompt - generation will happen there
-    const params = new URLSearchParams({ prompt: prompt.trim() });
-    router.push(`/app/new-draft?${params.toString()}`);
+    // Store prompt in sessionStorage
+    setCreationPrompt(prompt.trim());
+    
+    // Navigate
+    router.push("/app/new-draft");
   };
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
