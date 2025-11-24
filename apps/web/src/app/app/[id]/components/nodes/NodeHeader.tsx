@@ -1,11 +1,18 @@
 "use client";
 
 import React from "react";
-import { Code, Eye, Copy, Trash2 } from "lucide-react";
+import { Code, Eye, Copy, Trash2, MoreVertical } from "lucide-react";
 import { useEditorMode } from "../providers/EditorModeProvider";
 import { useCanvas } from "../providers/CanvasProvider";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Switch } from "@/components/ui/switch";
+import {
+  DropdownMenu,
+  DropdownMenuItem,
+  DropdownMenuContent,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 
 interface NodeHeaderProps {
   version: number;
@@ -47,7 +54,9 @@ export function NodeHeader({
         {/* Version Badge */}
 
         {/* Node Title */}
-        <h3 className="text-sm font-semibold text-muted-foreground">{name}</h3>
+        <h3 className="text-sm font-semibold text-muted-foreground line-clamp-1 max-w-[200px]">
+          {name}
+        </h3>
 
         {/* Current Indicator */}
         {isCurrent && <Badge variant="success">Current</Badge>}
@@ -59,38 +68,59 @@ export function NodeHeader({
       {/* Actions */}
       <div className="flex items-center gap-2">
         {/* View/Code Toggle */}
+
+        <div className="flex items-center gap-2 bg-card rounded-md">
+
+        <Button
+          variant="ghost"
+          size="icon"
+          
+          onClick={handleToggleMode}
+          className={currentMode === "view" ? "bg-accent" : ""}
+          >
+            <Eye className="size-4 text-muted-foreground" />
+
+          </Button>
         <Button
           variant="ghost"
           size="icon"
           onClick={handleToggleMode}
-          title={currentMode === "view" ? "Switch to Code" : "Switch to View"}
-        >
-          {currentMode === "view" ? (
+          className={currentMode === "code" ? "bg-accent" : ""}
+          >
             <Code className="size-4 text-muted-foreground" />
-          ) : (
-            <Eye className="size-4 text-muted-foreground" />
-          )}
-        </Button>
 
-        {/* Duplicate */}
-        <Button
-          variant="ghost"
-          size="icon"
-          onClick={handleDuplicate}
-          title="Duplicate"
-        >
-          <Copy className="size-4 text-muted-foreground" />
-        </Button>
+          </Button>
+          </div>
 
-        {/* Delete */}
-        <Button
-          variant="ghost"
-          size="icon"
-          onClick={handleDelete}
-          title="Delete"
-        >
-          <Trash2 className="size-4 text-destructive" />
-        </Button>
+        <DropdownMenu>
+          <DropdownMenuTrigger>
+            <Button variant="ghost" size="icon" title="More Actions">
+              <MoreVertical className="size-4 text-muted-foreground" />
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent>
+            <DropdownMenuItem asChild>
+              <Button
+                variant="ghost"
+                onClick={handleDuplicate}
+                title="Duplicate"
+              >
+                <Copy className="size-4 text-muted-foreground" />
+                Duplicate
+              </Button>
+            </DropdownMenuItem>
+            <DropdownMenuItem asChild>
+              <Button
+                variant="ghost"
+                onClick={handleDelete}
+                className="text-destructive w-full justify-start hover:text-destructive"
+              >
+                <Trash2 className="size-4 text-destructive" />
+                Delete
+              </Button>
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
       </div>
     </div>
   );

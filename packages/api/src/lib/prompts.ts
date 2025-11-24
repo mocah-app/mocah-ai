@@ -87,10 +87,11 @@ Return only the regenerated content, nothing else.`;
 
 /**
  * Zod schema for template generation output
+ * Optimized for streaming with early fields first
  */
 export const templateGenerationSchema = z.object({
-  subject: z.string().describe("Email subject line"),
-  previewText: z.string().describe("Email preview text (50-100 characters)"),
+  subject: z.string().describe("Email subject line - generate this first"),
+  previewText: z.string().describe("Email preview text (50-100 characters) - generate early for quick preview"),
   sections: z.array(
     z.object({
       type: z
@@ -103,7 +104,7 @@ export const templateGenerationSchema = z.object({
           "testimonial",
           "footer",
         ])
-        .describe("Section type"),
+        .describe("Section type - generate sections in order from header to footer"),
       content: z.object({
         headline: z.string().optional().describe("Section headline"),
         subheadline: z.string().optional().describe("Section subheadline"),
@@ -121,10 +122,12 @@ export const templateGenerationSchema = z.object({
         })
         .optional(),
     })
-  ),
+  ).describe("Generate sections incrementally, one at a time from top to bottom"),
   metadata: z.object({
     emailType: z.string().optional(),
     generatedAt: z.string(),
+    model: z.string(),
+    tokensUsed: z.number(),
   }),
 });
 

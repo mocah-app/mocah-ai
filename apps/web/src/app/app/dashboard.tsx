@@ -11,11 +11,12 @@ import {
 } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useOrganization } from "@/contexts/organization-context";
-import { FileText, Palette, Plus, Settings } from "lucide-react";
+import { FileText, Palette, Plus, Send, Settings, Sparkles } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { formatDistanceToNow } from "date-fns";
 import { trpc } from "@/utils/trpc";
+import { Textarea } from "@/components/ui/textarea";
 
 interface TemplateCardProps {
   template: {
@@ -34,25 +35,21 @@ interface TemplateCardProps {
 
 const TemplateCard = ({ template }: TemplateCardProps) => {
   return (
-    <Link href={`/template/${template.id}`}>
-      <Card className="gap-0 hover:shadow-md transition-all duration-300 group">
-        <CardHeader>
+    <Link href={`/app/[id]${template.id}`}>
+      <Card className="gap-0 hover:shadow-md transition-all duration-300 group p-0 h-full overflow-hidden">
+        <CardHeader className="p-0">
           <div className="flex items-start justify-between">
             <div className="flex-1">
-              <CardTitle className="group-hover:text-primary transition-colors duration-300 line-clamp-1">
+              <div className="flex items-center gap-2 w-full h-28 bg-primary/10" />
+              <CardTitle className="group-hover:text-primary transition-colors duration-300 p-2">
                 {template.name}
               </CardTitle>
-              {template.subject && (
-                <CardDescription className="mt-1 line-clamp-1">
-                  {template.subject}
-                </CardDescription>
-              )}
             </div>
             {template.isFavorite && (
               <span className="text-yellow-500 text-sm">★</span>
             )}
           </div>
-          <div className="flex items-center justify-between text-xs text-muted-foreground mt-2">
+          <div className="flex items-center justify-between text-xs text-muted-foreground mt-2 p-2">
             <div className="flex items-center gap-2">
               <FileText className="h-3 w-3" />
               <span>{template._count.versions} versions</span>
@@ -96,7 +93,7 @@ const TemplateList = ({ organizationId }: { organizationId: string }) => {
   }
 
   return (
-    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
       {data.templates.map((template) => (
         <TemplateCard key={template.id} template={template} />
       ))}
@@ -105,10 +102,15 @@ const TemplateList = ({ organizationId }: { organizationId: string }) => {
 };
 export default function Dashboard() {
   const router = useRouter();
-  const { activeOrganization, organizations, isLoading: orgLoading } = useOrganization();
+  const {
+    activeOrganization,
+    organizations,
+    isLoading: orgLoading,
+  } = useOrganization();
 
   // Show first organization if we have orgs but no active one set yet
-  const displayOrg = activeOrganization || (organizations.length > 0 ? organizations[0] : null);
+  const displayOrg =
+    activeOrganization || (organizations.length > 0 ? organizations[0] : null);
 
   if (!displayOrg && !orgLoading) {
     return (
@@ -121,7 +123,10 @@ export default function Dashboard() {
             </CardDescription>
           </CardHeader>
           <CardContent>
-            <Button onClick={() => router.push("/brand-setup")} className="w-full">
+            <Button
+              onClick={() => router.push("/brand-setup")}
+              className="w-full"
+            >
               <Plus className="mr-2 h-4 w-4" />
               Create Brand
             </Button>
@@ -131,9 +136,15 @@ export default function Dashboard() {
     );
   }
 
+  interface TopStats {
+    title: string;
+    value: number | string;
+    description: string | React.ReactNode;
+  }
+
   // Check if brand kit is set up
   const hasBrandKit = displayOrg?.metadata?.setupCompleted;
-  
+
   // Fetch templates count
   const { data: templatesData } = trpc.template.list.useQuery(
     { limit: 100 },
@@ -141,9 +152,30 @@ export default function Dashboard() {
   );
   const templateCount = templatesData?.templates.length || 0;
 
+  const topStats: TopStats[] = [
+    {
+      title: "Templates",
+      value: templateCount,
+      description: "Your email templates",
+    },
+    { title: "AI Credits", value: 0, description: "50 remaining this month" },
+    {
+      title: "Plan",
+      value: 0,
+      description: (
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() => router.push("/pricing")}
+        >
+          Upgrade Plan
+        </Button>
+      ),
+    },
+  ];
+
   return (
     <div className="space-y-6 relative">
-
       <h1 className="sr-only">{displayOrg?.name}</h1>
 
       {/* Brand Kit Setup Call-to-Action */}
@@ -153,107 +185,25 @@ export default function Dashboard() {
         </div>
       )}
 
+      <PromptInput />
+
       {/* Stats */}
       <div className="grid gap-4 md:grid-cols-3 relative z-10">
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">
-              Templates
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold relative">
-              {orgLoading  ? <Skeleton className="h-5 w-10" /> : templateCount}
-            </div>
-            <p className="text-xs text-muted-foreground mt-1">
-              Your email templates
-            </p>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">
-              AI Credits
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold relative">
-              {orgLoading ? <Skeleton className="h-5 w-10" /> : "0"}
-            </div>
-            <p className="text-xs text-muted-foreground mt-1">
-              50 remaining this month
-            </p>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Current Plan</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold relative">
-              {orgLoading ? <Skeleton className="h-5 w-10" /> : "Free"}
-            </div>
-            <Button
-              variant="link"
-              className="px-0 h-auto"
-              onClick={() => router.push("/pricing")}
-            >
-              Upgrade Plan
-            </Button>
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* Quick Actions */}
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3 relative z-10">
-        <Card
-          className="cursor-pointer hover:bg-accent transition-colors"
-          onClick={() => router.push("/template/new")}
-        >
-          <CardContent className="pt-6">
-            <div className="flex flex-col items-center text-center space-y-2">
-              <Plus className="h-8 w-8 text-primary" />
-              <h3 className="font-semibold">Generate Template</h3>
-              <p className="text-sm text-muted-foreground">
-                Create with AI from a prompt
+        {topStats.map((stat) => (
+          <Card key={stat.title} className="gap-2 py-4">
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">
+                {stat.title}
+              </CardTitle>
+              <div className="text-2xl font-bold relative">{stat.value}</div>
+            </CardHeader>
+            <CardContent>
+              <p className="text-xs text-muted-foreground mt-1">
+                {stat.description}
               </p>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card
-          className="cursor-pointer hover:bg-accent transition-colors"
-          onClick={() => router.push("/library")}
-        >
-          <CardContent className="pt-6">
-            <div className="flex flex-col items-center text-center space-y-2">
-              <Settings className="h-8 w-8 text-primary" />
-              <h3 className="font-semibold">Browse Library</h3>
-              <p className="text-sm text-muted-foreground">
-                Choose from 40+ templates
-              </p>
-            </div>
-          </CardContent>
-        </Card>
-
-        {hasBrandKit && (
-          <Card
-            className="cursor-pointer hover:bg-accent transition-colors"
-            onClick={() => router.push("/dashboard/settings")}
-          >
-            <CardContent className="pt-6">
-              <div className="flex flex-col items-center text-center space-y-2">
-                <Palette className="h-8 w-8 text-primary" />
-                <h3 className="font-semibold">Edit Brand Kit</h3>
-                <p className="text-sm text-muted-foreground">
-                  Update colors and fonts
-                </p>
-              </div>
             </CardContent>
           </Card>
-        )}
+        ))}
       </div>
 
       {/* Recent Templates */}
@@ -261,13 +211,6 @@ export default function Dashboard() {
         <Card className="relative z-10">
           <CardHeader className="flex flex-row items-center justify-between">
             <CardTitle>Recent Templates</CardTitle>
-            {/* <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => router.push("/templates")}
-            >
-              View all
-            </Button> */}
           </CardHeader>
           <CardContent>
             {displayOrg?.id && <TemplateList organizationId={displayOrg.id} />}
@@ -280,7 +223,7 @@ export default function Dashboard() {
               <p className="text-lg font-semibold mb-2">No templates yet</p>
               <p>Create your first template to get started!</p>
             </div>
-            <Button onClick={() => router.push("/template/new")}>
+            <Button onClick={() => router.push("/app/new")}>
               <Plus className="mr-2 h-4 w-4" />
               New Template
             </Button>
@@ -290,3 +233,30 @@ export default function Dashboard() {
     </div>
   );
 }
+
+const PromptInput = () => {
+  const handleGenerate = () => {
+    console.log("Generate");
+  };
+  return (
+    <div className="mx-auto max-w-2xl flex flex-col items-center justify-center gap-4 py-8">
+      <h2 className="text-2xl font-bold">What do you want to create?</h2>
+      <div className="w-full relative">
+      <Textarea
+        placeholder="Describe the email template you want to generate..."
+        rows={4}
+        maxLength={1000}
+        className="w-full bg-card focus:ring-0 focus-visible:ring-0 focus-visible:ring-offset-2 focus-visible:ring-offset-ring/5 focus:outline-none focus-visible:border-ring outline-none resize-none max-h-[180px] disabled:opacity-50 shadow-2xl"
+      />
+      <Button
+        size="icon"
+        onClick={handleGenerate}
+        className="absolute bottom-0.5 right-0.5 rounded-md w-10 h-8"
+        aria-label="Generate template"
+      >
+        <Send className="size-4" />
+      </Button>
+      </div>
+    </div>
+  );
+};

@@ -128,7 +128,7 @@ export const templateRouter = router({
     }),
 
   /**
-   * Generate a new template using AI
+   * Generate a new template using AI (non-streaming fallback)
    */
   generate: organizationProcedure
     .input(
@@ -205,6 +205,29 @@ export const templateRouter = router({
       });
 
       return template;
+    }),
+
+  /**
+   * Stream template generation for real-time updates
+   * Use the /api/template/generate endpoint for actual streaming
+   * This returns the stream configuration
+   */
+  generateStreamConfig: organizationProcedure
+    .input(
+      z.object({
+        prompt: z.string(),
+      })
+    )
+    .query(async ({ ctx, input }) => {
+      // Return configuration for frontend to use with fetch/EventSource
+      return {
+        endpoint: "/api/template/generate",
+        method: "POST",
+        body: {
+          prompt: input.prompt,
+          organizationId: ctx.organizationId,
+        },
+      };
     }),
 
   /**

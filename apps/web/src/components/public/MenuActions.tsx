@@ -67,7 +67,7 @@ export default function MenuActions({
             className={cn(variant === "mobile" && "w-full")}
             onClick={onActionClick}
           >
-            <Link href="/dashboard">Dashboard</Link>
+            <Link href="/app">Dashboard</Link>
           </Button>
         </motion.div>
       </div>

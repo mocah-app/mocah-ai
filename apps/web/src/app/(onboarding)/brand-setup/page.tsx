@@ -429,7 +429,7 @@ function BrandSetupContent() {
       // Refresh organization data to reflect the updated logo and brand kit
       await refreshOrganizations(orgId);
 
-      router.push("/dashboard");
+      router.push("/app");
     } catch (error: any) {
       toast.error(error.message || "Failed to complete setup");
     } finally {

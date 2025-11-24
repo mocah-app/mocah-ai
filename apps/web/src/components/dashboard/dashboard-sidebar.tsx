@@ -29,7 +29,7 @@ export function DashboardSidebar() {
   const pathname = usePathname();
   const { state, isMobile, open } = useSidebar();
   const isActive = (href: string) => {
-    if (href === "/dashboard") {
+    if (href === "/app") {
       return pathname === href;
     }
     return pathname.startsWith(href);

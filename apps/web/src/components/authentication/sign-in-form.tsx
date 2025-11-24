@@ -257,7 +257,7 @@ function SignInFormContent({ callbackUrl }: { callbackUrl: string }) {
 // Wrapper component that extracts callbackUrl from search params
 function SignInFormWithParams() {
   const searchParams = useSearchParams();
-  const callbackUrl = searchParams.get('callbackUrl') || '/dashboard';
+  const callbackUrl = searchParams.get('callbackUrl') || '/app';
   
   return <SignInFormContent callbackUrl={callbackUrl} />;
 }

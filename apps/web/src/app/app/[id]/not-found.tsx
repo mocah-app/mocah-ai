@@ -10,7 +10,7 @@ export default function NotFound() {
       </p>
       <div className="flex items-center justify-center gap-4">
         <Link
-          href="/dashboard"
+          href="/app"
           className={buttonVariants({ className: "mt-8", variant: "default" })}
         >
           Return to Templates

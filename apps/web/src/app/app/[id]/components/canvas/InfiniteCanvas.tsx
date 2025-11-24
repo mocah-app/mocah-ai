@@ -4,7 +4,7 @@ import {
   Background,
   BackgroundVariant,
   Controls,
-  ReactFlow
+  ReactFlow,
 } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
 import { useEffect, useState } from "react";
@@ -62,9 +62,9 @@ export function InfiniteCanvas() {
             backdropFilter: "blur(10px)",
           }}
         >
-          <CustomCanvasControl 
-            // isHandMode={isHandMode} 
-            // setIsHandMode={setIsHandMode} 
+          <CustomCanvasControl
+          // isHandMode={isHandMode}
+          // setIsHandMode={setIsHandMode}
           />
         </Controls>
       </ReactFlow>

@@ -1,5 +1,5 @@
 import { createOpenRouter } from "@openrouter/ai-sdk-provider";
-import { generateObject, generateText } from "ai";
+import { generateObject, generateText, streamObject, streamText } from "ai";
 import { z } from "zod";
 import { logger } from "@mocah/shared/logger";
 
@@ -89,7 +89,84 @@ export const aiClient = {
     }
   },
 
+  /**
+   * Stream structured JSON output using Zod schema
+   * Returns streams for progressive rendering
+   * @param schema - Zod schema for validation
+   * @param prompt - Generation prompt
+   * @param model - Optional model override
+   */
+  streamStructured<T extends z.ZodType>(
+    schema: T,
+    prompt: string,
+    model?: string
+  ): ReturnType<typeof streamObject<T>> {
+    const modelName = model || DEFAULT_MODEL;
+    try {
+      logger.info("AI streaming started", {
+        component: "ai",
+        action: "streamStructured",
+        model: modelName,
+      });
 
+      return streamObject({
+        model: openrouter(modelName),
+        schema,
+        prompt,
+        onFinish: ({ usage }) => {
+          logger.info("AI stream completed", {
+            component: "ai",
+            action: "streamStructured",
+            model: modelName,
+            tokensUsed: usage.totalTokens,
+          });
+        },
+      });
+    } catch (error) {
+      logger.error("AI streaming error", {
+        component: "ai",
+        action: "streamStructured",
+        model: modelName,
+      }, error as Error);
+      throw new Error("Failed to stream structured output");
+    }
+  },
+
+  /**
+   * Stream text output
+   * @param prompt - Generation prompt
+   * @param model - Optional model override
+   */
+  streamText(prompt: string, model?: string): ReturnType<typeof streamText> {
+    const modelName = model || DEFAULT_MODEL;
+    try {
+      logger.info("AI text streaming started", {
+        component: "ai",
+        action: "streamText",
+        model: modelName,
+      });
+
+      return streamText({
+        model: openrouter(modelName),
+        prompt,
+        onFinish: ({ usage }) => {
+          logger.info("AI text stream completed", {
+            component: "ai",
+            action: "streamText",
+            model: modelName,
+            tokensUsed: usage.totalTokens,
+          });
+        },
+      });
+    } catch (error) {
+      logger.error("AI text streaming error", {
+        component: "ai",
+        action: "streamText",
+        model: modelName,
+      }, error as Error);
+      throw new Error("Failed to stream text");
+    }
+  },
 };
 
 /**

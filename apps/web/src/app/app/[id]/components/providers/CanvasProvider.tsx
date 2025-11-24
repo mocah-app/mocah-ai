@@ -59,11 +59,15 @@ function CanvasProviderInner({ children }: { children: React.ReactNode }) {
   );
 
   const updateNode = useCallback(
-    (nodeId: string, data: any) => {
+    (nodeId: string, updates: Partial<Node<TemplateNodeData>>) => {
       setNodes((nds) =>
         nds.map((node) =>
           node.id === nodeId
-            ? { ...node, data: { ...node.data, ...data } }
+            ? { 
+                ...node, 
+                ...updates,
+                data: updates.data ? { ...node.data, ...updates.data } : node.data 
+              }
             : node
         )
       );

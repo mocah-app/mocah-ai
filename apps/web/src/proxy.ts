@@ -8,7 +8,7 @@ export async function proxy(request: NextRequest) {
   const authRoutes = ["/login", "/register", "/reset-password"];
 
   // Protect dashboard routes
-  if (request.nextUrl.pathname.startsWith("/dashboard")) {
+  if (request.nextUrl.pathname.startsWith("/app")) {
     if (!sessionCookie) {
       return NextResponse.redirect(new URL("/login", request.url));
     }
@@ -19,7 +19,7 @@ export async function proxy(request: NextRequest) {
     sessionCookie &&
     authRoutes.includes(request.nextUrl.pathname)
   ) {
-    return NextResponse.redirect(new URL("/dashboard", request.url));
+    return NextResponse.redirect(new URL("/app", request.url));
   }
 
   return NextResponse.next();
