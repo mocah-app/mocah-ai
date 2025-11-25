@@ -74,3 +74,9 @@ enum ImageVariationType {
   edit          // Edited/modified version
 }
 
+enum StyleType {
+  INLINE              // style={{ ... }} directly on elements
+  PREDEFINED_CLASSES  // className="hero-section"
+  STYLE_OBJECTS       // const heroStyle = { ... }
+}
+
