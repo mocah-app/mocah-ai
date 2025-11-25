@@ -6,6 +6,8 @@ import { aiClient, TEMPLATE_GENERATION_MODEL } from "../lib/ai";
 import {
   buildTemplateGenerationPrompt,
   templateGenerationSchema,
+  buildReactEmailPrompt,
+  reactEmailGenerationSchema,
 } from "../lib/prompts";
 
 export const templateRouter = router({
@@ -134,6 +136,7 @@ export const templateRouter = router({
     .input(
       z.object({
         prompt: z.string(),
+        useReactEmail: z.boolean().optional().default(true),
       })
     )
     .mutation(async ({ ctx, input }) => {
@@ -143,68 +146,138 @@ export const templateRouter = router({
         select: { brandKit: true },
       });
 
-      // 2. Generate template structure
-      const prompt = buildTemplateGenerationPrompt(
-        input.prompt,
-        organization?.brandKit as any
-      );
+      // 2. Generate template using React Email format (default) or legacy format
+      if (input.useReactEmail) {
+        // NEW: React Email JSX generation
+        const prompt = buildReactEmailPrompt(
+          input.prompt,
+          organization?.brandKit as any
+        );
 
-      const result = await aiClient.generateStructured(
-        templateGenerationSchema,
-        prompt,
-        TEMPLATE_GENERATION_MODEL
-      );
+        const result = await aiClient.generateStructured(
+          reactEmailGenerationSchema,
+          prompt,
+          TEMPLATE_GENERATION_MODEL
+        );
 
-      // 3. Transform sections (flatten content)
-      const sections = result.sections.map((section: any) => ({
-        type: section.type,
-        styles: section.styles,
-        ...section.content,
-      }));
-
-      const templateData = {
-        subject: result.subject,
-        previewText: result.previewText,
-        sections,
-      };
-
-      const contentString = JSON.stringify(templateData);
-
-      // 4. Create template
-      const template = await ctx.db.template.create({
-        data: {
-          organizationId: ctx.organizationId,
-          name: result.subject || "AI Generated Template",
+        // Legacy content for backward compatibility
+        const legacyContent = JSON.stringify({
           subject: result.subject,
-          content: contentString,
-          description: `Generated from prompt: ${input.prompt}`,
-        },
-      });
+          previewText: result.previewText,
+          sections: [],
+        });
 
-      // 5. Create initial version
-      const version = await ctx.db.templateVersion.create({
-        data: {
-          templateId: template.id,
-          version: 1,
-          name: "V1",
-          content: contentString,
-          subject: result.subject,
-          isCurrent: true,
-          createdBy: ctx.session?.user?.id,
-          metadata: {
-            generatedFrom: "ai",
-            prompt: input.prompt,
+        // 3. Create template with React Email format
+        const template = await ctx.db.template.create({
+          data: {
+            organizationId: ctx.organizationId,
+            name: result.subject || "AI Generated Template",
+            subject: result.subject,
+            content: legacyContent, // Keep for backward compatibility
+            description: `Generated from prompt: ${input.prompt}`,
+            
+            // React Email fields
+            reactEmailCode: result.reactEmailCode,
+            styleType: result.styleType.toUpperCase() as any,
+            styleDefinitions: result.styleDefinitions || {},
+            previewText: result.previewText,
           },
-        },
-      });
+        });
 
-      // 6. Update template with current version
-      await ctx.db.template.update({
-        where: { id: template.id },
-        data: { currentVersionId: version.id },
-      });
+        // 4. Create initial version
+        const version = await ctx.db.templateVersion.create({
+          data: {
+            templateId: template.id,
+            version: 1,
+            name: "V1",
+            content: legacyContent,
+            subject: result.subject,
+            isCurrent: true,
+            createdBy: ctx.session?.user?.id,
+            
+            // React Email fields
+            reactEmailCode: result.reactEmailCode,
+            styleType: result.styleType.toUpperCase() as any,
+            styleDefinitions: result.styleDefinitions || {},
+            previewText: result.previewText,
+            
+            metadata: {
+              generatedFrom: "ai",
+              prompt: input.prompt,
+              format: "react-email",
+              ...result.metadata,
+            },
+          },
+        });
 
-      return template;
+        // 5. Update template with current version
+        await ctx.db.template.update({
+          where: { id: template.id },
+          data: { currentVersionId: version.id },
+        });
+
+        return template;
+      } else {
+        // LEGACY: Original JSON sections format
+        const prompt = buildTemplateGenerationPrompt(
+          input.prompt,
+          organization?.brandKit as any
+        );
+
+        const result = await aiClient.generateStructured(
+          templateGenerationSchema,
+          prompt,
+          TEMPLATE_GENERATION_MODEL
+        );
+
+        const sections = result.sections.map((section: any) => ({
+          type: section.type,
+          styles: section.styles,
+          ...section.content,
+        }));
+
+        const templateData = {
+          subject: result.subject,
+          previewText: result.previewText,
+          sections,
+        };
+
+        const contentString = JSON.stringify(templateData);
+
+        const template = await ctx.db.template.create({
+          data: {
+            organizationId: ctx.organizationId,
+            name: result.subject || "AI Generated Template",
+            subject: result.subject,
+            content: contentString,
+            description: `Generated from prompt: ${input.prompt}`,
+          },
+        });
+
+        const version = await ctx.db.templateVersion.create({
+          data: {
+            templateId: template.id,
+            version: 1,
+            name: "V1",
+            content: contentString,
+            subject: result.subject,
+            isCurrent: true,
+            createdBy: ctx.session?.user?.id,
+            metadata: {
+              generatedFrom: "ai",
+              prompt: input.prompt,
+              format: "legacy",
+            },
+          },
+        });
+
+        await ctx.db.template.update({
+          where: { id: template.id },
+          data: { currentVersionId: version.id },
+        });
+
+        return template;
+      }
     }),
 
   /**
@@ -238,6 +311,7 @@ export const templateRouter = router({
       z.object({
         templateId: z.string(),
         prompt: z.string(),
+        useReactEmail: z.boolean().optional().default(true),
       })
     )
     .mutation(async ({ ctx, input }) => {
@@ -268,33 +342,6 @@ export const templateRouter = router({
         });
       }
 
-      // Generate template structure
-      const prompt = buildTemplateGenerationPrompt(
-        input.prompt,
-        template.organization.brandKit as any
-      );
-
-      const result = await aiClient.generateStructured(
-        templateGenerationSchema,
-        prompt,
-        TEMPLATE_GENERATION_MODEL
-      );
-
-      // Transform sections
-      const sections = result.sections.map((section: any) => ({
-        type: section.type,
-        styles: section.styles,
-        ...section.content,
-      }));
-
-      const templateData = {
-        subject: result.subject,
-        previewText: result.previewText,
-        sections,
-      };
-
-      const contentString = JSON.stringify(templateData);
-
       // Get latest version number
       const latestVersion = await ctx.db.templateVersion.findFirst({
         where: { templateId: input.templateId },
@@ -303,34 +350,124 @@ export const templateRouter = router({
 
       const newVersionNumber = (latestVersion?.version || 0) + 1;
 
-      // Create new version
-      const version = await ctx.db.templateVersion.create({
-        data: {
-          templateId: input.templateId,
-          version: newVersionNumber,
-          name: `AI Generated V${newVersionNumber}`,
-          content: contentString,
+      if (input.useReactEmail) {
+        // NEW: React Email JSX regeneration
+        const prompt = buildReactEmailPrompt(
+          input.prompt,
+          template.organization.brandKit as any
+        );
+
+        const result = await aiClient.generateStructured(
+          reactEmailGenerationSchema,
+          prompt,
+          TEMPLATE_GENERATION_MODEL
+        );
+
+        // Legacy content for backward compatibility
+        const legacyContent = JSON.stringify({
           subject: result.subject,
-          isCurrent: true,
-          createdBy: ctx.session.user.id,
-          metadata: {
-            generatedFrom: "ai",
-            prompt: input.prompt,
+          previewText: result.previewText,
+          sections: [],
+        });
+
+        // Create new version
+        const version = await ctx.db.templateVersion.create({
+          data: {
+            templateId: input.templateId,
+            version: newVersionNumber,
+            name: `AI Generated V${newVersionNumber}`,
+            content: legacyContent,
+            subject: result.subject,
+            isCurrent: true,
+            createdBy: ctx.session.user.id,
+            
+            // React Email fields
+            reactEmailCode: result.reactEmailCode,
+            styleType: result.styleType.toUpperCase() as any,
+            styleDefinitions: result.styleDefinitions || {},
+            previewText: result.previewText,
+            
+            metadata: {
+              generatedFrom: "ai",
+              prompt: input.prompt,
+              format: "react-email",
+              ...result.metadata,
+            },
           },
-        },
-      });
+        });
 
-      // Update template with current version
-      await ctx.db.template.update({
-        where: { id: input.templateId },
-        data: {
-          currentVersionId: version.id,
+        // Update template with current version
+        await ctx.db.template.update({
+          where: { id: input.templateId },
+          data: {
+            currentVersionId: version.id,
+            subject: result.subject,
+            content: legacyContent,
+            
+            // React Email fields
+            reactEmailCode: result.reactEmailCode,
+            styleType: result.styleType.toUpperCase() as any,
+            styleDefinitions: result.styleDefinitions || {},
+            previewText: result.previewText,
+          },
+        });
+
+        return version;
+      } else {
+        // LEGACY: Original JSON sections format
+        const prompt = buildTemplateGenerationPrompt(
+          input.prompt,
+          template.organization.brandKit as any
+        );
+
+        const result = await aiClient.generateStructured(
+          templateGenerationSchema,
+          prompt,
+          TEMPLATE_GENERATION_MODEL
+        );
+
+        const sections = result.sections.map((section: any) => ({
+          type: section.type,
+          styles: section.styles,
+          ...section.content,
+        }));
+
+        const templateData = {
           subject: result.subject,
-          content: contentString,
-        },
-      });
+          previewText: result.previewText,
+          sections,
+        };
 
-      return version;
+        const contentString = JSON.stringify(templateData);
+
+        const version = await ctx.db.templateVersion.create({
+          data: {
+            templateId: input.templateId,
+            version: newVersionNumber,
+            name: `AI Generated V${newVersionNumber}`,
+            content: contentString,
+            subject: result.subject,
+            isCurrent: true,
+            createdBy: ctx.session.user.id,
+            metadata: {
+              generatedFrom: "ai",
+              prompt: input.prompt,
+              format: "legacy",
+            },
+          },
+        });
+
+        await ctx.db.template.update({
+          where: { id: input.templateId },
+          data: {
+            currentVersionId: version.id,
+            subject: result.subject,
+            content: contentString,
+          },
+        });
+
+        return version;
+      }
     }),
 
   /**
@@ -346,6 +483,12 @@ export const templateRouter = router({
         content: z.string(),
         category: z.string().optional(),
         isPublic: z.boolean().default(false),
+        
+        // React Email fields (optional)
+        reactEmailCode: z.string().optional(),
+        styleType: z.enum(["INLINE", "PREDEFINED_CLASSES", "STYLE_OBJECTS"]).optional(),
+        styleDefinitions: z.record(z.string(), z.any()).optional(),
+        previewText: z.string().optional(),
       })
     )
     .mutation(async ({ ctx, input }) => {
@@ -373,6 +516,12 @@ export const templateRouter = router({
           content: input.content,
           category: input.category,
           isPublic: input.isPublic,
+          
+          // React Email fields
+          reactEmailCode: input.reactEmailCode,
+          styleType: input.styleType,
+          styleDefinitions: input.styleDefinitions,
+          previewText: input.previewText,
         },
       });
 
@@ -386,6 +535,12 @@ export const templateRouter = router({
           subject: input.subject,
           isCurrent: true,
           createdBy: ctx.session?.user?.id,
+          
+          // React Email fields
+          reactEmailCode: input.reactEmailCode,
+          styleType: input.styleType,
+          styleDefinitions: input.styleDefinitions,
+          previewText: input.previewText,
         },
       });
 
@@ -412,6 +567,12 @@ export const templateRouter = router({
         category: z.string().optional(),
         isPublic: z.boolean().optional(),
         isFavorite: z.boolean().optional(),
+        
+        // React Email fields (optional)
+        reactEmailCode: z.string().optional(),
+        styleType: z.enum(["INLINE", "PREDEFINED_CLASSES", "STYLE_OBJECTS"]).optional(),
+        styleDefinitions: z.record(z.string(), z.any()).optional(),
+        previewText: z.string().optional(),
       })
     )
     .mutation(async ({ ctx, input }) => {

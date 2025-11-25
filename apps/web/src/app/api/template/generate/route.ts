@@ -1,6 +1,8 @@
 import { NextRequest } from "next/server";
 import { aiClient, TEMPLATE_GENERATION_MODEL } from "@mocah/api/lib/ai";
 import {
+  buildReactEmailPrompt,
+  reactEmailGenerationSchema,
   buildTemplateGenerationPrompt,
   templateGenerationSchema,
 } from "@mocah/api/lib/prompts";
@@ -23,7 +25,7 @@ export async function POST(req: NextRequest) {
     }
 
     // 2. Parse request body
-    const { prompt, organizationId } = await req.json();
+    const { prompt, organizationId, useReactEmail } = await req.json();
 
     if (!prompt || !organizationId) {
       return new Response("Missing required fields", { status: 400 });
@@ -47,15 +49,20 @@ export async function POST(req: NextRequest) {
       select: { brandKit: true },
     });
 
-    // 5. Build prompt
-    const promptText = buildTemplateGenerationPrompt(
-      prompt,
-      organization?.brandKit as any
-    );
+    // 5. Build prompt based on format (default to React Email)
+    const useReactEmailFormat = useReactEmail !== false; // Default to true
+    
+    const promptText = useReactEmailFormat
+      ? buildReactEmailPrompt(prompt, organization?.brandKit as any)
+      : buildTemplateGenerationPrompt(prompt, organization?.brandKit as any);
+    
+    const schema = useReactEmailFormat
+      ? reactEmailGenerationSchema
+      : templateGenerationSchema;
 
     // 6. Start streaming with AI SDK
     const result = aiClient.streamStructured(
-      templateGenerationSchema,
+      schema,
       promptText,
       TEMPLATE_GENERATION_MODEL
     );
