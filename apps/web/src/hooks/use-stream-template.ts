@@ -2,10 +2,10 @@
 
 import { useState, useCallback } from "react";
 import { experimental_useObject as useObject } from "@ai-sdk/react";
-import { templateGenerationSchema } from "@mocah/api/lib/prompts";
+import { reactEmailGenerationSchema } from "@mocah/api/lib/prompts";
 import type { z } from "zod";
 
-type TemplateGenerationOutput = z.infer<typeof templateGenerationSchema>;
+type TemplateGenerationOutput = z.infer<typeof reactEmailGenerationSchema>;
 
 interface UseStreamTemplateOptions {
   organizationId: string;
@@ -26,7 +26,7 @@ export function useStreamTemplate({
 
   const { object, submit, error, isLoading } = useObject({
     api: "/api/template/generate",
-    schema: templateGenerationSchema,
+    schema: reactEmailGenerationSchema,
     onFinish: ({ object: finalObject }) => {
       setIsGenerating(false);
       if (finalObject && onComplete) {

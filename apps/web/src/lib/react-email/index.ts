@@ -15,7 +15,7 @@ export {
   findStyleDefinition,
   getElementStyleProp,
   getElementClassName,
-} from '../jsx-parser';
+} from './jsx-parser';
 
 // Element Extractor
 export {
@@ -25,16 +25,16 @@ export {
   hasTextContent,
   isLayoutElement,
   getEditableProperties,
-} from '../element-extractor';
-export type { ElementData } from '../element-extractor';
+} from './element-extractor';
+export type { ElementData } from './element-extractor';
 
 // Code Updater
 export {
   updateReactEmailCode,
   convertInlineToStyleObject,
   convertStyleObjectToInline,
-} from '../code-updater';
-export type { ElementUpdates } from '../code-updater';
+} from './code-updater';
+export type { ElementUpdates } from './code-updater';
 
 // React Email Renderer
 export {
@@ -45,8 +45,4 @@ export {
   validateReactEmailCode,
   extractPreviewText,
   getEmailMetadata,
-} from '../react-email-renderer';
-
-// Example & Testing
-export { exampleReactEmailCode, testRendering } from './example';
-
+} from './react-email-renderer';

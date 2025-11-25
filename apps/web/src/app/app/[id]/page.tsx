@@ -97,16 +97,13 @@ function EditorContent() {
     if (templateState.currentTemplate) {
       const template = templateState.currentTemplate;
 
-      let templateContent = { sections: [] };
-      if (typeof template.content === "string") {
-        try {
-          templateContent = JSON.parse(template.content);
-        } catch (e) {
-          console.error("Failed to parse template content", e);
-        }
-      } else if (typeof template.content === "object") {
-        templateContent = template.content;
-      }
+      // Build template content using React Email format
+      const templateContent = {
+        subject: template.subject ?? undefined,
+        previewText: template.previewText ?? undefined,
+        reactEmailCode: templateState.reactEmailCode || template.reactEmailCode || undefined,
+        styleDefinitions: templateState.styleDefinitions,
+      };
 
       const initialNode = {
         id: "template-node",
@@ -144,16 +141,13 @@ function EditorContent() {
 
     const template = templateState.currentTemplate;
 
-    let templateContent = { sections: [] };
-    if (typeof template.content === "string") {
-      try {
-        templateContent = JSON.parse(template.content);
-      } catch (e) {
-        console.error("Failed to parse template content", e);
-      }
-    } else if (typeof template.content === "object") {
-      templateContent = template.content;
-    }
+    // Build template content using React Email format
+    const templateContent = {
+      subject: template.subject ?? undefined,
+      previewText: template.previewText ?? undefined,
+      reactEmailCode: templateState.reactEmailCode || template.reactEmailCode || undefined,
+      styleDefinitions: templateState.styleDefinitions,
+    };
 
     // Check if content actually changed (avoid infinite updates)
     const currentContent = JSON.stringify(existingNode.data.template);
@@ -184,6 +178,8 @@ function EditorContent() {
   }, [
     templateState.isStreaming,
     templateState.currentTemplate,
+    templateState.reactEmailCode,
+    templateState.styleDefinitions,
     canvasState.nodes,
     canvasActions,
   ]);

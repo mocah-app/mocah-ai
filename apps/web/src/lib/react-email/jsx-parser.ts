@@ -69,14 +69,20 @@ export function injectElementIds(reactEmailCode: string): string {
 
 /**
  * Find element node at specific line
+ * Returns the full JSXElement (not just opening element) to access children
  */
 export function findElementAtLine(ast: any, line: number) {
   let foundNode = null;
   
   traverse(ast, {
-    JSXOpeningElement(path: any) {
-      if (path.node.loc?.start.line === line) {
-        foundNode = path.node;
+    JSXElement(path: any) {
+      if (path.node.openingElement.loc?.start.line === line) {
+        foundNode = {
+          openingElement: path.node.openingElement,
+          children: path.node.children,
+          closingElement: path.node.closingElement,
+          fullNode: path.node,
+        };
       }
     }
   });
@@ -90,18 +96,23 @@ export function findElementAtLine(ast: any, line: number) {
 export function extractTextContent(node: any): string {
   if (!node) return '';
   
+  // For JSX elements, we need to find the JSXElement (parent) to get children
+  // This function now expects a JSXElement node, not just the opening element
+  const children = node.children || [];
+  
   let textContent = '';
   
-  traverse(node, {
-    JSXText(path: any) {
-      textContent += path.node.value;
-    },
-    JSXExpressionContainer(path: any) {
-      if (path.node.expression.type === 'StringLiteral') {
-        textContent += path.node.expression.value;
+  for (const child of children) {
+    if (child.type === 'JSXText') {
+      textContent += child.value;
+    } else if (child.type === 'JSXExpressionContainer') {
+      if (child.expression.type === 'StringLiteral') {
+        textContent += child.expression.value;
+      } else if (child.expression.type === 'Identifier') {
+        textContent += `{${child.expression.name}}`;
       }
     }
-  });
+  }
   
   return textContent.trim();
 }

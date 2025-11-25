@@ -8,6 +8,8 @@ import { CodeModeContent } from "./CodeModeContent";
 import { useEditorMode } from "../providers/EditorModeProvider";
 import { Button } from "@/components/ui/button";
 import { ChevronRight, Plus } from "lucide-react";
+import { Form, FormItem, FormLabel, FormField, FormControl } from "@/components/ui/form";
+import { Switch } from "@/components/ui/switch";
 
 // Custom data type for template nodes
 // Includes index signature to satisfy React Flow's Record<string, unknown> constraint
@@ -19,8 +21,8 @@ export interface TemplateNodeData {
   template: {
     subject?: string;
     previewText?: string;
-    content?: string;
-    sections: any[]; // TODO: should we have a proper type for this?
+    reactEmailCode?: string;
+    styleDefinitions?: Record<string, React.CSSProperties>;
   };
   metadata?: {
     createdAt: Date;
@@ -71,7 +73,7 @@ export function TemplateNode({ data, id }: TemplateNodeProps) {
       {data.isLoading ? (
         <LoadingState />
       ) : (
-        <div className={`min-h-[400px] max-h-[600px] overflow-auto`}>
+        <div className="h-[600px] overflow-hidden">
           {mode === "view" ? (
             <ViewModeContent template={data.template} />
           ) : (
@@ -87,9 +89,26 @@ export function TemplateNode({ data, id }: TemplateNodeProps) {
             ? `Saved ${new Date(data.metadata.updatedAt).toLocaleTimeString()}`
             : "Not saved"}
         </span>
-        <Button variant="link" className="text-primary hover:underline text-xs">
-          Branch Out
-        </Button>
+        {/* <Form {...form}>
+          <form onSubmit={form.handleSubmit(handleSubmit)}>
+            <FormField
+              control={form.control}
+              name="mode"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Design Mode</FormLabel>
+                  <FormControl>
+                    <Switch
+                      checked={field.value}
+                      onCheckedChange={field.onChange}
+                    />
+                  </FormControl>
+                </FormItem>
+
+              )}
+            />
+          </form>
+        </Form> */}
       </div>
     </div>
   );

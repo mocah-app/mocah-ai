@@ -58,6 +58,10 @@ export function extractElementData(
     throw new Error(`Element not found at line ${line}`);
   }
 
+  // Get the opening element (for attributes) and children (for content)
+  const openingElement = elementNode.openingElement;
+  const children = elementNode.children;
+
   // Determine style type
   let styleType: ElementData["styleType"] = "inline";
   let styleName: string | undefined;
@@ -65,7 +69,7 @@ export function extractElementData(
   let className: string | undefined;
 
   // Check for style prop
-  const styleProp = getElementStyleProp(elementNode);
+  const styleProp = getElementStyleProp(openingElement);
 
   if (styleProp?.type === "JSXExpressionContainer") {
     const expression = styleProp.expression;
@@ -82,19 +86,19 @@ export function extractElementData(
   }
 
   // Check for className
-  const classNameResult = getElementClassName(elementNode);
+  const classNameResult = getElementClassName(openingElement);
   if (classNameResult) {
     className = classNameResult;
     styleType = "predefined-class";
   }
 
-  // Extract content
-  const content = extractTextContent(elementNode);
+  // Extract content from children
+  const content = extractTextContent({ children });
 
   // Extract other attributes
   const attributes: Record<string, any> = {};
-  if (elementNode.attributes && Array.isArray(elementNode.attributes)) {
-    elementNode.attributes.forEach((attr: any) => {
+  if (openingElement.attributes && Array.isArray(openingElement.attributes)) {
+    openingElement.attributes.forEach((attr: any) => {
       const attrName = attr.name?.name;
       if (
         attrName &&

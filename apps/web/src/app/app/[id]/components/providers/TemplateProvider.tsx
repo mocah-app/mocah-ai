@@ -18,23 +18,9 @@ import { useRouter } from "next/navigation";
 interface StreamingProgress {
   subject?: string;
   previewText?: string;
-  sections?: Array<{
-    type?: string;
-    content?: {
-      headline?: string;
-      subheadline?: string;
-      body?: string;
-      buttonText?: string;
-      buttonUrl?: string;
-      imageUrl?: string;
-      imageAlt?: string;
-    };
-    styles?: {
-      backgroundColor?: string;
-      textColor?: string;
-      padding?: string;
-    };
-  }>;
+  reactEmailCode?: string;
+  styleType?: 'INLINE' | 'PREDEFINED_CLASSES' | 'STYLE_OBJECTS';
+  styleDefinitions?: Record<string, React.CSSProperties>;
   metadata?: {
     emailType?: string;
     generatedAt?: string;
@@ -52,6 +38,10 @@ interface TemplateState {
   isLoading: boolean;
   isStreaming: boolean;
   streamingProgress: StreamingProgress | null;
+  
+  // React Email specific state
+  reactEmailCode: string | null;
+  styleDefinitions: Record<string, React.CSSProperties>;
 }
 
 interface TemplateActions {
@@ -66,6 +56,9 @@ interface TemplateActions {
   generateTemplate: (prompt: string) => Promise<Template | null>;
   generateTemplateStream: (prompt: string) => Promise<void>;
   setIsDirty: (dirty: boolean) => void;
+  
+  // React Email specific actions
+  updateReactEmailCode: (code: string, styleDefinitions?: Record<string, React.CSSProperties>) => void;
 }
 
 interface TemplateContextValue {
@@ -103,6 +96,8 @@ export function TemplateProvider({
     isLoading: false,
     isStreaming: false,
     streamingProgress: null,
+    reactEmailCode: null,
+    styleDefinitions: {},
   });
 
   // Streaming hook
@@ -116,32 +111,27 @@ export function TemplateProvider({
     onComplete: async (template) => {
       // When streaming completes, update the existing template in database
       try {
-        // Transform the streamed template structure to match database format
-        const sections =
-          template.sections?.map((section: any) => ({
-            type: section.type,
-            styles: section.styles,
-            ...section.content,
-          })) || [];
-
-        const templateData = {
-          subject: template.subject || "AI Generated Template",
-          previewText: template.previewText || "",
-          sections,
-        };
-
-        const contentString = JSON.stringify(templateData);
-
         // Update the existing template (should have been created as skeleton)
         if (!templateId) {
           throw new Error("No template ID available to update");
         }
 
+        // Convert styleType to uppercase to match Prisma enum
+        const styleTypeMap: Record<string, 'INLINE' | 'PREDEFINED_CLASSES' | 'STYLE_OBJECTS'> = {
+          'inline': 'INLINE',
+          'predefined-classes': 'PREDEFINED_CLASSES',
+          'style-objects': 'STYLE_OBJECTS',
+        };
+        const mappedStyleType = template.styleType ? styleTypeMap[template.styleType] : 'STYLE_OBJECTS';
+
         const result = await updateMutation.mutateAsync({
           id: templateId,
           name: template.subject || "AI Generated Template",
           subject: template.subject,
-          content: contentString,
+          reactEmailCode: template.reactEmailCode,
+          styleType: mappedStyleType,
+          styleDefinitions: template.styleDefinitions,
+          previewText: template.previewText,
         });
 
         const processedResult = convertDates(result);
@@ -149,6 +139,8 @@ export function TemplateProvider({
         setState((prev) => ({
           ...prev,
           currentTemplate: processedResult,
+          reactEmailCode: template.reactEmailCode || null,
+          styleDefinitions: template.styleDefinitions || {},
           isStreaming: false,
           streamingProgress: null,
           isLoading: false,
@@ -225,6 +217,8 @@ export function TemplateProvider({
         versions: processedData.versions as TemplateVersion[],
         currentVersion: processedData.currentVersionId,
         brandKit: processedData.organization.brandKit as BrandKit,
+        reactEmailCode: processedData.reactEmailCode || null,
+        styleDefinitions: (processedData.styleDefinitions as Record<string, React.CSSProperties>) || {},
         isLoading: false,
       }));
     }
@@ -418,6 +412,18 @@ export function TemplateProvider({
     setState((prev) => ({ ...prev, isDirty: dirty }));
   }, []);
 
+  const updateReactEmailCode = useCallback((
+    code: string,
+    styleDefinitions?: Record<string, React.CSSProperties>
+  ) => {
+    setState((prev) => ({
+      ...prev,
+      reactEmailCode: code,
+      styleDefinitions: styleDefinitions || prev.styleDefinitions,
+      isDirty: true,
+    }));
+  }, []);
+
   const generateTemplateStream = useCallback(
     async (prompt: string) => {
       if (!activeOrganization?.id) {
@@ -458,6 +464,7 @@ export function TemplateProvider({
     generateTemplate,
     generateTemplateStream,
     setIsDirty,
+    updateReactEmailCode,
   };
 
   return (
