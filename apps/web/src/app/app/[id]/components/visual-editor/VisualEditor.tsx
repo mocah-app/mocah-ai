@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { renderReactEmailWithIds, extractElementData } from '@/lib/react-email';
 import type { ElementData } from '@/lib/react-email';
-import { Loader2 } from 'lucide-react';
+import Loader from '@/components/loader';
 
 interface VisualEditorProps {
   reactEmailCode: string;
@@ -147,12 +147,7 @@ export function VisualEditor({
   if (isLoading) {
     return (
       <div className={`flex h-full items-center justify-center bg-muted/20 ${className}`}>
-        <div className="text-center">
-          <Loader2 className="mx-auto h-8 w-8 animate-spin text-primary" />
-          <p className="mt-2 text-sm text-muted-foreground">
-            Rendering email preview...
-          </p>
-        </div>
+       <Loader />
       </div>
     );
   }

@@ -14,7 +14,7 @@ interface ViewModeContentProps {
 }
 
 export function ViewModeContent({ template }: ViewModeContentProps) {
-  const { actions: editorActions } = useEditorMode();
+  const { state: editorState, actions: editorActions } = useEditorMode();
 
   // Handle element selection in React Email templates
   const handleElementSelect = (elementData: ElementData | null) => {
@@ -31,8 +31,9 @@ export function ViewModeContent({ template }: ViewModeContentProps) {
       <ReactEmailPreview 
         reactEmailCode={template.reactEmailCode || ""}
         styleDefinitions={template.styleDefinitions}
-        enableSelection={true}
+        enableSelection={editorState.designMode} // Only enable when design mode is active
         onElementSelect={handleElementSelect}
+        renderKey={editorState.previewRenderKey} // Force re-render when this changes
       />
     </div>
   );

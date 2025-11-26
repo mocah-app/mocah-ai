@@ -26,20 +26,6 @@ enum AIModel {
   claude_3_haiku
 }
 
-enum TemplateSectionType {
-  header
-  hero
-  body
-  footer
-  cta
-  divider
-  image
-  text
-  button
-  product_grid
-  testimonial
-}
-
 enum ExportFormat {
   html
   pdf

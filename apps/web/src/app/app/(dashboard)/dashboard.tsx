@@ -1,6 +1,5 @@
 "use client";
 import BrandKitSetupBanner from "@/components/brand-kit/BrandKitSetupBanner";
-import EdgeRayLoader from "@/components/EdgeLoader";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -22,13 +21,12 @@ interface TemplateCardProps {
   template: {
     id: string;
     name: string;
-    subject: string | null;
-    category: string | null;
+    subject?: string | null;
+    category?: string | null;
     updatedAt: string | Date;
-    isFavorite: boolean;
-    _count: {
+    isFavorite?: boolean;
+    _count?: {
       versions: number;
-      sections: number;
     };
   };
 }
@@ -52,7 +50,7 @@ const TemplateCard = ({ template }: TemplateCardProps) => {
           <div className="flex items-center justify-between text-xs text-muted-foreground mt-2 p-2">
             <div className="flex items-center gap-2">
               <FileText className="h-3 w-3" />
-              <span>{template._count.versions} versions</span>
+              <span>{template._count?.versions ?? 0} versions</span>
             </div>
             <span>
               {formatDistanceToNow(new Date(template.updatedAt), {
@@ -95,7 +93,7 @@ const TemplateList = ({ organizationId }: { organizationId: string }) => {
   return (
     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
       {data.templates.map((template) => (
-        <TemplateCard key={template.id} template={template} />
+        <TemplateCard key={template.id} template={template as TemplateCardProps['template']} />
       ))}
     </div>
   );

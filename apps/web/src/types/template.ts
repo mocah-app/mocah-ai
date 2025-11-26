@@ -1,13 +1,4 @@
-export type SectionType =
-  | "header"
-  | "hero"
-  | "text"
-  | "button"
-  | "image"
-  | "footer"
-  | "cta"
-  | "product_grid"
-  | "testimonial";
+// React Email template types
 
 export interface ElementStyles {
   color?: string;
@@ -24,38 +15,24 @@ export interface ElementStyles {
   [key: string]: any;
 }
 
-export interface SectionStyles {
-  backgroundColor?: string;
-  padding?: string;
-  backgroundImage?: string;
-  textColor?: string;
-  [key: string]: any;
-}
+export type StyleType = "INLINE" | "PREDEFINED_CLASSES" | "STYLE_OBJECTS";
 
-// Flat structure for now, matching AI output
-export interface EmailSection {
-  id?: string; // Optional as AI might not generate it immediately
-  type: SectionType;
-  styles?: SectionStyles;
-
-  // Content fields
-  headline?: string;
-  subheadline?: string;
-  body?: string;
-  buttonText?: string;
-  buttonUrl?: string;
-  imageUrl?: string;
-  imageAlt?: string;
-
-  // For future nested structure
-  elements?: any[];
-
-  [key: string]: any;
+export interface ReactEmailTemplate {
+  id: string;
+  name: string;
+  subject?: string;
+  previewText?: string;
+  reactEmailCode: string;
+  styleType: StyleType;
+  styleDefinitions?: Record<string, React.CSSProperties>;
+  htmlCode?: string;
+  tableHtmlCode?: string;
 }
 
 export interface TemplateData {
   subject?: string;
   previewText?: string;
-  content?: string;
-  sections: EmailSection[];
+  reactEmailCode?: string;
+  styleType?: StyleType;
+  styleDefinitions?: Record<string, React.CSSProperties>;
 }

@@ -4,11 +4,10 @@ import { protectedProcedure, router } from "../index";
 import { organizationProcedure } from "../middleware";
 import { aiClient, TEMPLATE_GENERATION_MODEL } from "../lib/ai";
 import {
-  buildTemplateGenerationPrompt,
-  templateGenerationSchema,
   buildReactEmailPrompt,
   reactEmailGenerationSchema,
 } from "../lib/prompts";
+import { validateReactEmailCode, logger } from "@mocah/shared";
 
 export const templateRouter = router({
   /**
@@ -26,9 +25,6 @@ export const templateRouter = router({
         include: {
           versions: {
             orderBy: { version: "desc" },
-          },
-          sections: {
-            orderBy: { order: "asc" },
           },
           organization: {
             select: {
@@ -114,7 +110,6 @@ export const templateRouter = router({
           _count: {
             select: {
               versions: true,
-              sections: true,
             },
           },
         },
@@ -136,7 +131,6 @@ export const templateRouter = router({
     .input(
       z.object({
         prompt: z.string(),
-        useReactEmail: z.boolean().optional().default(true),
       })
     )
     .mutation(async ({ ctx, input }) => {
@@ -146,138 +140,124 @@ export const templateRouter = router({
         select: { brandKit: true },
       });
 
-      // 2. Generate template using React Email format (default) or legacy format
-      if (input.useReactEmail) {
-        // NEW: React Email JSX generation
-        const prompt = buildReactEmailPrompt(
-          input.prompt,
-          organization?.brandKit as any
-        );
+      // 2. Generate React Email template
+      const prompt = buildReactEmailPrompt(
+        input.prompt,
+        organization?.brandKit as any
+      );
 
-        const result = await aiClient.generateStructured(
-          reactEmailGenerationSchema,
-          prompt,
-          TEMPLATE_GENERATION_MODEL
-        );
+      // Log complete AI request details
+      logger.info("\n" + "=".repeat(80));
+      logger.info("🤖 AI GENERATION REQUEST");
+      logger.info("=".repeat(80));
+      logger.info("\n📝 USER PROMPT:", { prompt: input.prompt });
+      logger.info("\n🎨 BRAND KIT:", { brandKit: organization?.brandKit || {} });
+      logger.info("\n📋 COMPLETE SYSTEM PROMPT:", { systemPrompt: prompt });
+      logger.info("\n🔧 GENERATION CONFIG:", {
+        model: TEMPLATE_GENERATION_MODEL,
+        schemaFields: Object.keys(reactEmailGenerationSchema.shape),
+      });
+      logger.info("\n" + "=".repeat(80) + "\n");
 
-        // Legacy content for backward compatibility
-        const legacyContent = JSON.stringify({
-          subject: result.subject,
-          previewText: result.previewText,
-          sections: [],
-        });
+      const result = await aiClient.generateStructured(
+        reactEmailGenerationSchema,
+        prompt,
+        TEMPLATE_GENERATION_MODEL
+      );
 
-        // 3. Create template with React Email format
-        const template = await ctx.db.template.create({
-          data: {
-            organizationId: ctx.organizationId,
-            name: result.subject || "AI Generated Template",
-            subject: result.subject,
-            content: legacyContent, // Keep for backward compatibility
-            description: `Generated from prompt: ${input.prompt}`,
-            
-            // React Email fields
-            reactEmailCode: result.reactEmailCode,
-            styleType: result.styleType.toUpperCase() as any,
-            styleDefinitions: result.styleDefinitions || {},
-            previewText: result.previewText,
-          },
-        });
+      // Log AI response summary
+      logger.info("\n" + "=".repeat(80));
+      logger.info("✅ AI GENERATION RESPONSE");
+      logger.info("=".repeat(80));
+      logger.info("Response Summary:", {
+        subject: result.subject,
+        previewText: result.previewText,
+        styleType: result.styleType,
+        codeLength: result.reactEmailCode?.length || 0,
+        model: result.metadata?.model || "unknown",
+        tokensUsed: result.metadata?.tokensUsed || "unknown",
+      });
+      logger.info("=".repeat(80) + "\n");
 
-        // 4. Create initial version
-        const version = await ctx.db.templateVersion.create({
-          data: {
-            templateId: template.id,
-            version: 1,
-            name: "V1",
-            content: legacyContent,
-            subject: result.subject,
-            isCurrent: true,
-            createdBy: ctx.session?.user?.id,
-            
-            // React Email fields
-            reactEmailCode: result.reactEmailCode,
-            styleType: result.styleType.toUpperCase() as any,
-            styleDefinitions: result.styleDefinitions || {},
-            previewText: result.previewText,
-            
-            metadata: {
-              generatedFrom: "ai",
-              prompt: input.prompt,
-              format: "react-email",
-              ...result.metadata,
-            },
-          },
-        });
-
-        // 5. Update template with current version
-        await ctx.db.template.update({
-          where: { id: template.id },
-          data: { currentVersionId: version.id },
-        });
-
-        return template;
-      } else {
-        // LEGACY: Original JSON sections format
-        const prompt = buildTemplateGenerationPrompt(
-          input.prompt,
-          organization?.brandKit as any
-        );
-
-        const result = await aiClient.generateStructured(
-          templateGenerationSchema,
-          prompt,
-          TEMPLATE_GENERATION_MODEL
-        );
-
-        const sections = result.sections.map((section: any) => ({
-          type: section.type,
-          styles: section.styles,
-          ...section.content,
-        }));
-
-        const templateData = {
-          subject: result.subject,
-          previewText: result.previewText,
-          sections,
-        };
-
-        const contentString = JSON.stringify(templateData);
-
-        const template = await ctx.db.template.create({
-          data: {
-            organizationId: ctx.organizationId,
-            name: result.subject || "AI Generated Template",
-            subject: result.subject,
-            content: contentString,
-            description: `Generated from prompt: ${input.prompt}`,
-          },
-        });
-
-        const version = await ctx.db.templateVersion.create({
-          data: {
-            templateId: template.id,
-            version: 1,
-            name: "V1",
-            content: contentString,
-            subject: result.subject,
-            isCurrent: true,
-            createdBy: ctx.session?.user?.id,
-            metadata: {
-              generatedFrom: "ai",
-              prompt: input.prompt,
-              format: "legacy",
-            },
-          },
-        });
-
-        await ctx.db.template.update({
-          where: { id: template.id },
-          data: { currentVersionId: version.id },
-        });
-
-        return template;
+      // Validate generated React Email code
+      logger.info("\n" + "=".repeat(80));
+      logger.info("🔍 VALIDATION RESULTS");
+      logger.info("=".repeat(80));
+      const validation = validateReactEmailCode(result.reactEmailCode);
+      logger.info(`Valid: ${validation.isValid ? "✅ YES" : "❌ NO"}`);
+      
+      if (validation.errors && validation.errors.length > 0) {
+        logger.error("❌ VALIDATION ERRORS:", { errors: validation.errors });
       }
+      
+      if (validation.warnings && validation.warnings.length > 0) {
+        logger.warn("⚠️  VALIDATION WARNINGS:", { warnings: validation.warnings });
+      }
+      
+      if (validation.isValid && (!validation.warnings || validation.warnings.length === 0)) {
+        logger.info("✨ Perfect! No errors or warnings.");
+      }
+      logger.info("=".repeat(80) + "\n");
+      
+      if (!validation.isValid) {
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message: `Generated code failed validation: ${validation.errors.join(", ")}`,
+        });
+      }
+
+      // Parse styleDefinitions from JSON string if provided
+      let styleDefinitions = {};
+      if (result.styleDefinitionsJson) {
+        try {
+          styleDefinitions = JSON.parse(result.styleDefinitionsJson);
+        } catch {
+          // Ignore parse errors, use empty object
+        }
+      }
+
+      // 3. Create template
+      const template = await ctx.db.template.create({
+        data: {
+          organizationId: ctx.organizationId,
+          name: result.subject || "AI Generated Template",
+          subject: result.subject,
+          description: `Generated from prompt: ${input.prompt}`,
+          reactEmailCode: result.reactEmailCode,
+          styleType: result.styleType.toUpperCase() as any,
+          styleDefinitions,
+          previewText: result.previewText,
+        },
+      });
+
+      // 4. Create initial version
+      const version = await ctx.db.templateVersion.create({
+        data: {
+          templateId: template.id,
+          version: 1,
+          name: "V1",
+          subject: result.subject,
+          isCurrent: true,
+          createdBy: ctx.session?.user?.id,
+          reactEmailCode: result.reactEmailCode,
+          styleType: result.styleType.toUpperCase() as any,
+          styleDefinitions,
+          previewText: result.previewText,
+          metadata: {
+            generatedFrom: "ai",
+            prompt: input.prompt,
+            ...result.metadata,
+          },
+        },
+      });
+
+      // 5. Update template with current version
+      await ctx.db.template.update({
+        where: { id: template.id },
+        data: { currentVersionId: version.id },
+      });
+
+      return template;
     }),
 
   /**
@@ -311,7 +291,6 @@ export const templateRouter = router({
       z.object({
         templateId: z.string(),
         prompt: z.string(),
-        useReactEmail: z.boolean().optional().default(true),
       })
     )
     .mutation(async ({ ctx, input }) => {
@@ -350,124 +329,63 @@ export const templateRouter = router({
 
       const newVersionNumber = (latestVersion?.version || 0) + 1;
 
-      if (input.useReactEmail) {
-        // NEW: React Email JSX regeneration
-        const prompt = buildReactEmailPrompt(
-          input.prompt,
-          template.organization.brandKit as any
-        );
+      // Generate React Email template
+      const prompt = buildReactEmailPrompt(
+        input.prompt,
+        template.organization.brandKit as any
+      );
 
-        const result = await aiClient.generateStructured(
-          reactEmailGenerationSchema,
-          prompt,
-          TEMPLATE_GENERATION_MODEL
-        );
+      const result = await aiClient.generateStructured(
+        reactEmailGenerationSchema,
+        prompt,
+        TEMPLATE_GENERATION_MODEL
+      );
 
-        // Legacy content for backward compatibility
-        const legacyContent = JSON.stringify({
-          subject: result.subject,
-          previewText: result.previewText,
-          sections: [],
-        });
-
-        // Create new version
-        const version = await ctx.db.templateVersion.create({
-          data: {
-            templateId: input.templateId,
-            version: newVersionNumber,
-            name: `AI Generated V${newVersionNumber}`,
-            content: legacyContent,
-            subject: result.subject,
-            isCurrent: true,
-            createdBy: ctx.session.user.id,
-            
-            // React Email fields
-            reactEmailCode: result.reactEmailCode,
-            styleType: result.styleType.toUpperCase() as any,
-            styleDefinitions: result.styleDefinitions || {},
-            previewText: result.previewText,
-            
-            metadata: {
-              generatedFrom: "ai",
-              prompt: input.prompt,
-              format: "react-email",
-              ...result.metadata,
-            },
-          },
-        });
-
-        // Update template with current version
-        await ctx.db.template.update({
-          where: { id: input.templateId },
-          data: {
-            currentVersionId: version.id,
-            subject: result.subject,
-            content: legacyContent,
-            
-            // React Email fields
-            reactEmailCode: result.reactEmailCode,
-            styleType: result.styleType.toUpperCase() as any,
-            styleDefinitions: result.styleDefinitions || {},
-            previewText: result.previewText,
-          },
-        });
-
-        return version;
-      } else {
-        // LEGACY: Original JSON sections format
-        const prompt = buildTemplateGenerationPrompt(
-          input.prompt,
-          template.organization.brandKit as any
-        );
-
-        const result = await aiClient.generateStructured(
-          templateGenerationSchema,
-          prompt,
-          TEMPLATE_GENERATION_MODEL
-        );
-
-        const sections = result.sections.map((section: any) => ({
-          type: section.type,
-          styles: section.styles,
-          ...section.content,
-        }));
-
-        const templateData = {
-          subject: result.subject,
-          previewText: result.previewText,
-          sections,
-        };
-
-        const contentString = JSON.stringify(templateData);
-
-        const version = await ctx.db.templateVersion.create({
-          data: {
-            templateId: input.templateId,
-            version: newVersionNumber,
-            name: `AI Generated V${newVersionNumber}`,
-            content: contentString,
-            subject: result.subject,
-            isCurrent: true,
-            createdBy: ctx.session.user.id,
-            metadata: {
-              generatedFrom: "ai",
-              prompt: input.prompt,
-              format: "legacy",
-            },
-          },
-        });
-
-        await ctx.db.template.update({
-          where: { id: input.templateId },
-          data: {
-            currentVersionId: version.id,
-            subject: result.subject,
-            content: contentString,
-          },
-        });
-
-        return version;
+      // Parse styleDefinitions from JSON string if provided
+      let styleDefinitions = {};
+      if (result.styleDefinitionsJson) {
+        try {
+          styleDefinitions = JSON.parse(result.styleDefinitionsJson);
+        } catch {
+          // Ignore parse errors, use empty object
+        }
       }
+
+      // Create new version
+      const version = await ctx.db.templateVersion.create({
+        data: {
+          templateId: input.templateId,
+          version: newVersionNumber,
+          name: `AI Generated V${newVersionNumber}`,
+          subject: result.subject,
+          isCurrent: true,
+          createdBy: ctx.session.user.id,
+          reactEmailCode: result.reactEmailCode,
+          styleType: result.styleType.toUpperCase() as any,
+          styleDefinitions,
+          previewText: result.previewText,
+          metadata: {
+            generatedFrom: "ai",
+            prompt: input.prompt,
+            ...result.metadata,
+          },
+        },
+      });
+
+      // Update template with current version
+      await ctx.db.template.update({
+        where: { id: input.templateId },
+        data: {
+          currentVersionId: version.id,
+          subject: result.subject,
+          reactEmailCode: result.reactEmailCode,
+          styleType: result.styleType.toUpperCase() as any,
+          styleDefinitions,
+          previewText: result.previewText,
+        },
+      });
+
+      return version;
     }),
 
   /**
@@ -480,13 +398,10 @@ export const templateRouter = router({
         name: z.string().min(1),
         description: z.string().optional(),
         subject: z.string().optional(),
-        content: z.string(),
         category: z.string().optional(),
         isPublic: z.boolean().default(false),
-        
-        // React Email fields (optional)
-        reactEmailCode: z.string().optional(),
-        styleType: z.enum(["INLINE", "PREDEFINED_CLASSES", "STYLE_OBJECTS"]).optional(),
+        reactEmailCode: z.string(),
+        styleType: z.enum(["INLINE", "PREDEFINED_CLASSES", "STYLE_OBJECTS"]).default("STYLE_OBJECTS"),
         styleDefinitions: z.record(z.string(), z.any()).optional(),
         previewText: z.string().optional(),
       })
@@ -508,16 +423,13 @@ export const templateRouter = router({
 
       const template = await ctx.db.template.create({
         data: {
-          ...(input.id && { id: input.id }), // Use client ID if provided
+          ...(input.id && { id: input.id }),
           organizationId: ctx.organizationId,
           name: input.name,
           description: input.description,
           subject: input.subject,
-          content: input.content,
           category: input.category,
           isPublic: input.isPublic,
-          
-          // React Email fields
           reactEmailCode: input.reactEmailCode,
           styleType: input.styleType,
           styleDefinitions: input.styleDefinitions,
@@ -531,12 +443,9 @@ export const templateRouter = router({
           templateId: template.id,
           version: 1,
           name: "V1",
-          content: input.content,
           subject: input.subject,
           isCurrent: true,
           createdBy: ctx.session?.user?.id,
-          
-          // React Email fields
           reactEmailCode: input.reactEmailCode,
           styleType: input.styleType,
           styleDefinitions: input.styleDefinitions,
@@ -563,12 +472,9 @@ export const templateRouter = router({
         name: z.string().optional(),
         description: z.string().optional(),
         subject: z.string().optional(),
-        content: z.string().optional(),
         category: z.string().optional(),
         isPublic: z.boolean().optional(),
         isFavorite: z.boolean().optional(),
-        
-        // React Email fields (optional)
         reactEmailCode: z.string().optional(),
         styleType: z.enum(["INLINE", "PREDEFINED_CLASSES", "STYLE_OBJECTS"]).optional(),
         styleDefinitions: z.record(z.string(), z.any()).optional(),
@@ -602,6 +508,22 @@ export const templateRouter = router({
           code: "FORBIDDEN",
           message: "You do not have access to this template",
         });
+      }
+
+      // Validate React Email code if provided
+      if (updateData.reactEmailCode) {
+        const validation = validateReactEmailCode(updateData.reactEmailCode);
+        if (!validation.isValid) {
+          throw new TRPCError({
+            code: "BAD_REQUEST",
+            message: `Invalid React Email code: ${validation.errors.join(", ")}`,
+          });
+        }
+
+        // Log warnings if any
+        if (validation.warnings && validation.warnings.length > 0) {
+          console.warn("[Template Update] Validation warnings:", validation.warnings);
+        }
       }
 
       const updatedTemplate = await ctx.db.template.update({

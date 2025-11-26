@@ -3,12 +3,10 @@ import { aiClient, TEMPLATE_GENERATION_MODEL } from "@mocah/api/lib/ai";
 import {
   buildReactEmailPrompt,
   reactEmailGenerationSchema,
-  buildTemplateGenerationPrompt,
-  templateGenerationSchema,
 } from "@mocah/api/lib/prompts";
 import { auth } from "@mocah/auth";
 import prisma from "@mocah/db";
-
+import { logger } from "@mocah/shared";
 
 // AI SDK streaming works in both Edge and Node.js runtimes
 export const runtime = "nodejs";
@@ -25,7 +23,7 @@ export async function POST(req: NextRequest) {
     }
 
     // 2. Parse request body
-    const { prompt, organizationId, useReactEmail } = await req.json();
+    const { prompt, organizationId } = await req.json();
 
     if (!prompt || !organizationId) {
       return new Response("Missing required fields", { status: 400 });
@@ -49,20 +47,28 @@ export async function POST(req: NextRequest) {
       select: { brandKit: true },
     });
 
-    // 5. Build prompt based on format (default to React Email)
-    const useReactEmailFormat = useReactEmail !== false; // Default to true
-    
-    const promptText = useReactEmailFormat
-      ? buildReactEmailPrompt(prompt, organization?.brandKit as any)
-      : buildTemplateGenerationPrompt(prompt, organization?.brandKit as any);
-    
-    const schema = useReactEmailFormat
-      ? reactEmailGenerationSchema
-      : templateGenerationSchema;
+    // 5. Build React Email prompt
+    const promptText = buildReactEmailPrompt(prompt, organization?.brandKit as any);
+
+    // Log complete AI request details for streaming
+    logger.info("\n" + "=".repeat(80));
+    logger.info("🌊 AI STREAMING REQUEST");
+    logger.info("=".repeat(80));
+    logger.info("\n📝 USER PROMPT:", { prompt });
+    logger.info("\n🎨 BRAND KIT:", { brandKit: organization?.brandKit || {} });
+    logger.info("\n📋 COMPLETE SYSTEM PROMPT:", { systemPrompt: promptText });
+    logger.info("\n🔧 GENERATION CONFIG:", {
+      model: TEMPLATE_GENERATION_MODEL,
+      schemaFields: Object.keys(reactEmailGenerationSchema.shape),
+      streaming: true,
+      user: session.user.email || session.user.id,
+      organizationId,
+    });
+    logger.info("\n" + "=".repeat(80) + "\n");
 
     // 6. Start streaming with AI SDK
     const result = aiClient.streamStructured(
-      schema,
+      reactEmailGenerationSchema,
       promptText,
       TEMPLATE_GENERATION_MODEL
     );
@@ -70,7 +76,7 @@ export async function POST(req: NextRequest) {
     // 7. Return streaming response using AI SDK's built-in method
     return result.toTextStreamResponse();
   } catch (error) {
-    console.error("Template generation error:", error);
+    logger.error("Template generation error:", { error });
     return new Response("Internal server error", { status: 500 });
   }
 }

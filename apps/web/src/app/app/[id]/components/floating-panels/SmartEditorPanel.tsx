@@ -1,31 +1,27 @@
-import React from "react";
-import {
-  X,
-  MousePointer,
-  FileSliders,
-} from "lucide-react";
+"use client";
+
+import React, { useCallback, useRef } from "react";
 import { useEditorMode } from "../providers/EditorModeProvider";
 import { useTemplate } from "../providers/TemplateProvider";
 import { useCanvas } from "../providers/CanvasProvider";
-import { ReactEmailEditorPanel } from "../smart-editor/ReactEmailEditorPanel";
+import { EditorShell } from "../smart-editor/EditorShell";
 import type { TemplateNodeData } from "../nodes/TemplateNode";
-import type { ElementData } from "@/lib/react-email";
-import { Button } from "@/components/ui/button";
-import { cn } from "@/lib/utils";
+import type { ElementData, ElementUpdates } from "@/lib/react-email";
+
+interface SmartEditorPanelProps {
+  isOpen: boolean;
+  onClose: () => void;
+}
 
 export const SmartEditorPanel = ({
   isOpen,
   onClose,
-}: {
-  isOpen: boolean;
-  onClose: () => void;
-}) => {
+}: SmartEditorPanelProps) => {
   const { state: editorState } = useEditorMode();
-  const { actions: templateActions } = useTemplate();
-  const { state: canvasState, actions: canvasActions } = useCanvas();
+  const { state: canvasState } = useCanvas();
   const { selectedElement } = editorState;
 
-  // Get current value to render
+  // Get current active node
   const nodes = canvasState.nodes;
   const activeNode =
     nodes.find((n) => n.data.isCurrent) ||
@@ -37,106 +33,68 @@ export const SmartEditorPanel = ({
     try {
       elementData = JSON.parse(selectedElement);
     } catch (e) {
-      console.error('Failed to parse element data:', e);
+      console.error("Failed to parse element data:", e);
     }
   }
 
-  // Use ReactEmailEditorPanel for element editing
-  if (elementData && activeNode) {
-    const handleElementUpdate = async (updates: any) => {
-      // Use React Email code-updater utility to modify the React Email code
-      const { updateReactEmailCode } = await import('@/lib/react-email');
-      
-      const currentCode = (activeNode.data as TemplateNodeData).template.reactEmailCode!;
-      const currentStyleDefs = (activeNode.data as TemplateNodeData).template.styleDefinitions || {};
-      
-      try {
-        // Update React Email code based on element changes
-        const { updatedCode, updatedStyleDefinitions } = updateReactEmailCode(
-          currentCode,
-          elementData,
-          updates,
-          currentStyleDefs
-        );
+  // Get style definitions from active node
+  const styleDefinitions =
+    (activeNode?.data as TemplateNodeData)?.template?.styleDefinitions || {};
 
-        // Update template provider with modified code
-        templateActions.updateReactEmailCode(updatedCode, updatedStyleDefinitions);
+  // Handle live preview updates (DOM manipulation, no save)
+  const handlePreviewUpdate = useCallback((elementId: string, updates: ElementUpdates) => {
+    // Find the iframe and update the element directly in the DOM
+    const iframe = document.querySelector('iframe[title="Email Preview"]') as HTMLIFrameElement;
+    if (!iframe?.contentDocument) return;
 
-        // Update canvas node
-        canvasActions.setNodes((nds) =>
-          nds.map((node) => {
-            if (node.id === activeNode.id) {
-              return {
-                ...node,
-                data: {
-                  ...node.data,
-                  template: {
-                    ...(node.data as TemplateNodeData).template,
-                    reactEmailCode: updatedCode,
-                    styleDefinitions: updatedStyleDefinitions,
-                  },
-                },
-              };
-            }
-            return node;
-          })
-        );
-      } catch (error) {
-        console.error('Failed to update React Email code:', error);
+    const element = iframe.contentDocument.querySelector(`[data-element-id="${elementId}"]`);
+    if (!element) return;
+
+    // Apply style updates
+    if (updates.styles) {
+      Object.entries(updates.styles).forEach(([property, value]) => {
+        if (value !== undefined && value !== null) {
+          // Convert camelCase to kebab-case for CSS
+          const cssProperty = property.replace(/([A-Z])/g, '-$1').toLowerCase();
+          (element as HTMLElement).style.setProperty(cssProperty, String(value));
+        }
+      });
+    }
+
+    // Apply content updates
+    if (updates.content !== undefined) {
+      // For elements that have direct text content
+      const textNode = element.childNodes[0];
+      if (textNode && textNode.nodeType === Node.TEXT_NODE) {
+        textNode.textContent = updates.content;
+      } else if (element.children.length === 0) {
+        element.textContent = updates.content;
       }
-    };
+    }
 
-    return (
-      <ReactEmailEditorPanel
-        isOpen={isOpen}
-        onClose={onClose}
-        elementData={elementData}
-        styleDefinitions={(activeNode.data as TemplateNodeData).template.styleDefinitions || {}}
-        onElementUpdate={handleElementUpdate}
-      />
-    );
-  }
+    // Apply attribute updates
+    if (updates.attributes) {
+      Object.entries(updates.attributes).forEach(([attr, value]) => {
+        if (value !== undefined && value !== null) {
+          if (attr === 'src' && element.tagName === 'IMG') {
+            (element as HTMLImageElement).src = String(value);
+          } else if (attr === 'href' && element.tagName === 'A') {
+            (element as HTMLAnchorElement).href = String(value);
+          } else if (attr === 'alt' && element.tagName === 'IMG') {
+            (element as HTMLImageElement).alt = String(value);
+          }
+        }
+      });
+    }
+  }, []);
 
-  // No element selected - show empty state
   return (
-    <div
-      className={cn(
-        "bg-card rounded-r-xl shadow-2xl border border-border overflow-hidden flex flex-col z-40 h-dvh",
-        "transition-all duration-300 ease-in-out",
-        isOpen
-          ? "translate-x-0 opacity-100 w-80"
-          : "-translate-x-full opacity-0 pointer-events-none w-0"
-      )}
-    >
-      {/* Header */}
-      <div className="p-2 border-b border-border flex justify-between items-center bg-muted">
-        <div className="flex items-center gap-2">
-          <FileSliders className="size-3 text-primary" />
-          <h3 className="font-semibold text-sm">
-            Editor
-          </h3>
-        </div>
-        <Button onClick={onClose} variant="outline" size="icon">
-          <X size={16} />
-        </Button>
-      </div>
-
-      {/* Empty State */}
-      <div className="flex-1 flex items-center justify-center p-6">
-        <div className="text-center space-y-3">
-          <div className="w-12 h-12 rounded-full bg-muted/50 flex items-center justify-center mx-auto">
-            <MousePointer className="w-6 h-6 text-muted-foreground" />
-          </div>
-          <div className="space-y-1">
-            <p className="text-sm font-medium text-foreground">
-              No Element Selected
-            </p>
-            <p className="text-xs text-muted-foreground max-w-[200px]">
-              Click on any element in your React Email template to edit it
-            </p>
-          </div>
-        </div>
-      </div>
-    </div>
+    <EditorShell
+      isOpen={isOpen}
+      onClose={onClose}
+      elementData={elementData}
+      styleDefinitions={styleDefinitions}
+      onPreviewUpdate={handlePreviewUpdate}
+    />
   );
 };

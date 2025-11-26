@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect } from "react";
+import React, { useEffect, useCallback, useState } from "react";
 import { CanvasProvider } from "./components/providers/CanvasProvider";
 import {
   TemplateProvider,
@@ -11,10 +11,13 @@ import { InfiniteCanvas } from "./components/canvas/InfiniteCanvas";
 import { SmartEditorPanel } from "./components/floating-panels/SmartEditorPanel";
 import { ChatPanel } from "./components/floating-panels/ChatPanel";
 import { FloatingNav } from "./components/floating-panels/FloatingNav";
+import { SaveDesignEdit } from "./components/canvas/SaveDesignEdit";
 import { useCanvas } from "./components/providers/CanvasProvider";
 import { useEditorMode } from "./components/providers/EditorModeProvider";
 import { useParams } from "next/navigation";
 import { useTemplateCreation } from "@/utils/store-prompt-in-session";
+import type { TemplateNodeData } from "./components/nodes/TemplateNode";
+import type { ElementData } from "@/lib/react-email";
 
 function EditorContent() {
   const { state: templateState, actions: templateActions } = useTemplate();
@@ -28,6 +31,72 @@ function EditorContent() {
   const promptFromStorage = React.useMemo(() => getPrompt(), []);
   const [activePanel, setActivePanel] = React.useState<string | null>(null);
   const [initialPrompt] = React.useState<string | null>(promptFromStorage);
+  const [isSaving, setIsSaving] = useState(false);
+
+  // Check if there are pending changes
+  const hasPendingChanges = editorState.pendingChanges !== null;
+
+  // Get active node for save operations
+  const activeNode =
+    canvasState.nodes.find((n) => n.data.isCurrent) ||
+    canvasState.nodes.find((n) => n.type === "template");
+
+  // Handle save design changes - persists to database
+  const handleSaveChanges = useCallback(async () => {
+    if (!editorState.pendingChanges || !activeNode) return;
+
+    setIsSaving(true);
+
+    try {
+      const { updateReactEmailCode } = await import("@/lib/react-email");
+
+      // Parse element data
+      const elementData: ElementData = JSON.parse(
+        editorState.pendingChanges.originalElement
+      );
+
+      const currentCode = (activeNode.data as TemplateNodeData).template
+        .reactEmailCode!;
+      const currentStyleDefs =
+        (activeNode.data as TemplateNodeData).template.styleDefinitions || {};
+
+      // Update React Email code based on pending changes
+      const { updatedCode, updatedStyleDefinitions } = updateReactEmailCode(
+        currentCode,
+        elementData,
+        editorState.pendingChanges.updates,
+        currentStyleDefs
+      );
+
+      // Save to database and revalidate
+      await templateActions.saveReactEmailCode(
+        updatedCode,
+        updatedStyleDefinitions
+      );
+
+      // Clear pending changes after successful save
+      editorActions.clearPendingChanges();
+    } catch (error) {
+      console.error("Failed to save design changes:", error);
+    } finally {
+      setIsSaving(false);
+    }
+  }, [
+    editorState.pendingChanges,
+    activeNode,
+    templateActions,
+    editorActions,
+  ]);
+
+  // Handle reset changes
+  const handleResetChanges = useCallback(() => {
+    // Clear pending changes
+    editorActions.clearPendingChanges();
+
+    // Force the preview to re-render with original content
+    // This reverts any live DOM changes made during editing
+    editorActions.refreshPreview();
+  }, [editorActions]);
 
   // Auto-open chat if we have a prompt
   useEffect(() => {
@@ -50,16 +119,26 @@ function EditorContent() {
     if (activePanel === panel) {
       // Close the currently open panel
       setActivePanel(null);
-      // If closing editor, also deselect element
+      // If closing editor, also deselect element and disable design mode
       if (panel === "editor") {
         editorActions.selectElement(null);
+        editorActions.setDesignMode(false);
       }
     } else {
       // Open the new panel and close any other
       setActivePanel(panel);
+      
+      // If opening editor, enable design mode for element selection
+      if (panel === "editor") {
+        editorActions.setDesignMode(true);
+      }
+      
       // If opening chat, close editor and deselect element
-      if (panel === "chat" && editorState.selectedElement) {
-        editorActions.selectElement(null);
+      if (panel === "chat") {
+        if (editorState.selectedElement) {
+          editorActions.selectElement(null);
+        }
+        editorActions.setDesignMode(false);
       }
     }
   };
@@ -86,7 +165,7 @@ function EditorContent() {
           name: "Generating...",
           isCurrent: true,
           isLoading: true,
-          template: { sections: [] },
+          template: { reactEmailCode: "" },
         },
       };
       canvasActions.addNode(loadingNode as any);
@@ -201,10 +280,19 @@ function EditorContent() {
           onClose={() => {
             setActivePanel(null);
             editorActions.selectElement(null);
+            editorActions.setDesignMode(false);
           }}
         />
       </div>
       <InfiniteCanvas />
+      
+      {/* Floating save bar for unsaved design changes */}
+      <SaveDesignEdit
+        isVisible={hasPendingChanges}
+        onSave={handleSaveChanges}
+        onReset={handleResetChanges}
+        isSaving={isSaving}
+      />
     </div>
   );
 }

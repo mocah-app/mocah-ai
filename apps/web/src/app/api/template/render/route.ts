@@ -52,12 +52,14 @@ async function renderReactEmailComponent(code: string): Promise<string> {
       ""
     );
 
-    // Step 2: Transform JSX to JavaScript using Babel
+    // Step 2: Transform TypeScript/JSX to JavaScript using Babel
+    // Use both TypeScript and React presets to handle full React Email syntax
     const transformedResult = Babel.transform(cleanedCode, {
       presets: [
+        ["typescript", { isTSX: true, allExtensions: true }],
         ["react", { runtime: "classic" }],
       ],
-      filename: "email.jsx",
+      filename: "email.tsx",
     });
 
     if (!transformedResult.code) {

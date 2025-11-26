@@ -8,7 +8,7 @@ import { validateReactEmailCode } from '@/lib/react-email';
 interface CodeEditorProps {
   code: string;
   onChange: (code: string) => void;
-  onValidationChange?: (isValid: boolean, errors: string[]) => void;
+  onValidationChange?: (isValid: boolean, errors: string[], warnings?: string[]) => void;
   className?: string;
   readOnly?: boolean;
   language?: string; // 'typescript', 'html', 'javascript', etc.
@@ -28,8 +28,8 @@ export function CodeEditor({
   useEffect(() => {
     if (!onValidationChange) return;
 
-    const { isValid, errors } = validateReactEmailCode(code);
-    onValidationChange(isValid, errors);
+    const { isValid, errors, warnings } = validateReactEmailCode(code);
+    onValidationChange(isValid, errors, warnings);
   }, [code, onValidationChange]);
 
   const handleEditorDidMount = (editor: editor.IStandaloneCodeEditor) => {

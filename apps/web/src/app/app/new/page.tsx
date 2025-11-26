@@ -41,11 +41,12 @@ export default function NewTemplatePage() {
     // Create skeleton in background (fire-and-forget)
     createSkeletonMutation.mutate(
       {
-        id: templateId, // Use pre-generated ID
-        name: "Empty Template",
-        description: "This is an empty template",
+        id: templateId,
+        name: "New Template",
+        description: prompt.trim(),
         subject: prompt.trim().slice(0, 100),
-        content: JSON.stringify({ sections: [] }),
+        reactEmailCode: "", // Empty - will be populated by AI generation
+        styleType: "STYLE_OBJECTS",
         isPublic: false,
       },
       {

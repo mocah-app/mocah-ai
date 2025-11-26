@@ -10,6 +10,8 @@ interface ReactEmailPreviewProps {
   styleDefinitions?: Record<string, React.CSSProperties>;
   onElementSelect?: (elementData: ElementData | null) => void;
   enableSelection?: boolean;
+  /** Force re-render key - change this to force a fresh render */
+  renderKey?: number;
 }
 
 export const ReactEmailPreview = ({
@@ -17,6 +19,7 @@ export const ReactEmailPreview = ({
   styleDefinitions,
   onElementSelect,
   enableSelection = false,
+  renderKey = 0,
 }: ReactEmailPreviewProps) => {
   const [html, setHtml] = useState<string>("");
   const [isLoading, setIsLoading] = useState(true);
@@ -66,7 +69,7 @@ export const ReactEmailPreview = ({
     }
 
     renderEmail();
-  }, [reactEmailCode, enableSelection]);
+  }, [reactEmailCode, enableSelection, renderKey]); // Added renderKey to force re-render
 
   if (isLoading) {
     return (
@@ -159,30 +162,15 @@ export const ReactEmailPreview = ({
     );
   }
 
-  // If selection is enabled, use iframe
-  if (enableSelection) {
-    return (
-      <div className="w-full h-full overflow-auto bg-zinc-50 dark:bg-zinc-900 p-8">
-        <div className="max-w-[600px] mx-auto shadow-lg bg-white dark:bg-zinc-800">
-          <iframe
-            ref={iframeRef}
-            srcDoc={html}
-            className="w-full min-h-[800px] border-0"
-            sandbox="allow-same-origin"
-            title="Email Preview"
-            onLoad={handleIframeLoad}
-          />
-        </div>
-      </div>
-    );
-  }
-
-  // Static preview without selection
   return (
-    <div className="w-full h-full overflow-auto bg-zinc-50 dark:bg-zinc-900 p-8">
-      <div
-        className="max-w-[600px] mx-auto shadow-lg bg-white dark:bg-zinc-800"
-        dangerouslySetInnerHTML={{ __html: html }}
+    <div className="w-full h-full overflow-auto max-w-[600px] mx-auto p-2">
+      <iframe
+        ref={iframeRef}
+        srcDoc={html}
+        className="w-full h-full border-0"
+        sandbox="allow-same-origin"
+        title="Email Preview"
+        onLoad={enableSelection ? handleIframeLoad : undefined}
       />
     </div>
   );

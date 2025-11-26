@@ -19,8 +19,8 @@ interface StreamingProgress {
   subject?: string;
   previewText?: string;
   reactEmailCode?: string;
-  styleType?: 'INLINE' | 'PREDEFINED_CLASSES' | 'STYLE_OBJECTS';
-  styleDefinitions?: Record<string, React.CSSProperties>;
+  styleType?: 'inline' | 'predefined-classes' | 'style-objects';
+  styleDefinitionsJson?: string;
   metadata?: {
     emailType?: string;
     generatedAt?: string;
@@ -59,6 +59,8 @@ interface TemplateActions {
   
   // React Email specific actions
   updateReactEmailCode: (code: string, styleDefinitions?: Record<string, React.CSSProperties>) => void;
+  saveReactEmailCode: (code: string, styleDefinitions?: Record<string, React.CSSProperties>) => Promise<void>;
+  refetchTemplate: () => Promise<void>;
 }
 
 interface TemplateContextValue {
@@ -124,13 +126,29 @@ export function TemplateProvider({
         };
         const mappedStyleType = template.styleType ? styleTypeMap[template.styleType] : 'STYLE_OBJECTS';
 
+        // Parse styleDefinitions - handle both JSON string and object formats
+        let styleDefinitions: Record<string, React.CSSProperties> = {};
+        const templateAny = template as any;
+        const styleDefsJson = templateAny.styleDefinitionsJson;
+        const styleDefs = templateAny.styleDefinitions;
+        
+        if (styleDefsJson && typeof styleDefsJson === 'string') {
+          try {
+            styleDefinitions = JSON.parse(styleDefsJson);
+          } catch {
+            // Ignore parse errors
+          }
+        } else if (styleDefs && typeof styleDefs === 'object') {
+          styleDefinitions = styleDefs;
+        }
+
         const result = await updateMutation.mutateAsync({
           id: templateId,
           name: template.subject || "AI Generated Template",
           subject: template.subject,
           reactEmailCode: template.reactEmailCode,
           styleType: mappedStyleType,
-          styleDefinitions: template.styleDefinitions,
+          styleDefinitions,
           previewText: template.previewText,
         });
 
@@ -140,7 +158,7 @@ export function TemplateProvider({
           ...prev,
           currentTemplate: processedResult,
           reactEmailCode: template.reactEmailCode || null,
-          styleDefinitions: template.styleDefinitions || {},
+          styleDefinitions,
           isStreaming: false,
           streamingProgress: null,
           isLoading: false,
@@ -248,14 +266,15 @@ export function TemplateProvider({
     try {
       await updateMutation.mutateAsync({
         id: state.currentTemplate.id,
-        content: state.currentTemplate.content,
+        reactEmailCode: state.reactEmailCode || undefined,
+        styleDefinitions: state.styleDefinitions,
       });
       console.log("Template saved");
       setState((prev) => ({ ...prev, isDirty: false }));
     } catch (error) {
       console.error("Failed to save template:", error);
     }
-  }, [state.currentTemplate, updateMutation]);
+  }, [state.currentTemplate, state.reactEmailCode, state.styleDefinitions, updateMutation]);
 
   const createVersion = useCallback(
     async (name?: string) => {
@@ -286,54 +305,10 @@ export function TemplateProvider({
     }
   }, []);
 
-  const updateElement = useCallback((elementPath: string, data: any) => {
-    setState((prev) => {
-      if (!prev.currentTemplate) return prev;
-
-      let content: any = prev.currentTemplate.content;
-      // Parse content if it's a string
-      if (typeof content === "string") {
-        try {
-          content = JSON.parse(content);
-        } catch (e) {
-          console.error("Failed to parse template content for update", e);
-          return prev;
-        }
-      }
-
-      // Deep clone to avoid mutation
-      const newContent = JSON.parse(JSON.stringify(content));
-
-      // Helper to set value at path
-      const set = (obj: any, path: string, value: any) => {
-        const parts = path.split(".");
-        let current = obj;
-        for (let i = 0; i < parts.length - 1; i++) {
-          const part = parts[i];
-          if (!current[part]) current[part] = {};
-          current = current[part];
-        }
-        const lastPart = parts[parts.length - 1];
-        // Merge data instead of replacing
-        current[lastPart] = { ...current[lastPart], ...value };
-      };
-
-      try {
-        set(newContent, elementPath, data);
-      } catch (e) {
-        console.error("Failed to update element at path", elementPath, e);
-        return prev;
-      }
-
-      return {
-        ...prev,
-        currentTemplate: {
-          ...prev.currentTemplate,
-          content: JSON.stringify(newContent),
-        },
-        isDirty: true,
-      };
-    });
+  // Legacy updateElement - now a no-op as we use React Email code directly
+  // Element updates are handled via updateReactEmailCode
+  const updateElement = useCallback((_elementPath: string, _data: any) => {
+    console.warn("updateElement is deprecated. Use updateReactEmailCode instead.");
   }, []);
 
   const regenerateElement = useCallback(
@@ -424,6 +399,43 @@ export function TemplateProvider({
     }));
   }, []);
 
+  // Save React Email code to database
+  const saveReactEmailCode = useCallback(async (
+    code: string,
+    styleDefinitions?: Record<string, React.CSSProperties>
+  ) => {
+    if (!state.currentTemplate) {
+      throw new Error("No template loaded");
+    }
+
+    try {
+      await updateMutation.mutateAsync({
+        id: state.currentTemplate.id,
+        reactEmailCode: code,
+        styleDefinitions: styleDefinitions,
+      });
+
+      // Update local state
+      setState((prev) => ({
+        ...prev,
+        reactEmailCode: code,
+        styleDefinitions: styleDefinitions || prev.styleDefinitions,
+        isDirty: false,
+      }));
+
+      // Refetch to ensure UI is in sync
+      await refetch();
+    } catch (error) {
+      console.error("Failed to save React Email code:", error);
+      throw error;
+    }
+  }, [state.currentTemplate, updateMutation, refetch]);
+
+  // Expose refetch for revalidation
+  const refetchTemplate = useCallback(async () => {
+    await refetch();
+  }, [refetch]);
+
   const generateTemplateStream = useCallback(
     async (prompt: string) => {
       if (!activeOrganization?.id) {
@@ -465,6 +477,8 @@ export function TemplateProvider({
     generateTemplateStream,
     setIsDirty,
     updateReactEmailCode,
+    saveReactEmailCode,
+    refetchTemplate,
   };
 
   return (

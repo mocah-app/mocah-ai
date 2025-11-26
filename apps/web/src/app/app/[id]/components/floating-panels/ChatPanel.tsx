@@ -1,12 +1,24 @@
-import React, { useState, useEffect, useCallback, useRef } from "react";
-import { Send, X, Bot, User, Loader2, Sparkles, StopCircleIcon, MessageCircle } from "lucide-react";
-import { cn } from "@/lib/utils";
-import { useTemplate } from "../providers/TemplateProvider";
 import { Button } from "@/components/ui/button";
-import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent } from "@/components/ui/card";
+import { Textarea } from "@/components/ui/textarea";
+import { cn } from "@/lib/utils";
+import {
+  Code2,
+  FileText,
+  Loader2,
+  MessageCircle,
+  Palette,
+  Send,
+  Sparkles,
+  StopCircleIcon,
+  Type,
+  X,
+} from "lucide-react";
 import { useParams } from "next/navigation";
-import Loader from "@/components/loader";
+import React, { useCallback, useEffect, useRef, useState } from "react";
+import { useTemplate } from "../providers/TemplateProvider";
+import { Prism as SyntaxHighlighter } from "react-syntax-highlighter";
+import { vscDarkPlus } from "react-syntax-highlighter/dist/esm/styles/prism";
 
 interface Message {
   id: string;
@@ -52,18 +64,8 @@ export const ChatPanel = ({
   // Check if template is a skeleton (needs generation)
   const isNewTemplate = React.useMemo(() => {
     if (!templateState.currentTemplate) return true;
-
-    // Check if content is empty or just has empty sections
-    try {
-      const content =
-        typeof templateState.currentTemplate.content === "string"
-          ? JSON.parse(templateState.currentTemplate.content)
-          : templateState.currentTemplate.content;
-
-      return !content.sections || content.sections.length === 0;
-    } catch {
-      return true;
-    }
+    // Template is new/skeleton if it doesn't have React Email code
+    return !templateState.currentTemplate.reactEmailCode;
   }, [templateState.currentTemplate]);
 
   const [messages, setMessages] = useState<Message[]>([]);
@@ -133,23 +135,8 @@ export const ChatPanel = ({
 
       try {
         // Check if we're generating for the first time (skeleton template) or updating
-        // A skeleton template has empty sections
-        let isGeneratingFirstTime = false;
-        if (templateState.currentTemplate) {
-          try {
-            const content =
-              typeof templateState.currentTemplate.content === "string"
-                ? JSON.parse(templateState.currentTemplate.content)
-                : templateState.currentTemplate.content;
-
-            isGeneratingFirstTime =
-              !content.sections || content.sections.length === 0;
-          } catch {
-            isGeneratingFirstTime = true;
-          }
-        } else {
-          isGeneratingFirstTime = true;
-        }
+        const isGeneratingFirstTime =
+          !templateState.currentTemplate?.reactEmailCode;
 
         if (isGeneratingFirstTime) {
           // Use streaming for first-time generation
@@ -257,9 +244,7 @@ export const ChatPanel = ({
       <div className="p-2 border-b border-border flex justify-between items-center bg-muted">
         <div className="flex items-center gap-2">
           <MessageCircle className="size-3 text-primary" />
-          <h3 className="font-semibold text-sm">
-            Chat
-            </h3>
+          <h3 className="font-semibold text-sm">Chat</h3>
         </div>
         <Button onClick={onClose} variant="outline" size="icon">
           <X size={16} />
@@ -353,67 +338,161 @@ export const ChatPanel = ({
   );
 };
 
-// Component to show streaming progress
+// Code preview with proper syntax highlighting
+function CodePreview({ code }: { code: string }) {
+  const lines = code.split("\n");
+  const previewLines = lines.slice(0, 12);
+  const hasMore = lines.length > 12;
+
+  return (
+    <div className="relative">
+      <div className="bg-[#1e1e1e] rounded-md overflow-hidden border border-gray-800">
+        <SyntaxHighlighter
+          language="tsx"
+          style={vscDarkPlus}
+          customStyle={{
+            margin: 0,
+            padding: "12px",
+            background: "#1e1e1e",
+            fontSize: "12px",
+            lineHeight: "1.5",
+          }}
+          showLineNumbers={true}
+          lineNumberStyle={{
+            minWidth: "2.5em",
+            paddingRight: "1em",
+            color: "#858585",
+            textAlign: "right",
+            userSelect: "none",
+          }}
+          wrapLines={true}
+        >
+          {previewLines.join("\n")}
+        </SyntaxHighlighter>
+        {hasMore && (
+          <div className="px-3 py-2 text-xs text-gray-500 font-mono border-t border-gray-800">
+            ... {lines.length - 12} more lines
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// Main streaming progress component
 function StreamingProgress({
   progress,
 }: {
   progress: {
     subject?: string;
     previewText?: string;
-    sections?: Array<{
-      type?: string;
-      content?: {
-        headline?: string;
-        subheadline?: string;
-        body?: string;
-      };
-    }>;
+    reactEmailCode?: string;
+    styleType?: string;
   };
 }) {
+  const [dots, setDots] = useState("");
+
+  // Animated dots effect
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setDots((prev) => (prev.length >= 3 ? "" : prev + "."));
+    }, 500);
+    return () => clearInterval(interval);
+  }, []);
+
+  const sections = [
+    {
+      key: "subject",
+      label: "Subject Line",
+      icon: Type,
+      value: progress.subject,
+      color: "text-blue-400",
+    },
+    {
+      key: "previewText",
+      label: "Preview Text",
+      icon: FileText,
+      value: progress.previewText,
+      color: "text-purple-400",
+    },
+    {
+      key: "reactEmailCode",
+      label: "React Email Code",
+      icon: Code2,
+      value: progress.reactEmailCode,
+      color: "text-green-400",
+      isCode: true,
+    },
+  ];
+
+  const completedSections = sections.filter((s) => s.value);
+  const currentSection = completedSections[completedSections.length - 1];
+
   return (
-    <Card className="bg-muted/30 border-primary/20">
-      <CardContent className="p-3 space-y-2">
-        <div className="flex items-center gap-2 text-xs text-primary">
-          <Sparkles className="h-3 w-3" />
-          <span className="font-medium">Generating...</span>
-        </div>
+    <div className="">
+      <div className="p-4 space-y-4">
+        {/* Sections */}
+        <div className="space-y-3 max-h-[400px] overflow-y-auto">
+          {sections.map((section) => {
+            const isCompleted = !!section.value;
+            const isCurrent = currentSection?.key === section.key;
+            const Icon = section.icon;
 
-        {progress.subject && (
-          <div className="space-y-1">
-            <p className="text-xs text-muted-foreground">Subject:</p>
-            <p className="text-sm font-medium">{progress.subject}</p>
-          </div>
-        )}
+            if (!isCompleted) return null;
 
-        {progress.previewText && (
-          <div className="space-y-1">
-            <p className="text-xs text-muted-foreground">Preview:</p>
-            <p className="text-xs">{progress.previewText}</p>
-          </div>
-        )}
-
-        {progress.sections && progress.sections.length > 0 && (
-          <div className="space-y-1">
-            <p className="text-xs text-muted-foreground">
-              Sections: {progress.sections.length}
-            </p>
-            <div className="space-y-1">
-              {progress.sections.slice(-2).map((section, idx) => (
-                <div key={idx} className="text-xs bg-background/50 p-2 rounded">
-                  <span className="text-muted-foreground uppercase">
-                    {section.type}
+            return (
+              <div
+                key={section.key}
+                className={`space-y-2 transition-all duration-300 ${
+                  isCurrent ? "animate-in slide-in-from-bottom-2" : ""
+                }`}
+              >
+                <div className="flex items-center gap-2">
+                  <Icon className={`h-3.5 w-3.5 ${section.color}`} />
+                  <span className="text-xs font-medium text-muted-foreground">
+                    {section.label}
                   </span>
-                  {section.content?.headline && (
-                    <p className="font-medium truncate">
-                      {section.content.headline}
-                    </p>
+                  {isCurrent && (
+                    <div className="flex gap-1 ml-auto">
+                      <div
+                        className="w-1 h-1 bg-primary rounded-full animate-bounce"
+                        style={{ animationDelay: "0ms" }}
+                      />
+                      <div
+                        className="w-1 h-1 bg-primary rounded-full animate-bounce"
+                        style={{ animationDelay: "150ms" }}
+                      />
+                      <div
+                        className="w-1 h-1 bg-primary rounded-full animate-bounce"
+                        style={{ animationDelay: "300ms" }}
+                      />
+                    </div>
                   )}
                 </div>
-              ))}
-            </div>
-          </div>
-        )}
-      </CardContent>
-    </Card>
+
+                {section.isCode && section.value ? (
+                  <CodePreview code={section.value} />
+                ) : (
+                  <div className="bg-card/50 rounded-lg p-3 border border-border/50">
+                    <p className="text-sm leading-relaxed">{section.value}</p>
+                  </div>
+                )}
+
+                {section.key === "reactEmailCode" && section.value && (
+                  <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                    <div className="flex items-center gap-1">
+                      <div className="w-2 h-2 rounded-full bg-green-500" />
+                      <span>{section.value.split("\n").length} lines</span>
+                    </div>
+                    <div className="w-1 h-1 rounded-full bg-muted-foreground/30" />
+                    <span>{(section.value.length / 1024).toFixed(1)} KB</span>
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      </div>
+    </div>
   );
 }

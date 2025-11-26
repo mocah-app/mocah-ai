@@ -34,11 +34,16 @@ export function updateReactEmailCode(
 } {
   const ast = parseJSX(originalCode);
   let updatedStyleDefinitions = { ...styleDefinitions };
+  let elementFound = false;
   
-  // Find the element node
+  // Find the element node by line number
   traverse(ast, {
     JSXOpeningElement(path: any) {
-      if (path.node.loc?.start.line === elementData.line) {
+      const nodeLine = path.node.loc?.start.line;
+      
+      if (nodeLine === elementData.line) {
+        elementFound = true;
+        
         // Update content
         if (updates.content !== undefined) {
           updateElementContent(path, updates.content);
@@ -47,12 +52,14 @@ export function updateReactEmailCode(
         // Update attributes
         if (updates.attributes) {
           Object.entries(updates.attributes).forEach(([key, value]) => {
-            updateAttribute(path.node, key, value);
+            if (value !== undefined) {
+              updateAttribute(path.node, key, value);
+            }
           });
         }
         
         // Update styles
-        if (updates.styles) {
+        if (updates.styles && Object.keys(updates.styles).length > 0) {
           if (elementData.styleType === 'style-object' && elementData.styleName) {
             // Will update style object separately
           } else {
@@ -63,6 +70,13 @@ export function updateReactEmailCode(
       }
     }
   });
+  
+  if (!elementFound) {
+    console.warn('updateReactEmailCode: Element not found at line', elementData.line, {
+      elementType: elementData.type,
+      elementId: elementData.id
+    });
+  }
   
   // Update style object if needed
   if (updates.styles && elementData.styleType === 'style-object' && elementData.styleName) {
@@ -102,14 +116,21 @@ export function updateReactEmailCode(
 function updateElementContent(path: any, content: string) {
   const parentPath = path.parentPath;
   
-  if (parentPath.node.type === 'JSXElement') {
+  if (parentPath && parentPath.node && parentPath.node.type === 'JSXElement') {
     // Clear existing children
     parentPath.node.children = [];
     
-    // Add new text content
-    if (content) {
-      parentPath.node.children.push(t.jsxText(content));
+    // Add new text content (even empty string is valid)
+    if (content !== undefined && content !== null) {
+      // Use JSXText for the content
+      const textNode = t.jsxText(content);
+      parentPath.node.children.push(textNode);
     }
+  } else {
+    console.warn('updateElementContent: Could not find parent JSXElement', {
+      hasParentPath: !!parentPath,
+      parentNodeType: parentPath?.node?.type
+    });
   }
 }
 

@@ -7,6 +7,7 @@
  */
 
 import { injectElementIds } from "./jsx-parser";
+import { validateReactEmailCode as validateReactEmailCodeShared } from "@mocah/shared";
 
 /**
  * Render React Email JSX to HTML using server-side API
@@ -89,43 +90,15 @@ export async function convertToTableHTML(
 
 /**
  * Validate React Email JSX code
+ * Re-exports the shared validation for convenience
+ * Client and server both use @mocah/shared for validation
  */
 export function validateReactEmailCode(code: string): {
   isValid: boolean;
   errors: string[];
+  warnings?: string[];
 } {
-  const errors: string[] = [];
-
-  try {
-    // Basic validation
-    if (!code || code.trim().length === 0) {
-      errors.push("Code is empty");
-      return { isValid: false, errors };
-    }
-
-    // Check for required imports
-    if (!code.includes("@react-email/components")) {
-      errors.push("Missing @react-email/components import");
-    }
-
-    // Check for export default
-    if (!code.includes("export default")) {
-      errors.push("Missing export default statement");
-    }
-
-    // Check for basic JSX structure
-    if (!code.includes("<") || !code.includes(">")) {
-      errors.push("Missing JSX elements");
-    }
-
-    return {
-      isValid: errors.length === 0,
-      errors,
-    };
-  } catch (error) {
-    errors.push(`Validation error: ${error}`);
-    return { isValid: false, errors };
-  }
+  return validateReactEmailCodeShared(code);
 }
 
 /**
