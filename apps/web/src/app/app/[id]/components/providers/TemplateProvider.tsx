@@ -224,6 +224,14 @@ export function TemplateProvider({
     }
   );
 
+  // Sync query loading state
+  useEffect(() => {
+    setState((prev) => ({
+      ...prev,
+      isLoading: isQueryLoading,
+    }));
+  }, [isQueryLoading]);
+
   // Sync query data to state
   useEffect(() => {
     if (templateData) {

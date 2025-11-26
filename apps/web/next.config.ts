@@ -12,6 +12,10 @@ const nextConfig: NextConfig = {
       },
       {
         protocol: "https",
+        hostname: "storage.mocah.ai",
+      },
+      {
+        protocol: "https",
         hostname: "fly.storage.tigris.dev",
       },
     ],

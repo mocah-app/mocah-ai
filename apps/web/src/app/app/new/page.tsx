@@ -70,30 +70,33 @@ export default function NewTemplatePage() {
   const suggestedPrompts = [
     {
       label: "Welcome Email",
-      prompt: "Create a welcome email for new subscribers with a coupon code",
+      prompt:
+        "Create a warm welcome email for new subscribers that introduces our brand story, includes a personalized greeting, highlights our key products or services, and offers an exclusive 15% discount coupon code for their first purchase. Include a clear call-to-action button and social media links.",
     },
     {
       label: "Black Friday Sales",
       prompt:
-        "Write a Black Friday sales announcement with bold product highlights",
+        "Design a high-energy Black Friday sales announcement email with eye-catching headlines, showcase our top 5 trending products with discount percentages, include countdown timer graphics, add urgency messaging about limited stock, and feature multiple call-to-action buttons for different product categories.",
     },
     {
       label: "Monthly Newsletter",
       prompt:
-        "Generate a monthly newsletter for a SaaS business with feature updates",
+        "Generate a professional monthly newsletter for a SaaS business that includes: a friendly introduction from the CEO, highlights of 3 major feature updates with screenshots, customer success story spotlight, upcoming webinar announcement, relevant blog article links, and team member introduction section.",
     },
     {
       label: "Abandoned Cart Reminder",
-      prompt: "Draft an abandoned cart reminder email for an online store",
+      prompt:
+        "Draft a persuasive abandoned cart recovery email for an online store that shows product images of items left behind, displays the total cart value, addresses common purchase concerns, offers a time-sensitive 10% discount incentive, includes customer testimonials, and provides easy one-click checkout link.",
     },
     {
       label: "Feedback Request",
       prompt:
-        "Design a feedback request email post-purchase with a discount for reviews",
+        "Design a thoughtful post-purchase feedback request email that thanks the customer for their recent order, asks for honest product review with star rating, includes direct review platform links, offers a 10% discount coupon for their next purchase as appreciation, and shows how customer feedback helps improve our service.",
     },
     {
       label: "Product Launch",
-      prompt: "Create a product launch email for a new product with a discount",
+      prompt:
+        "Create an exciting product launch announcement email featuring: compelling hero image of the new product, detailed description of key features and benefits, early-bird exclusive 20% discount for first 100 customers, product demonstration video embed, pre-order button, expected shipping timeline, and FAQ section.",
     },
   ];
 

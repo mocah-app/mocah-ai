@@ -92,7 +92,7 @@ export function NodeHeader({
         </div>
 
         <DropdownMenu>
-          <DropdownMenuTrigger>
+          <DropdownMenuTrigger asChild>
             <Button variant="ghost" size="icon" title="More Actions">
               <MoreVertical className="size-4 text-muted-foreground" />
             </Button>

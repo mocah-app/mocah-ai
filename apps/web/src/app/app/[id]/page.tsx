@@ -18,6 +18,8 @@ import { useParams } from "next/navigation";
 import { useTemplateCreation } from "@/utils/store-prompt-in-session";
 import type { TemplateNodeData } from "./components/nodes/TemplateNode";
 import type { ElementData } from "@/lib/react-email";
+import EdgeRayLoader from "@/components/EdgeLoader";
+import MocahLoadingIcon from "@/components/mocah-brand/MocahLoadingIcon";
 
 function EditorContent() {
   const { state: templateState, actions: templateActions } = useTemplate();
@@ -263,6 +265,12 @@ function EditorContent() {
     canvasActions,
   ]);
 
+  // Show loading overlay when template is loading and no node exists yet
+  const isLoadingTemplate = templateState.isLoading && !templateState.currentTemplate && !templateState.isStreaming;
+  const hasTemplateNode = canvasState.nodes.some(
+    (n) => n.id === "template-node" || n.id.startsWith("template-")
+  );
+
   return (
     <div className="h-screen w-full relative overflow-hidden flex">
       <div className="flex h-dvh">
@@ -285,6 +293,23 @@ function EditorContent() {
         />
       </div>
       <InfiniteCanvas />
+      
+      {/* Loading overlay when opening template from dashboard */}
+      {isLoadingTemplate && !hasTemplateNode && (
+        <div className="absolute inset-0 z-50 bg-background/80 backdrop-blur-sm flex items-center justify-center">
+          <div className="relative w-full h-full">
+            <EdgeRayLoader />
+            <div className="absolute inset-0 flex flex-col items-center justify-center p-12">
+              <div className="relative mb-4">
+                <MocahLoadingIcon isLoading={true} />
+              </div>
+              <p className="text-muted-foreground text-sm">
+                Loading template...
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
       
       {/* Floating save bar for unsaved design changes */}
       <SaveDesignEdit

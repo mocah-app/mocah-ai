@@ -38,8 +38,10 @@ const TemplateCard = ({ template }: TemplateCardProps) => {
         <CardHeader className="p-0">
           <div className="flex items-start justify-between">
             <div className="flex-1">
-              <div className="flex items-center gap-2 w-full h-28 bg-primary/10" />
-              <CardTitle className="group-hover:text-primary transition-colors duration-300 p-2">
+              <div className="flex items-center gap-2 w-full h-28 bg-primary/10 bg-dot opacity-25" >
+              <span className="text-muted-foreground w-full text-center">Preview</span>
+              </div>
+              <CardTitle className="group-hover:text-primary transition-colors duration-300 p-4 text-lg lg:text-xl">
                 {template.name}
               </CardTitle>
             </div>
@@ -183,7 +185,7 @@ export default function Dashboard() {
         </div>
       )}
 
-      <PromptInput />
+      {/* <PromptInput /> */}
 
       {/* Stats */}
       <div className="grid gap-4 md:grid-cols-3 relative z-10">

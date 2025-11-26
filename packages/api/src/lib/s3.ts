@@ -56,15 +56,16 @@ export function sanitizeFilename(filename: string): string {
 }
 
 export function generateStoragePath(
-  userId: string,
   filename: string,
   prefix: string = "logos"
 ): string {
+  const randomId = crypto.randomUUID();
   const timestamp = Date.now();
   const sanitized = sanitizeFilename(filename);
-  return `${prefix}/${userId}/${timestamp}-${sanitized}`;
+  return `${prefix}/${randomId}/${timestamp}-${sanitized}`;
 }
 
 export function getPublicUrl(filePath: string): string {
-  return `https://${TIGRIS_BUCKET}.fly.storage.tigris.dev/${filePath}`;
+  const customDomain = process.env.TIGRIS_PUBLIC_URL || "storage.mocah.ai";
+  return `https://${customDomain}/${filePath}`;
 }

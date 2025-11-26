@@ -2,6 +2,7 @@
 
 import { Card } from "@/components/ui/card";
 import { Mail } from "lucide-react";
+import { getContrastTextColor, isLightColor } from "@/lib/color-utils";
 
 interface BrandPreview {
   brandName?: string;
@@ -54,6 +55,15 @@ export function LiveEmailPreview({ brand }: { brand: BrandPreview }) {
     sampleContent[brandVoice as keyof typeof sampleContent] ||
     sampleContent.professional;
 
+  // Calculate appropriate text colors for accessibility
+  const primaryTextColor = getContrastTextColor(primaryColor);
+  const secondaryTextColor = getContrastTextColor(secondaryColor || primaryColor);
+  const buttonBgColor = secondaryColor || primaryColor;
+  const buttonTextColor = getContrastTextColor(buttonBgColor);
+  
+  // For text on white background: use black if primaryColor is light, otherwise use primaryColor
+  const greetingTextColor = isLightColor(primaryColor) ? "#000000" : primaryColor;
+
   return (
     <div className="h-full flex flex-col space-y-4 bg-secondary ">
       {/* Email Client Mockup */}
@@ -95,7 +105,10 @@ export function LiveEmailPreview({ brand }: { brand: BrandPreview }) {
                   />
                 ) : (
                   <div className="h-12 flex items-center justify-center">
-                    <span className="text-2xl font-bold text-white">
+                    <span
+                      className="text-2xl font-bold"
+                      style={{ color: primaryTextColor }}
+                    >
                       {brandName}
                     </span>
                   </div>
@@ -107,7 +120,7 @@ export function LiveEmailPreview({ brand }: { brand: BrandPreview }) {
                 {/* Greeting */}
                 <h2
                   className="text-2xl font-bold"
-                  style={{ color: primaryColor }}
+                  style={{ color: greetingTextColor }}
                 >
                   {content.greeting}
                 </h2>
@@ -120,8 +133,11 @@ export function LiveEmailPreview({ brand }: { brand: BrandPreview }) {
                 {/* CTA Button */}
                 <div className="pt-4">
                   <button
-                    className="px-8 py-3 rounded-lg font-semibold text-white transition-all hover:opacity-90"
-                    style={{ backgroundColor: secondaryColor || primaryColor }}
+                    className="px-8 py-3 rounded-lg font-semibold transition-all hover:opacity-90"
+                    style={{
+                      backgroundColor: buttonBgColor,
+                      color: buttonTextColor,
+                    }}
                   >
                     {content.cta}
                   </button>
