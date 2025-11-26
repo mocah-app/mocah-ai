@@ -5,8 +5,10 @@ import type { TemplateNodeData } from "./TemplateNode";
 import { ReactEmailCodeEditor } from "../code-editor/ReactEmailCodeEditor";
 import { HtmlCodeViewer } from "../code-editor/HtmlCodeViewer";
 import { Button } from "@/components/ui/button";
-import { RefreshCw } from "lucide-react";
+import { AlertCircle, Copy, RefreshCw } from "lucide-react";
 import Loader from "@/components/loader";
+import { toast } from "sonner";
+import { Badge } from "@/components/ui/badge";
 
 interface CodeModeContentProps {
   template: {
@@ -58,35 +60,54 @@ export function CodeModeContent({ template, nodeId }: CodeModeContentProps) {
 
         {/* Tab actions */}
         <div className="flex items-center gap-2">
+          <Button variant="outline" size="sm" className="text-xs relative">
+            Alerts
+            <Badge className="absolute -top-1 -right-2 h-4 w-4 text-[9px] font-medium">15</Badge>
+          </Button>
           {activeTab === "react" && (
-            <span className="text-xs">
-              {reactEmailCode.startsWith("import") ? (
-                <span className="text-green-600 dark:text-green-400">
-                  ✓ JSX
-                </span>
-              ) : (
-                <span className="text-gray-600 dark:text-gray-400">
-                  ⚠️ Unknown
-                </span>
-              )}
-            </span>
+            <>
+              <span className="text-xs">
+                {reactEmailCode.startsWith("import") ? null : (
+                  <span className="text-muted-foreground">⚠️ Unknown code</span>
+                )}
+              </span>
+
+              <Button
+                variant="ghost"
+                size="sm"
+                className="scale-100 focus-visible:scale-105 transition-transform"
+                onClick={() => {
+                  navigator.clipboard.writeText(reactEmailCode);
+                  toast.success("React Email code copied to clipboard");
+                }}
+              >
+                <Copy className="h-3 w-3" />
+              </Button>
+            </>
           )}
 
           {activeTab === "html" && (
             <>
               {htmlError && (
-                <span className="text-xs text-red-600 dark:text-red-400">
-                  Render failed
-                </span>
+                <span className="text-xs text-destructive">Render failed</span>
               )}
               {htmlLoading && <Loader />}
-              {!htmlLoading &&
-                cachedHtml &&
-                cachedHtml.code === reactEmailCode && (
-                  <span className="text-xs text-green-600 dark:text-green-400">
-                    ✓ Cached
-                  </span>
-                )}
+
+              {cachedHtml && (
+                <>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => {
+                      navigator.clipboard.writeText(cachedHtml?.html || "");
+                      toast.success("HTML code copied to clipboard");
+                    }}
+                  >
+                    <Copy className="h-3 w-3" />
+                  </Button>
+                </>
+              )}
+
               <Button
                 variant="ghost"
                 size="sm"

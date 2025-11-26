@@ -1,6 +1,5 @@
 "use client";
 
-import EdgeRayLoader from "@/components/EdgeLoader";
 import { Handle, Position } from "@xyflow/react";
 import { Plus } from "lucide-react";
 import React from "react";
@@ -87,7 +86,6 @@ export function TemplateNode({ data, id }: TemplateNodeProps) {
 function LoadingState() {
   return (
     <div className="bg-background w-full relative">
-      <EdgeRayLoader />
       {/* Loading Content */}
       <div className="min-h-[500px] flex flex-col items-center justify-center p-12">
         <div className="relative mb-4">

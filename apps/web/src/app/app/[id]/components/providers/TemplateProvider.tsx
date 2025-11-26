@@ -9,7 +9,7 @@ import React, {
   useState,
   useEffect,
 } from "react";
-import { convertDates } from "@mocah/shared";
+import { convertDates, logger } from "@mocah/shared";
 import { useStreamTemplate } from "@/hooks/use-stream-template";
 import { useOrganization } from "@/contexts/organization-context";
 import { useRouter } from "next/navigation";
@@ -142,7 +142,8 @@ export function TemplateProvider({
           styleDefinitions = styleDefs;
         }
 
-        const result = await updateMutation.mutateAsync({
+        // Log the data being saved for debugging
+        const updatePayload = {
           id: templateId,
           name: template.subject || "AI Generated Template",
           subject: template.subject,
@@ -150,7 +151,21 @@ export function TemplateProvider({
           styleType: mappedStyleType,
           styleDefinitions,
           previewText: template.previewText,
+        };
+        
+        logger.info("📝 [TemplateProvider] Saving streamed template data:", {
+          id: updatePayload.id,
+          name: updatePayload.name,
+          subject: updatePayload.subject,
+          previewText: updatePayload.previewText,
+          styleType: updatePayload.styleType,
+          reactEmailCodeLength: updatePayload.reactEmailCode?.length || 0,
+          reactEmailCodePreview: updatePayload.reactEmailCode?.substring(0, 500) || "",
+          reactEmailCodeFull: updatePayload.reactEmailCode, // Full code for debugging
+          styleDefinitionsKeys: Object.keys(styleDefinitions),
         });
+
+        const result = await updateMutation.mutateAsync(updatePayload);
 
         const processedResult = convertDates(result);
 
@@ -167,7 +182,17 @@ export function TemplateProvider({
         // Refetch to get the latest data
         await refetch();
       } catch (error) {
-        console.error("Failed to save streamed template:", error);
+        console.error("❌ [TemplateProvider] Failed to save streamed template:", error);
+        console.error("📋 [TemplateProvider] Error details:", {
+          errorMessage: error instanceof Error ? error.message : String(error),
+          errorStack: error instanceof Error ? error.stack : undefined,
+          templateId,
+          templateData: {
+            subject: template.subject,
+            reactEmailCodeLength: template.reactEmailCode?.length || 0,
+            reactEmailCodePreview: template.reactEmailCode?.substring(0, 1000) || "",
+          },
+        });
         setState((prev) => ({
           ...prev,
           isStreaming: false,
