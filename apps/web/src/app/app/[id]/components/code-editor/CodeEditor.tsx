@@ -1,6 +1,6 @@
 'use client';
 
-import { useRef, useEffect } from 'react';
+import { useRef, useEffect, useImperativeHandle, forwardRef } from 'react';
 import Editor from '@monaco-editor/react';
 import type { editor } from 'monaco-editor';
 import { loader } from '@monaco-editor/react';
@@ -15,15 +15,30 @@ interface CodeEditorProps {
   language?: string; // 'typescript', 'html', 'javascript', etc.
 }
 
-export function CodeEditor({
+export interface CodeEditorRef {
+  scrollToLine: (line: number) => void;
+}
+
+export const CodeEditor = forwardRef<CodeEditorRef, CodeEditorProps>(function CodeEditor({
   code,
   onChange,
   onValidationChange,
   className = '',
   readOnly = false,
   language = 'typescript',
-}: CodeEditorProps) {
+}, ref) {
   const editorRef = useRef<editor.IStandaloneCodeEditor | null>(null);
+
+  // Expose scrollToLine method via ref
+  useImperativeHandle(ref, () => ({
+    scrollToLine: (line: number) => {
+      if (editorRef.current) {
+        editorRef.current.revealLineInCenter(line);
+        editorRef.current.setPosition({ lineNumber: line, column: 1 });
+        editorRef.current.focus();
+      }
+    },
+  }), []);
 
   // Configure Monaco TypeScript settings
   useEffect(() => {
@@ -100,8 +115,7 @@ export function CodeEditor({
   };
 
   return (
-    <div className={`h-full w-full ${className}`}
-    >
+    <div className={`h-full w-full ${className}`}>
       <Editor
         height="100%"
         defaultLanguage="typescript"
@@ -124,5 +138,5 @@ export function CodeEditor({
       />
     </div>
   );
-}
+});
 

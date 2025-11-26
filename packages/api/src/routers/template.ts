@@ -512,8 +512,49 @@ export const templateRouter = router({
 
       // Validate React Email code if provided
       if (updateData.reactEmailCode) {
+
+        // Find span tags in the code for debugging
+        const spanTagMatches = updateData.reactEmailCode.match(/<span[\s>]/g);
+        if (spanTagMatches) {
+          logger.warn("⚠️ Found span tags in code:", {
+            count: spanTagMatches.length,
+            matches: spanTagMatches.slice(0, 10), // First 10 matches
+          });
+          
+          // Find line numbers where span tags appear
+          const lines = updateData.reactEmailCode.split('\n');
+          const spanTagLines: Array<{ line: number; content: string }> = [];
+          lines.forEach((line, index) => {
+            if (/<span[\s>]/.test(line)) {
+              spanTagLines.push({
+                line: index + 1,
+                content: line.trim().substring(0, 200),
+              });
+            }
+          });
+          
+          if (spanTagLines.length > 0) {
+            logger.warn("📍 Span tags found at lines:", {
+              lines: spanTagLines.slice(0, 20), // First 20 occurrences
+            });
+          }
+        }
+
         const validation = validateReactEmailCode(updateData.reactEmailCode);
+        
+        logger.info("Validation result:", {
+          isValid: validation.isValid,
+          errors: validation.errors || [],
+          warnings: validation.warnings || [],
+        });
+        logger.info("=".repeat(80) + "\n");
+
         if (!validation.isValid) {
+          logger.error("❌ [Template Update] Validation failed:", {
+            errors: validation.errors,
+            codeLength: updateData.reactEmailCode.length,
+            codePreview: updateData.reactEmailCode.substring(0, 500),
+          });
           throw new TRPCError({
             code: "BAD_REQUEST",
             message: `Invalid React Email code: ${validation.errors.join(", ")}`,
@@ -522,7 +563,7 @@ export const templateRouter = router({
 
         // Log warnings if any
         if (validation.warnings && validation.warnings.length > 0) {
-          console.warn("[Template Update] Validation warnings:", validation.warnings);
+          logger.warn("⚠️ [Template Update] Validation warnings:", validation.warnings);
         }
       }
 

@@ -1,14 +1,17 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useCallback, useEffect, useRef } from "react";
 import type { TemplateNodeData } from "./TemplateNode";
 import { ReactEmailCodeEditor } from "../code-editor/ReactEmailCodeEditor";
+import type { CodeEditorRef } from "../code-editor/CodeEditor";
 import { HtmlCodeViewer } from "../code-editor/HtmlCodeViewer";
+import { CodeAlertsDrawer } from "../code-editor/CodeAlertsDrawer";
 import { Button } from "@/components/ui/button";
-import { AlertCircle, Copy, RefreshCw } from "lucide-react";
+import { Copy, RefreshCw } from "lucide-react";
 import Loader from "@/components/loader";
 import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
+import { validateReactEmailCode } from "@mocah/shared/validation/react-email-validator";
 
 interface CodeModeContentProps {
   template: {
@@ -33,7 +36,44 @@ export function CodeModeContent({ template, nodeId }: CodeModeContentProps) {
   const [htmlLoading, setHtmlLoading] = useState(false);
   const [htmlRefreshTrigger, setHtmlRefreshTrigger] = useState(0);
 
+  // State for validation and alerts drawer
+  const [validationErrors, setValidationErrors] = useState<string[]>([]);
+  const [validationWarnings, setValidationWarnings] = useState<string[]>([]);
+  const [isAlertsDrawerOpen, setIsAlertsDrawerOpen] = useState(false);
+
+  // Ref to the code editor for scrolling to lines
+  const editorRef = useRef<CodeEditorRef>(null);
+
   const reactEmailCode = template.reactEmailCode || "";
+
+  // Handle "go to line" from alerts drawer
+  const handleGoToLine = useCallback((line: number) => {
+    // Switch to React tab if not already there
+    setActiveTab("react");
+    // Close the drawer
+    setIsAlertsDrawerOpen(false);
+    // Small delay to ensure tab switch completes and editor is mounted
+    setTimeout(() => {
+      editorRef.current?.scrollToLine(line);
+    }, 100);
+  }, []);
+
+  // Run initial validation when code changes
+  useEffect(() => {
+    if (reactEmailCode) {
+      const result = validateReactEmailCode(reactEmailCode);
+      setValidationErrors(result.errors);
+      setValidationWarnings(result.warnings || []);
+    }
+  }, [reactEmailCode]);
+
+  // Handle validation state updates from the editor
+  const handleValidationStateChange = useCallback((errors: string[], warnings: string[]) => {
+    setValidationErrors(errors);
+    setValidationWarnings(warnings);
+  }, []);
+
+  const totalAlerts = validationErrors.length + validationWarnings.length;
 
   return (
     <div className="h-full flex flex-col">
@@ -60,9 +100,21 @@ export function CodeModeContent({ template, nodeId }: CodeModeContentProps) {
 
         {/* Tab actions */}
         <div className="flex items-center gap-2">
-          <Button variant="outline" size="sm" className="text-xs relative">
+          <Button 
+            variant="outline" 
+            size="sm" 
+            className="text-xs relative"
+            onClick={() => setIsAlertsDrawerOpen(true)}
+          >
             Alerts
-            <Badge className="absolute -top-1 -right-2 h-4 w-4 text-[9px] font-medium">15</Badge>
+            {totalAlerts > 0 && (
+              <Badge 
+                className="absolute -top-1 -right-2 h-4 min-w-4 px-1 text-[9px] font-medium"
+                variant={validationErrors.length > 0 ? "destructive" : "default"}
+              >
+                {totalAlerts}
+              </Badge>
+            )}
           </Button>
           {activeTab === "react" && (
             <>
@@ -129,9 +181,11 @@ export function CodeModeContent({ template, nodeId }: CodeModeContentProps) {
       <div className="flex-1 overflow-hidden">
         {activeTab === "react" ? (
           <ReactEmailCodeEditor
+            ref={editorRef}
             reactEmailCode={reactEmailCode}
             styleDefinitions={template.styleDefinitions}
             nodeId={nodeId}
+            onValidationStateChange={handleValidationStateChange}
           />
         ) : (
           <HtmlCodeViewer
@@ -149,6 +203,16 @@ export function CodeModeContent({ template, nodeId }: CodeModeContentProps) {
           />
         )}
       </div>
+
+      {/* Alerts Drawer */}
+      <CodeAlertsDrawer
+        isOpen={isAlertsDrawerOpen}
+        onClose={() => setIsAlertsDrawerOpen(false)}
+        errors={validationErrors}
+        warnings={validationWarnings}
+        reactEmailCode={reactEmailCode}
+        onGoToLine={handleGoToLine}
+      />
     </div>
   );
 }
