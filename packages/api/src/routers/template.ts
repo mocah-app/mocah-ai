@@ -62,7 +62,7 @@ export const templateRouter = router({
     }),
 
   /**
-   * List all templates for an organization
+   * List all templates for an organization (minimal data for dashboard/lists)
    */
   list: organizationProcedure
     .input(
@@ -94,29 +94,34 @@ export const templateRouter = router({
         where.isFavorite = input.isFavorite;
       }
 
-      const templates = await ctx.db.template.findMany({
-        where,
-        take: input?.limit || 50,
-        ...(input?.cursor && {
-          skip: 1,
-          cursor: { id: input.cursor },
-        }),
-        orderBy: { updatedAt: "desc" },
-        include: {
-          versions: {
-            where: { isCurrent: true },
-            take: 1,
-          },
-          _count: {
-            select: {
-              versions: true,
+      // Run count and list queries in parallel
+      const [totalCount, templates] = await Promise.all([
+        ctx.db.template.count({ where }),
+        ctx.db.template.findMany({
+          where,
+          take: input?.limit || 50,
+          ...(input?.cursor && {
+            skip: 1,
+            cursor: { id: input.cursor },
+          }),
+          orderBy: { updatedAt: "desc" },
+          select: {
+            id: true,
+            name: true,
+            updatedAt: true,
+            isFavorite: true,
+            _count: {
+              select: {
+                versions: true,
+              },
             },
           },
-        },
-      });
+        }),
+      ]);
 
       return {
         templates,
+        totalCount,
         nextCursor:
           templates.length === (input?.limit || 50)
             ? templates[templates.length - 1]?.id

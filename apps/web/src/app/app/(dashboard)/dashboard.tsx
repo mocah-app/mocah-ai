@@ -1,4 +1,5 @@
 "use client";
+import { useEffect } from "react";
 import BrandKitSetupBanner from "@/components/brand-kit/BrandKitSetupBanner";
 import { Button } from "@/components/ui/button";
 import {
@@ -10,7 +11,7 @@ import {
 } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useOrganization } from "@/contexts/organization-context";
-import { FileText, Palette, Plus, Send, Settings, Sparkles } from "lucide-react";
+import { FileText, Plus, Send } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { formatDistanceToNow } from "date-fns";
@@ -21,11 +22,9 @@ interface TemplateCardProps {
   template: {
     id: string;
     name: string;
-    subject?: string | null;
-    category?: string | null;
     updatedAt: string | Date;
-    isFavorite?: boolean;
-    _count?: {
+    isFavorite: boolean | null;
+    _count: {
       versions: number;
     };
   };
@@ -52,7 +51,7 @@ const TemplateCard = ({ template }: TemplateCardProps) => {
           <div className="flex items-center justify-between text-xs text-muted-foreground mt-2 p-2">
             <div className="flex items-center gap-2">
               <FileText className="h-3 w-3" />
-              <span>{template._count?.versions ?? 0} versions</span>
+              <span>{template._count.versions} versions</span>
             </div>
             <span>
               {formatDistanceToNow(new Date(template.updatedAt), {
@@ -66,42 +65,38 @@ const TemplateCard = ({ template }: TemplateCardProps) => {
   );
 };
 
-const TemplateList = ({ organizationId }: { organizationId: string }) => {
-  const { data, isLoading } = trpc.template.list.useQuery(
-    { limit: 6 },
-    { enabled: !!organizationId }
-  );
+const TemplateListSkeleton = () => (
+  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+    {[1, 2, 3].map((i) => (
+      <Card key={i}>
+        <CardHeader>
+          <Skeleton className="h-28 w-full mb-2" />
+          <Skeleton className="h-6 w-3/4 mb-2" />
+          <Skeleton className="h-3 w-1/2 mt-2" />
+        </CardHeader>
+      </Card>
+    ))}
+  </div>
+);
 
-  if (isLoading) {
-    return (
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-        {[1, 2, 3].map((i) => (
-          <Card key={i}>
-            <CardHeader>
-              <Skeleton className="h-6 w-3/4 mb-2" />
-              <Skeleton className="h-4 w-full" />
-              <Skeleton className="h-3 w-1/2 mt-2" />
-            </CardHeader>
-          </Card>
-        ))}
-      </div>
-    );
-  }
-
-  if (!data?.templates || data.templates.length === 0) {
-    return null;
-  }
-
-  return (
-    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-      {data.templates.map((template) => (
-        <TemplateCard key={template.id} template={template as TemplateCardProps['template']} />
-      ))}
-    </div>
-  );
-};
+const StatsSkeleton = () => (
+  <div className="grid gap-4 md:grid-cols-3 relative z-10">
+    {[1, 2, 3].map((i) => (
+      <Card key={i} className="gap-2 py-4">
+        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+          <Skeleton className="h-4 w-20" />
+          <Skeleton className="h-8 w-12" />
+        </CardHeader>
+        <CardContent>
+          <Skeleton className="h-3 w-32 mt-1" />
+        </CardContent>
+      </Card>
+    ))}
+  </div>
+);
 export default function Dashboard() {
   const router = useRouter();
+  const utils = trpc.useUtils();
   const {
     activeOrganization,
     organizations,
@@ -111,6 +106,25 @@ export default function Dashboard() {
   // Show first organization if we have orgs but no active one set yet
   const displayOrg =
     activeOrganization || (organizations.length > 0 ? organizations[0] : null);
+
+  // Single query for templates - gets both list and count
+  const { data: templatesData, isLoading: templatesLoading } = trpc.template.list.useQuery(
+    { limit: 6 },
+    { enabled: !!displayOrg?.id }
+  );
+
+  // Invalidate templates when org changes
+  useEffect(() => {
+    if (displayOrg?.id) {
+      utils.template.list.invalidate();
+    }
+  }, [displayOrg?.id, utils.template.list]);
+
+  const templates = templatesData?.templates ?? [];
+  const templateCount = templatesData?.totalCount ?? 0;
+  
+  // Combined loading state
+  const isDataLoading = orgLoading || templatesLoading;
 
   if (!displayOrg && !orgLoading) {
     return (
@@ -145,13 +159,6 @@ export default function Dashboard() {
   // Check if brand kit is set up
   const hasBrandKit = displayOrg?.metadata?.setupCompleted;
 
-  // Fetch templates count
-  const { data: templatesData } = trpc.template.list.useQuery(
-    { limit: 100 },
-    { enabled: !!displayOrg?.id }
-  );
-  const templateCount = templatesData?.templates.length || 0;
-
   const topStats: TopStats[] = [
     {
       title: "Templates",
@@ -185,35 +192,50 @@ export default function Dashboard() {
         </div>
       )}
 
-      {/* <PromptInput /> */}
-
       {/* Stats */}
-      <div className="grid gap-4 md:grid-cols-3 relative z-10">
-        {topStats.map((stat) => (
-          <Card key={stat.title} className="gap-2 py-4">
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">
-                {stat.title}
-              </CardTitle>
-              <div className="text-2xl font-bold relative">{stat.value}</div>
-            </CardHeader>
-            <CardContent>
-              <p className="text-xs text-muted-foreground mt-1">
-                {stat.description}
-              </p>
-            </CardContent>
-          </Card>
-        ))}
-      </div>
+      {isDataLoading ? (
+        <StatsSkeleton />
+      ) : (
+        <div className="grid gap-4 md:grid-cols-3 relative z-10">
+          {topStats.map((stat) => (
+            <Card key={stat.title} className="gap-2 py-4">
+              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                <CardTitle className="text-sm font-medium">
+                  {stat.title}
+                </CardTitle>
+                <div className="text-2xl font-bold relative">{stat.value}</div>
+              </CardHeader>
+              <CardContent>
+                <p className="text-xs text-muted-foreground mt-1">
+                  {stat.description}
+                </p>
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+      )}
 
       {/* Recent Templates */}
-      {templateCount > 0 ? (
+      {isDataLoading ? (
         <Card className="relative z-10">
           <CardHeader className="flex flex-row items-center justify-between">
             <CardTitle>Recent Templates</CardTitle>
           </CardHeader>
           <CardContent>
-            {displayOrg?.id && <TemplateList organizationId={displayOrg.id} />}
+            <TemplateListSkeleton />
+          </CardContent>
+        </Card>
+      ) : templateCount > 0 ? (
+        <Card className="relative z-10">
+          <CardHeader className="flex flex-row items-center justify-between">
+            <CardTitle>Recent Templates</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {templates.map((template) => (
+                <TemplateCard key={template.id} template={template} />
+              ))}
+            </div>
           </CardContent>
         </Card>
       ) : (

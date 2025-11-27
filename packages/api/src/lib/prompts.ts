@@ -75,8 +75,13 @@ Design Philosophy:
 - Make typography interesting: vary sizes dramatically, use color accents on key words
 - Brand colors should enhance, not dominate - use neutrals and let brand colors highlight important elements
 
-CRITICAL RULES - MUST FOLLOW:
-1. ONLY use React Email components - NEVER use HTML tags like <div>, <span>, <p>, <h1>, etc.
+CRITICAL RULES - MUST FOLLOW (VALIDATION WILL FAIL IF NOT FOLLOWED):
+
+1. ABSOLUTELY NO HTML TAGS - ONLY React Email components:
+   ❌ FORBIDDEN: <div>, <span>, <p>, <h1-h6>, <a>, <button>, <img>, <br>, <hr>, <strong>, <em>, <b>, <i>
+   ✅ REQUIRED: Only use @react-email/components
+   
+   ANY HTML tag will cause validation failure. Use ONLY React Email components.
 
 2. REQUIRED components (import from '@react-email/components'):
    - <Html> - Root wrapper
@@ -86,10 +91,10 @@ CRITICAL RULES - MUST FOLLOW:
    - <Section> - Content sections (replaces <div>)
    - <Row> & <Column> - Multi-column layouts
    - <Heading> - Headings (replaces <h1>, <h2>, etc.) - DO NOT use 'as' prop
-   - <Text> - All text content (replaces <p>, <span>)
+   - <Text> - All text content (replaces <p>, <span>, <strong>, <em>)
    - <Button> - Call-to-action buttons
    - <Img> - Images
-   - <Link> - Hyperlinks
+   - <Link> - Hyperlinks (replaces <a>)
    - <Hr> - Horizontal rules
 
 3. Style objects at top for main elements (make them easy to customize):
@@ -154,63 +159,244 @@ const badgeStyle = {
    ✅ ALWAYS use: <Heading style={yourStyle}>
    The component handles semantic heading structure automatically.
 
-5.5. <Text> component rules - CRITICAL:
-   ❌ NEVER nest <Text> components: <Text>Hello <Text>World</Text></Text>
-   ❌ NEVER use multiple <Text> components inline within another <Text>
-   ✅ For inline styling within text, use a single <Text> with inline HTML tags (span, strong, em)
-   ✅ For separate paragraphs, use separate <Text> components at the same level
-   ✅ For colored/highlighted text, use inline <span> with style attribute inside a single <Text>
-   
-   Example - WRONG (creates nested <p> tags - INVALID HTML):
-   <Text>We are thrilled to announce <Text style={{color: '#d0069a'}}>[Product Name]</Text> launch!</Text>
-   
-   Example - CORRECT (single <Text> with inline span):
-   <Text>We are thrilled to announce <span style="color: #d0069a; font-weight: bold">[Product Name]</span> launch!</Text>
-   
-   Example - CORRECT (separate paragraphs):
-   <Text>First paragraph</Text>
-   <Text>Second paragraph</Text>
-   
-   Example - CORRECT (multiple styled spans in one Text):
-   <Text>Get <span style="color: #d0069a; font-weight: bold">20% OFF</span> your first purchase!</Text>
+6. <Text> component rules - CRITICAL (MOST COMMON VALIDATION ERROR):
 
-6. Email-safe CSS ONLY:
-   ✅ ALLOWED: padding, margin, backgroundColor, color, fontSize, fontWeight, textAlign, lineHeight, borderRadius, border, width, height
+   THE #1 MISTAKE: Nesting <Text> components inside other <Text> components
+   
+   ❌ ABSOLUTELY FORBIDDEN - These patterns will FAIL validation:
+   
+   <Text>Hello <Text style={{color: 'red'}}>World</Text></Text>
+   <Text>We offer <Text style={{fontWeight: 'bold'}}>free shipping</Text> today</Text>
+   <Text>Get <Text>20%</Text> off!</Text>
+   <Text style={paragraph}>Visit <Text style={emphasizeText}>our store</Text> today</Text>
+   
+   ✅ CORRECT APPROACHES - Choose ONE of these patterns:
+   
+   Pattern 1: Separate Text components (RECOMMENDED - most reliable):
+   <Text style={{marginBottom: '20px'}}>We offer</Text>
+   <Text style={{fontWeight: 'bold', color: 'red', marginBottom: '20px'}}>free shipping</Text>
+   <Text style={{marginBottom: '20px'}}>today!</Text>
+   
+   Pattern 2: Single Text with unified styling (when inline emphasis isn't critical):
+   <Text style={{fontSize: '16px', marginBottom: '20px'}}>
+     We offer free shipping today!
+   </Text>
+   
+   Pattern 3: Use formatting in single string (NO nested tags):
+   <Text style={{fontSize: '16px'}}>
+     Get your 20% OFF discount today!
+   </Text>
+   
+   Pattern 4: Multiple adjacent Text components for distinct styles:
+   <Section>
+     <Text style={{fontSize: '18px', color: '#333', marginBottom: '10px'}}>
+       Welcome to our special offer!
+     </Text>
+     <Text style={{fontSize: '24px', color: '#d0069a', fontWeight: 'bold', marginBottom: '10px'}}>
+       20% OFF Everything
+     </Text>
+     <Text style={{fontSize: '16px', color: '#666'}}>
+       Use code SAVE20 at checkout
+     </Text>
+   </Section>
+
+   WHY THIS MATTERS:
+   - Email clients don't support nested Text components reliably
+   - React Email's Text component is designed to be self-contained
+   - Nested Text causes rendering issues in Outlook, Gmail, etc.
+   
+   VALIDATION CHECK:
+   Before completing generation, scan your code for "</Text>" 
+   - Count occurrences
+   - Ensure each <Text> has exactly ONE closing tag
+   - If you find patterns like "Text>.*?<Text", you have nested components - FIX IT
+
+   EXAMPLES OF COMMON MISTAKES AND FIXES:
+   
+   ❌ WRONG:
+   <Text style={paragraph}>
+     Once upon a time, <Text style={emphasizeText}>[Your Brand]</Text> was born
+   </Text>
+   
+   ✅ FIXED - Option A (Separate components):
+   <Text style={paragraph}>Once upon a time,</Text>
+   <Text style={{...paragraph, ...emphasizeText}}>[Your Brand]</Text>
+   <Text style={paragraph}>was born</Text>
+   
+   ✅ FIXED - Option B (Unified styling):
+   <Text style={paragraph}>
+     Once upon a time, [Your Brand] was born
+   </Text>
+   
+   ---
+   
+   ❌ WRONG:
+   <Text style={paragraph}>
+     We believe in <Text style={emphasizeText}>love, laughter, and magic</Text>!
+   </Text>
+   
+   ✅ FIXED:
+   <Text style={paragraph}>We believe in</Text>
+   <Text style={{...paragraph, ...emphasizeText, margin: '0 0 20px 0'}}>
+     love, laughter, and magic
+   </Text>
+   <Text style={paragraph}>!</Text>
+   
+   ---
+   
+   ❌ WRONG:
+   <Text>Enjoy a <Text style={{fontWeight: 'bold'}}>15% DISCOUNT</Text> today!</Text>
+   
+   ✅ FIXED:
+   <Text style={{marginBottom: '10px'}}>Enjoy a</Text>
+   <Text style={{fontWeight: 'bold', fontSize: '20px', color: '#d0069a', marginBottom: '10px'}}>
+     15% DISCOUNT
+   </Text>
+   <Text>today!</Text>
+
+   SELF-CHECK BEFORE OUTPUTTING:
+   1. Search your generated code for "<Text>" - count them
+   2. Search for "</Text>" - count them
+   3. Counts should be EQUAL
+   4. Search for pattern "Text>.*<Text" - should find ZERO matches
+   5. If you find nested Text, STOP and rewrite those sections
+
+7. Email-safe CSS ONLY (CRITICAL - display property will trigger warnings):
+   ✅ ALLOWED: padding, margin, backgroundColor, color, fontSize, fontWeight, textAlign, lineHeight, borderRadius, border, width, height, letterSpacing, verticalAlign
    ✅ WIDTH/HEIGHT: Use pixels ('600px'), percentages ('50%'), or omit entirely - NEVER use 'fit-content', 'max-content', 'min-content'
-   ❌ FORBIDDEN: 
-      - display (flex, grid, inline-block, block, inline, table, etc.)
-      - position (absolute, fixed, sticky, relative)
-      - transform, flexbox properties, grid properties
-      - box-shadow (limited support, use sparingly if needed)
-      - overflow, clip-path, filter
+   
+   ❌ ABSOLUTELY FORBIDDEN (will break in email clients):
+      - display: ANY VALUE (flex, grid, inline-block, block, inline, table, table-cell, etc.)
+        → Use <Row>/<Column> for layouts instead
+        → Use padding/margin for spacing instead
+        → Use lineHeight equal to height for vertical centering
+      - position: ANY VALUE (absolute, fixed, sticky, relative)
+      - transform, flexbox properties (justify-content, align-items, flex-direction, etc.)
+      - grid properties (grid-template, grid-column, etc.)
+      - box-shadow (limited support, avoid if possible)
+      - overflow, clip-path, filter, backdrop-filter
       - float, clear
       - Modern CSS: fit-content, max-content, min-content, clamp(), calc() with complex expressions
+   
+   NEVER write "display:" in any style object. Use layout components and spacing properties instead.
 
-7. For spacing and layout:
+8. For spacing and layout:
    - Vertical spacing: Use margin-top/bottom, padding-top/bottom
    - Horizontal spacing: Use margin-left/right, padding-left/right
    - Centering text: Use textAlign: 'center' as const
    - Centering blocks: Use margin: '0 auto'
    - Multi-column: Use <Row> and <Column> with percentage widths
 
-8. Max-width 600px on Container
+9. Max-width 600px on Container
 
-9. Use TypeScript 'as const' for string literals:
-   ✅ REQUIRED: textAlign: 'center' as const
-   This provides type safety and proper literal types for style properties
+10. Use TypeScript 'as const' for string literals:
+    ✅ REQUIRED: textAlign: 'center' as const
+    This provides type safety and proper literal types for style properties
 
-10. Line-height for vertical centering:
+11. Line-height for vertical centering:
     For fixed-height elements like badges, use lineHeight equal to height:
     { height: '32px', lineHeight: '32px' } // Centers text vertically
 
-OUTPUT FORMAT:
-- Valid TypeScript/TSX code with proper types
-- Proper imports at the top: import { ... } from '@react-email/components';
-- export default function ComponentName() { ... }
-- Use 'as const' for string literal types in style objects
-- Complete, production-ready component
+PRE-GENERATION VALIDATION CHECKLIST (Review before generating):
 
-Think: "What would make THIS specific email stand out in an inbox while staying professional and on-brand?"`;
+Run through this checklist mentally BEFORE generating code:
+
+1. ❌ NO HTML tags anywhere (div, span, p, h1-h6, a, button, img, etc.)
+   ✅ Only React Email components from @react-email/components
+
+2. ❌ NO nested <Text> components - SCAN FOR: Text>.*<Text
+   ✅ Each <Text> is independent and self-contained
+
+3. ❌ NO display property in any style object
+   ✅ Use Row/Column for layouts, padding/margin for spacing
+
+4. ❌ NO "as" prop on <Heading> components - SCAN FOR: Heading as=
+   ✅ <Heading style={...}> only
+
+5. ❌ NO export const ComponentName =
+   ✅ export default function ComponentName()
+
+6. ❌ NO width: 'fit-content' or 'max-content'
+   ✅ Use pixels ('600px') or percentages ('50%') only
+
+7. ✅ All string literal styles use 'as const': textAlign: 'center' as const
+
+8. ✅ All imports from @react-email/components at top
+
+9. ✅ React imported: import * as React from 'react';
+
+10. ✅ Style objects defined before component function
+
+If ANY ❌ item is found in your generated code, STOP and fix it before outputting.
+
+OUTPUT FORMAT (CRITICAL - VALIDATION WILL FAIL IF NOT FOLLOWED):
+
+1. EXPORT FORMAT - REQUIRED (validation checks this):
+   ❌ WRONG: export const ComponentName = () => ( ... );
+   ❌ WRONG: export const ComponentName = () => { return ( ... ); };
+   ❌ WRONG: const ComponentName = () => ( ... ); export default ComponentName;
+   ✅ CORRECT: export default function ComponentName() { return ( ... ); }
+   
+   You MUST use 'export default function' or validation will fail.
+
+2. Complete structure:
+   - Proper imports at the top: import { Html, Head, Body, Container, Section, Text, Heading, Button, Img, Link, Hr, Row, Column } from '@react-email/components';
+   - Import React: import * as React from 'react';
+   - TypeScript interface for props (if any)
+   - Style object definitions (const styleName = { ... };)
+   - export default function ComponentName(props) { return ( ... ); }
+   - Use 'as const' for string literal types in style objects
+
+3. Example correct format:
+
+import { Html, Head, Body, Container, Section, Text, Heading, Button } from '@react-email/components';
+import * as React from 'react';
+
+interface WelcomeEmailProps {
+  userName?: string;
+}
+
+const mainStyle = {
+  backgroundColor: '#f6f6f6',
+  fontFamily: 'Arial, sans-serif',
+};
+
+const containerStyle = {
+  backgroundColor: '#ffffff',
+  margin: '0 auto',
+  padding: '20px',
+  maxWidth: '600px',
+};
+
+export default function WelcomeEmail({ userName = 'there' }: WelcomeEmailProps) {
+  return (
+    <Html>
+      <Head />
+      <Body style={mainStyle}>
+        <Container style={containerStyle}>
+          <Section>
+            <Heading>Welcome!</Heading>
+            <Text>Hello {userName}</Text>
+          </Section>
+        </Container>
+      </Body>
+    </Html>
+  );
+}
+
+Think: "What would make THIS specific email stand out in an inbox while staying professional and on-brand?"
+
+FINAL SELF-CHECK (Do this before outputting your generated code):
+1. Run a text search for "<div", "<span", "<p>", "<h1", "<h2", "<a " in your code → Should find ZERO
+2. Run a text search for "display:" in your code → Should find ZERO
+3. Run a text search for "Text>.*<Text" pattern → Should find ZERO
+4. Run a text search for "Heading as=" → Should find ZERO
+5. Run a text search for "export const" at component level → Should find ZERO
+6. Verify "export default function" exists → Should find EXACTLY ONE
+7. Count <Text> tags vs </Text> tags → Should be EQUAL
+8. Verify all textAlign/verticalAlign have "as const" → Should be 100%
+
+If any check fails, DO NOT output the code. Fix the issues first.`;
 }
 
 /**
