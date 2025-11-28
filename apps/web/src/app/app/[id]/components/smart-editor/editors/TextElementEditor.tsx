@@ -7,6 +7,7 @@ import {
   TypographySection,
   ColorSection,
   BackgroundSection,
+  LayoutSection,
 } from '../sections';
 
 interface TextElementEditorProps {
@@ -64,6 +65,14 @@ export function TextElementEditor({
       <BackgroundSection
         value={currentStyles.backgroundColor as string}
         onChange={(v) => handleStyleChange('backgroundColor', v)}
+      />
+
+      {/* Layout Section */}
+      <LayoutSection
+        padding={currentStyles.padding as string}
+        margin={currentStyles.margin as string}
+        onChange={handleStyleChange}
+        showBorderRadius={false}
       />
     </div>
   );

@@ -122,6 +122,7 @@ export function TypographySection({
           value={textDecoration}
           options={TEXT_DECORATIONS}
           onChange={(v) => onChange('textDecoration', v)}
+          allowReset={false}
         />
       )}
     </PropertySection>

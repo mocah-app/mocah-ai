@@ -2,6 +2,7 @@
 
 import React from 'react';
 import { PropertySection, ColorControl } from '../controls';
+import { BACKGROUND_COLOR_PRESETS } from '../constants/editor-constants';
 
 interface BackgroundSectionProps {
   value: string | undefined;
@@ -18,6 +19,7 @@ export function BackgroundSection({
         value={value}
         onChange={onChange}
         showPresets={true}
+        presets={BACKGROUND_COLOR_PRESETS}
       />
     </PropertySection>
   );

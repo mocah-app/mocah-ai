@@ -28,7 +28,7 @@ export function SaveDesignEdit({
           : "translate-y-20 opacity-0 pointer-events-none"
       )}
     >
-      <div className="flex items-center gap-3 bg-card border border-border rounded-full px-4 py-2 shadow-lg">
+      <div className="flex items-center gap-3 bg-secondary backdrop-blur-sm border border-primary/20 rounded-full px-4 py-2 shadow-lg">
         <div className="flex items-center gap-2 text-sm text-foreground">
           <AlertTriangle className="h-4 w-4 text-amber-500" />
           <span className="font-medium">Unsaved Changes</span>

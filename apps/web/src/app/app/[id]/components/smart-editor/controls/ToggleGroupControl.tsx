@@ -65,7 +65,14 @@ export function ToggleGroupControl({
       <ToggleGroup
         type="single"
         value={value || ''}
-        onValueChange={(v) => v && onChange(v)}
+        onValueChange={(v) => {
+          // Handle reset button (empty string) explicitly
+          if (v === '' || v === undefined) {
+            onChange('');
+          } else {
+            onChange(v);
+          }
+        }}
         className="justify-start bg-muted/50 p-1 rounded-md"
       >
         {allowReset && (

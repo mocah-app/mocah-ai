@@ -11,16 +11,12 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Slider } from "@/components/ui/slider";
 import { cn } from "@/lib/utils";
 import { COLOR_PRESETS } from "../constants/editor-constants";
-import { RotateCcw, Pipette, Copy, Check } from "lucide-react";
+import { RotateCcw, Pipette } from "lucide-react";
 
 // Extend colord with accessibility plugin
 extend([a11yPlugin]);
-
-type ColorFormat = "hex" | "rgb" | "hsl";
 
 interface ColorControlProps {
   label?: string;
@@ -31,6 +27,7 @@ interface ColorControlProps {
   showPresets?: boolean;
   showAlpha?: boolean;
   className?: string;
+  presets?: readonly string[];
 }
 
 interface HSLColor {
@@ -49,53 +46,44 @@ export function ColorControl({
   showPresets = false,
   showAlpha = false,
   className,
+  presets,
 }: ColorControlProps) {
   const [open, setOpen] = useState(false);
-  const [format, setFormat] = useState<ColorFormat>("hex");
-  const [copied, setCopied] = useState(false);
-  const [inputValue, setInputValue] = useState(value || "");
+  const isTransparent = value === 'transparent' || !value;
+  const [inputValue, setInputValue] = useState(isTransparent ? "transparent" : (value || ""));
 
   // Parse current color to HSL
+  // When transparent, use a default color for the picker UI (but don't change the actual value)
   const hsl = useMemo((): HSLColor => {
+    if (isTransparent) {
+      // Use a default color for picker display (white with full opacity)
+      return { h: 0, s: 0, l: 100, a: 1 };
+    }
     const parsed = colord(value || "#000000");
     if (!parsed.isValid()) {
       return { h: 0, s: 0, l: 0, a: 1 };
     }
     const { h, s, l, a } = parsed.toHsl();
     return { h, s, l, a };
-  }, [value]);
+  }, [value, isTransparent]);
 
   // Sync input value with prop value
   useEffect(() => {
-    setInputValue(value || "");
-  }, [value]);
+    setInputValue(isTransparent ? "transparent" : (value || ""));
+  }, [value, isTransparent]);
 
-  // Validate and format color
+  // Validate color
   const isValidColor = useCallback((color: string): boolean => {
+    if (color === 'transparent' || !color) return true;
     return colord(color).isValid();
-  }, []);
-
-  // Convert color to different formats
-  const formatColor = useCallback((color: string, fmt: ColorFormat): string => {
-    const c = colord(color);
-    if (!c.isValid()) return color;
-
-    switch (fmt) {
-      case "hex":
-        return c.toHex();
-      case "rgb":
-        return c.toRgbString();
-      case "hsl":
-        return c.toHslString();
-      default:
-        return c.toHex();
-    }
   }, []);
 
   // Handle HSL slider changes
   const handleHslChange = useCallback(
     (key: keyof HSLColor, newValue: number) => {
-      const newHsl = { ...hsl, [key]: newValue };
+      // If currently transparent, convert to visible color when user interacts
+      const baseHsl = isTransparent ? { h: 0, s: 0, l: 100, a: 1 } : hsl;
+      const newHsl = { ...baseHsl, [key]: newValue };
       const newColor = colord({
         h: newHsl.h,
         s: newHsl.s,
@@ -104,7 +92,24 @@ export function ColorControl({
       });
       onChange(newColor.toHex());
     },
-    [hsl, onChange]
+    [hsl, onChange, isTransparent]
+  );
+
+  // Handle 2D color picker changes (updates both saturation and lightness)
+  const handleColorPickerChange = useCallback(
+    (s: number, l: number) => {
+      // If currently transparent, convert to visible color when user interacts
+      const baseHsl = isTransparent ? { h: 0, s: 0, l: 100, a: 1 } : hsl;
+      const newHsl = { ...baseHsl, s, l };
+      const newColor = colord({
+        h: newHsl.h,
+        s: newHsl.s,
+        l: newHsl.l,
+        a: newHsl.a,
+      });
+      onChange(newColor.toHex());
+    },
+    [hsl, onChange, isTransparent]
   );
 
   // Handle input change with validation
@@ -113,7 +118,9 @@ export function ColorControl({
       const newValue = e.target.value;
       setInputValue(newValue);
 
-      if (isValidColor(newValue)) {
+      if (newValue === 'transparent' || !newValue) {
+        onChange('transparent');
+      } else if (isValidColor(newValue)) {
         onChange(colord(newValue).toHex());
       }
     },
@@ -122,10 +129,10 @@ export function ColorControl({
 
   // Handle input blur - revert to valid value if invalid
   const handleInputBlur = useCallback(() => {
-    if (!isValidColor(inputValue)) {
-      setInputValue(value || "");
+    if (!isValidColor(inputValue) && inputValue !== 'transparent') {
+      setInputValue(isTransparent ? "transparent" : (value || ""));
     }
-  }, [inputValue, value, isValidColor]);
+  }, [inputValue, value, isValidColor, isTransparent]);
 
   // Handle reset
   const handleReset = useCallback(() => {
@@ -136,27 +143,7 @@ export function ColorControl({
     }
   }, [defaultValue, onChange]);
 
-  // Handle copy to clipboard
-  const handleCopy = useCallback(async () => {
-    if (value) {
-      await navigator.clipboard.writeText(formatColor(value, format));
-      setCopied(true);
-      setTimeout(() => setCopied(false), 1500);
-    }
-  }, [value, format, formatColor]);
 
-  // Get display value based on format
-  const displayValue = useMemo(() => {
-    if (!value) return "";
-    return formatColor(value, format);
-  }, [value, format, formatColor]);
-
-  // Determine if text should be light or dark on the color swatch
-  const swatchTextColor = useMemo(() => {
-    if (!value) return "#000000";
-    const c = colord(value);
-    return c.isLight() ? "#000000" : "#ffffff";
-  }, [value]);
 
   return (
     <div className={cn("space-y-1.5", className)}>
@@ -178,7 +165,14 @@ export function ColorControl({
           >
             <div
               className="w-full h-full"
-              style={{ backgroundColor: value || "transparent" }}
+              style={{ 
+                backgroundColor: isTransparent ? "transparent" : (value || "transparent"),
+                backgroundImage: isTransparent
+                  ? "linear-gradient(45deg, #ccc 25%, transparent 25%), linear-gradient(-45deg, #ccc 25%, transparent 25%), linear-gradient(45deg, transparent 75%, #ccc 75%), linear-gradient(-45deg, transparent 75%, #ccc 75%)"
+                  : undefined,
+                backgroundSize: isTransparent ? "8px 8px" : undefined,
+                backgroundPosition: isTransparent ? "0 0, 0 4px, 4px -4px, -4px 0px" : undefined,
+              }}
             />
           </div>
           <Input
@@ -207,256 +201,151 @@ export function ColorControl({
               <Pipette className="h-4 w-4" />
             </Button>
           </PopoverTrigger>
-          <PopoverContent className="w-72 p-3" align="end">
-            <div className="space-y-4">
-              {/* Color Preview */}
-              <div
-                className="h-20 rounded-lg border border-border overflow-hidden relative"
-                style={{
-                  backgroundImage:
-                    "linear-gradient(45deg, #e0e0e0 25%, transparent 25%), linear-gradient(-45deg, #e0e0e0 25%, transparent 25%), linear-gradient(45deg, transparent 75%, #e0e0e0 75%), linear-gradient(-45deg, transparent 75%, #e0e0e0 75%)",
-                  backgroundSize: "16px 16px",
-                  backgroundPosition: "0 0, 0 8px, 8px -8px, -8px 0px",
-                }}
-              >
+          <PopoverContent className="w-64 p-3" align="end">
+            <div className="space-y-3">
+              {/* RGB Value Display */}
+              <div className="flex items-center gap-2">
                 <div
-                  className="absolute inset-0 flex items-center justify-center"
-                  style={{ backgroundColor: value || "transparent" }}
+                  className="w-8 h-8 rounded border border-border shrink-0"
+                  style={{ 
+                    backgroundColor: isTransparent ? "transparent" : (value || "transparent"),
+                    backgroundImage: isTransparent
+                      ? "linear-gradient(45deg, #ccc 25%, transparent 25%), linear-gradient(-45deg, #ccc 25%, transparent 25%), linear-gradient(45deg, transparent 75%, #ccc 75%), linear-gradient(-45deg, transparent 75%, #ccc 75%)"
+                      : undefined,
+                    backgroundSize: isTransparent ? "8px 8px" : undefined,
+                    backgroundPosition: isTransparent ? "0 0, 0 4px, 4px -4px, -4px 0px" : undefined,
+                  }}
+                />
+                <Input
+                  value={isTransparent ? "transparent" : colord(value || "#000000").toHex()}
+                  onChange={(e) => {
+                    const newValue = e.target.value.trim();
+                    if (newValue === 'transparent' || !newValue) {
+                      onChange('transparent');
+                    } else if (isValidColor(newValue)) {
+                      // Convert to hex format
+                      const parsed = colord(newValue);
+                      if (parsed.isValid()) {
+                        onChange(parsed.toHex());
+                      }
+                    }
+                  }}
+                  className="font-mono text-xs h-8 flex-1"
+                  placeholder="#000000"
+                />
+              </div>
+
+              {/* 2D Color Picker */}
+              <div className="relative">
+                <div
+                  className="w-full aspect-square max-h-40 rounded-lg border border-border overflow-hidden cursor-crosshair relative select-none"
+                  style={{
+                    background: `linear-gradient(to bottom, transparent, black), linear-gradient(to right, white, hsl(${hsl.h}, 100%, 50%))`,
+                  }}
+                  onMouseDown={(e) => {
+                    e.preventDefault();
+                    const rect = e.currentTarget.getBoundingClientRect();
+                    const x = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width));
+                    const y = Math.max(0, Math.min(1, (e.clientY - rect.top) / rect.height));
+                    const s = x * 100;
+                    const l = (1 - y) * 100;
+                    handleColorPickerChange(s, l);
+                  }}
+                  onMouseMove={(e) => {
+                    if (e.buttons === 1) {
+                      e.preventDefault();
+                      const rect = e.currentTarget.getBoundingClientRect();
+                      const x = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width));
+                      const y = Math.max(0, Math.min(1, (e.clientY - rect.top) / rect.height));
+                      const s = x * 100;
+                      const l = (1 - y) * 100;
+                      handleColorPickerChange(s, l);
+                    }
+                  }}
+                  onTouchStart={(e) => {
+                    e.preventDefault();
+                    const touch = e.touches[0];
+                    const rect = e.currentTarget.getBoundingClientRect();
+                    const x = Math.max(0, Math.min(1, (touch.clientX - rect.left) / rect.width));
+                    const y = Math.max(0, Math.min(1, (touch.clientY - rect.top) / rect.height));
+                    const s = x * 100;
+                    const l = (1 - y) * 100;
+                    handleColorPickerChange(s, l);
+                  }}
+                  onTouchMove={(e) => {
+                    e.preventDefault();
+                    const touch = e.touches[0];
+                    const rect = e.currentTarget.getBoundingClientRect();
+                    const x = Math.max(0, Math.min(1, (touch.clientX - rect.left) / rect.width));
+                    const y = Math.max(0, Math.min(1, (touch.clientY - rect.top) / rect.height));
+                    const s = x * 100;
+                    const l = (1 - y) * 100;
+                    handleColorPickerChange(s, l);
+                  }}
                 >
-                  <span
-                    className="font-mono text-xs font-medium px-2 py-1 rounded bg-black/10 backdrop-blur-sm"
-                    style={{ color: swatchTextColor }}
-                  >
-                    {displayValue || "No color"}
-                  </span>
+                  {/* Selector indicator */}
+                  <div
+                    className="absolute w-4 h-4 rounded-full border-2 border-white shadow-lg pointer-events-none transform -translate-x-1/2 -translate-y-1/2"
+                    style={{
+                      left: `${hsl.s}%`,
+                      top: `${100 - hsl.l}%`,
+                      backgroundColor: isTransparent 
+                        ? colord({ h: hsl.h, s: hsl.s, l: hsl.l }).toHex()
+                        : (value || "#000000"),
+                    }}
+                  />
                 </div>
               </div>
 
-              {/* HSL Sliders */}
-              <div className="space-y-3">
-                {/* Hue Slider */}
-                <div className="space-y-1.5">
-                  <div className="flex justify-between">
-                    <Label className="text-xs text-muted-foreground">Hue</Label>
-                    <span className="text-xs text-muted-foreground font-mono">
-                      {Math.round(hsl.h)}°
-                    </span>
-                  </div>
+              {/* Hue Slider */}
+              <div className="relative">
+                <div
+                  className="h-4 rounded-full overflow-hidden cursor-pointer select-none"
+                  style={{
+                    background:
+                      "linear-gradient(to right, #ff0000, #ffff00, #00ff00, #00ffff, #0000ff, #ff00ff, #ff0000)",
+                  }}
+                  onMouseDown={(e) => {
+                    e.preventDefault();
+                    const rect = e.currentTarget.getBoundingClientRect();
+                    const x = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width));
+                    handleHslChange("h", x * 360);
+                  }}
+                  onMouseMove={(e) => {
+                    if (e.buttons === 1) {
+                      e.preventDefault();
+                      const rect = e.currentTarget.getBoundingClientRect();
+                      const x = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width));
+                      handleHslChange("h", x * 360);
+                    }
+                  }}
+                  onTouchStart={(e) => {
+                    e.preventDefault();
+                    const touch = e.touches[0];
+                    const rect = e.currentTarget.getBoundingClientRect();
+                    const x = Math.max(0, Math.min(1, (touch.clientX - rect.left) / rect.width));
+                    handleHslChange("h", x * 360);
+                  }}
+                  onTouchMove={(e) => {
+                    e.preventDefault();
+                    const touch = e.touches[0];
+                    const rect = e.currentTarget.getBoundingClientRect();
+                    const x = Math.max(0, Math.min(1, (touch.clientX - rect.left) / rect.width));
+                    handleHslChange("h", x * 360);
+                  }}
+                >
+                  {/* Hue selector indicator */}
                   <div
-                    className="h-3 rounded-full overflow-hidden"
+                    className="absolute w-4 h-4 rounded-full border-2 border-white shadow-lg pointer-events-none transform -translate-x-1/2 -translate-y-1/2 top-1/2"
                     style={{
-                      background:
-                        "linear-gradient(to right, #ff0000, #ffff00, #00ff00, #00ffff, #0000ff, #ff00ff, #ff0000)",
+                      left: `${(hsl.h / 360) * 100}%`,
+                      backgroundColor: colord({ h: hsl.h, s: 100, l: 50 }).toHex(),
                     }}
-                  >
-                    <Slider
-                      value={[hsl.h]}
-                      min={0}
-                      max={360}
-                      step={1}
-                      onValueChange={([v]) => handleHslChange("h", v)}
-                      className="**:data-[slot=slider-track]:bg-transparent **:data-[slot=slider-range]:bg-transparent"
-                    />
-                  </div>
+                  />
                 </div>
-
-                {/* Saturation Slider */}
-                <div className="space-y-1.5">
-                  <div className="flex justify-between">
-                    <Label className="text-xs text-muted-foreground">
-                      Saturation
-                    </Label>
-                    <span className="text-xs text-muted-foreground font-mono">
-                      {Math.round(hsl.s)}%
-                    </span>
-                  </div>
-                  <div
-                    className="h-3 rounded-full overflow-hidden"
-                    style={{
-                      background: `linear-gradient(to right, ${colord({ h: hsl.h, s: 0, l: hsl.l }).toHex()}, ${colord({ h: hsl.h, s: 100, l: hsl.l }).toHex()})`,
-                    }}
-                  >
-                    <Slider
-                      value={[hsl.s]}
-                      min={0}
-                      max={100}
-                      step={1}
-                      onValueChange={([v]) => handleHslChange("s", v)}
-                      className="**:data-[slot=slider-track]:bg-transparent **:data-[slot=slider-range]:bg-transparent"
-                    />
-                  </div>
-                </div>
-
-                {/* Lightness Slider */}
-                <div className="space-y-1.5">
-                  <div className="flex justify-between">
-                    <Label className="text-xs text-muted-foreground">
-                      Lightness
-                    </Label>
-                    <span className="text-xs text-muted-foreground font-mono">
-                      {Math.round(hsl.l)}%
-                    </span>
-                  </div>
-                  <div
-                    className="h-3 rounded-full overflow-hidden"
-                    style={{
-                      background: `linear-gradient(to right, #000000, ${colord({ h: hsl.h, s: hsl.s, l: 50 }).toHex()}, #ffffff)`,
-                    }}
-                  >
-                    <Slider
-                      value={[hsl.l]}
-                      min={0}
-                      max={100}
-                      step={1}
-                      onValueChange={([v]) => handleHslChange("l", v)}
-                      className="**:data-[slot=slider-track]:bg-transparent **:data-[slot=slider-range]:bg-transparent"
-                    />
-                  </div>
-                </div>
-
-                {/* Alpha Slider (optional) */}
-                {showAlpha && (
-                  <div className="space-y-1.5">
-                    <div className="flex justify-between">
-                      <Label className="text-xs text-muted-foreground">
-                        Opacity
-                      </Label>
-                      <span className="text-xs text-muted-foreground font-mono">
-                        {Math.round(hsl.a * 100)}%
-                      </span>
-                    </div>
-                    <div
-                      className="h-3 rounded-full overflow-hidden relative"
-                      style={{
-                        backgroundImage:
-                          "linear-gradient(45deg, #ccc 25%, transparent 25%), linear-gradient(-45deg, #ccc 25%, transparent 25%), linear-gradient(45deg, transparent 75%, #ccc 75%), linear-gradient(-45deg, transparent 75%, #ccc 75%)",
-                        backgroundSize: "8px 8px",
-                        backgroundPosition: "0 0, 0 4px, 4px -4px, -4px 0px",
-                      }}
-                    >
-                      <div
-                        className="absolute inset-0 rounded-full"
-                        style={{
-                          background: `linear-gradient(to right, transparent, ${colord({ h: hsl.h, s: hsl.s, l: hsl.l }).toHex()})`,
-                        }}
-                      />
-                      <Slider
-                        value={[hsl.a * 100]}
-                        min={0}
-                        max={100}
-                        step={1}
-                        onValueChange={([v]) => handleHslChange("a", v / 100)}
-                        className="relative **:data-[slot=slider-track]:bg-transparent **:data-[slot=slider-range]:bg-transparent"
-                      />
-                    </div>
-                  </div>
-                )}
               </div>
 
-              {/* Format Tabs */}
-              <Tabs
-                value={format}
-                onValueChange={(v) => setFormat(v as ColorFormat)}
-              >
-                <TabsList className="w-full">
-                  <TabsTrigger value="hex" className="flex-1 text-xs">
-                    HEX
-                  </TabsTrigger>
-                  <TabsTrigger value="rgb" className="flex-1 text-xs">
-                    RGB
-                  </TabsTrigger>
-                  <TabsTrigger value="hsl" className="flex-1 text-xs">
-                    HSL
-                  </TabsTrigger>
-                </TabsList>
-                <TabsContent value="hex" className="mt-2">
-                  <Input
-                    value={displayValue}
-                    onChange={(e) => {
-                      if (isValidColor(e.target.value)) {
-                        onChange(colord(e.target.value).toHex());
-                      }
-                    }}
-                    className="font-mono text-xs h-8"
-                    placeholder="#000000"
-                  />
-                </TabsContent>
-                <TabsContent value="rgb" className="mt-2">
-                  <Input
-                    value={displayValue}
-                    onChange={(e) => {
-                      if (isValidColor(e.target.value)) {
-                        onChange(colord(e.target.value).toHex());
-                      }
-                    }}
-                    className="font-mono text-xs h-8"
-                    placeholder="rgb(0, 0, 0)"
-                  />
-                </TabsContent>
-                <TabsContent value="hsl" className="mt-2">
-                  <Input
-                    value={displayValue}
-                    onChange={(e) => {
-                      if (isValidColor(e.target.value)) {
-                        onChange(colord(e.target.value).toHex());
-                      }
-                    }}
-                    className="font-mono text-xs h-8"
-                    placeholder="hsl(0, 0%, 0%)"
-                  />
-                </TabsContent>
-              </Tabs>
-
-              {/* Actions */}
-              <div className="flex gap-2">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="flex-1 h-8 text-xs"
-                  onClick={handleCopy}
-                  disabled={!value}
-                >
-                  {copied ? (
-                    <Check className="h-3 w-3 mr-1" />
-                  ) : (
-                    <Copy className="h-3 w-3 mr-1" />
-                  )}
-                  {copied ? "Copied!" : "Copy"}
-                </Button>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="flex-1 h-8 text-xs"
-                  onClick={handleReset}
-                >
-                  <RotateCcw className="h-3 w-3 mr-1" />
-                  Reset
-                </Button>
-              </div>
-
-              {/* Presets */}
-              {showPresets && (
-                <div className="space-y-1.5">
-                  <Label className="text-xs text-muted-foreground">
-                    Presets
-                  </Label>
-                  <div className="flex flex-wrap gap-1.5">
-                    {COLOR_PRESETS.map((color) => (
-                      <button
-                        key={color}
-                        type="button"
-                        onClick={() => onChange(color)}
-                        className={cn(
-                          "w-6 h-6 rounded border border-border hover:scale-110 transition-transform",
-                          value === color && "ring-2 ring-primary ring-offset-1"
-                        )}
-                        style={{ backgroundColor: color }}
-                        aria-label={`Select ${color}`}
-                      />
-                    ))}
-                  </div>
-                </div>
-              )}
+              
             </div>
           </PopoverContent>
         </Popover>
@@ -476,23 +365,38 @@ export function ColorControl({
       </div>
 
       {/* Inline Presets (when not in popover) */}
-      {showPresets && (
-        <div className="flex flex-wrap gap-1 pt-1">
-          {COLOR_PRESETS.map((color) => (
-            <button
-              key={color}
-              type="button"
-              onClick={() => onChange(color)}
-              className={cn(
-                "w-5 h-5 rounded border border-border hover:scale-110 transition-transform",
-                value === color && "ring-2 ring-primary ring-offset-1"
-              )}
-              style={{ backgroundColor: color }}
-              aria-label={`Select ${color}`}
-            />
-          ))}
-        </div>
-      )}
+      {showPresets && (() => {
+        const colorPresets = presets || COLOR_PRESETS;
+        return (
+          <div className="flex flex-wrap gap-1 pt-1">
+            {colorPresets.map((color) => {
+              const isTransparent = color === 'transparent';
+              const isSelected = value === color || (isTransparent && (!value || value === 'transparent'));
+              
+              return (
+                <button
+                  key={color}
+                  type="button"
+                  onClick={() => onChange(isTransparent ? 'transparent' : color)}
+                  className={cn(
+                    "w-5 h-5 rounded border border-border hover:scale-110 transition-transform relative",
+                    isSelected && "ring-2 ring-primary ring-offset-1"
+                  )}
+                  style={{
+                    backgroundColor: isTransparent ? 'transparent' : color,
+                    backgroundImage: isTransparent
+                      ? "linear-gradient(45deg, #ccc 25%, transparent 25%), linear-gradient(-45deg, #ccc 25%, transparent 25%), linear-gradient(45deg, transparent 75%, #ccc 75%), linear-gradient(-45deg, transparent 75%, #ccc 75%)"
+                      : undefined,
+                    backgroundSize: isTransparent ? "8px 8px" : undefined,
+                    backgroundPosition: isTransparent ? "0 0, 0 4px, 4px -4px, -4px 0px" : undefined,
+                  }}
+                  aria-label={`Select ${isTransparent ? 'transparent' : color}`}
+                />
+              );
+            })}
+          </div>
+        );
+      })()}
     </div>
   );
 }
