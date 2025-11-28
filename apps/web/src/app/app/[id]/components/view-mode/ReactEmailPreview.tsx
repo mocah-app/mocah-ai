@@ -4,6 +4,7 @@ import React, { useState, useEffect, useRef } from "react";
 import { Loader2 } from "lucide-react";
 import { injectElementIds } from "@/lib/react-email";
 import type { ElementData } from "@/lib/react-email";
+import Loader from "@/components/loader";
 
 interface ReactEmailPreviewProps {
   reactEmailCode: string;
@@ -75,9 +76,9 @@ export const ReactEmailPreview = ({
     return (
       <div className="flex h-full w-full items-center justify-center bg-muted/20">
         <div className="text-center">
-          <Loader2 className="mx-auto h-8 w-8 animate-spin text-primary" />
+          <Loader />
           <p className="mt-2 text-sm text-muted-foreground">
-            Rendering preview...
+            Updating preview...
           </p>
         </div>
       </div>

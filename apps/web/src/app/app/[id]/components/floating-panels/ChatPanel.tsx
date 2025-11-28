@@ -1,5 +1,4 @@
 import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
 import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
 import {
@@ -7,9 +6,7 @@ import {
   FileText,
   Loader2,
   MessageCircle,
-  Palette,
   Send,
-  Sparkles,
   StopCircleIcon,
   Type,
   X,
@@ -19,12 +16,21 @@ import React, { useCallback, useEffect, useRef, useState } from "react";
 import { useTemplate, GENERATION_PHASE_MESSAGES } from "../providers/TemplateProvider";
 import { Prism as SyntaxHighlighter } from "react-syntax-highlighter";
 import { vscDarkPlus } from "react-syntax-highlighter/dist/esm/styles/prism";
+import { trpc } from "@/utils/trpc";
+
+interface GenerationResult {
+  subject?: string;
+  previewText?: string;
+  codePreview?: string; // First ~500 chars
+}
 
 interface Message {
   id: string;
   role: "user" | "assistant";
   content: string;
   isStreaming?: boolean;
+  isPersisted?: boolean;
+  generationResult?: GenerationResult; // Store the generated content with this message
 }
 
 export const ChatPanel = ({
@@ -42,59 +48,81 @@ export const ChatPanel = ({
   const params = useParams();
   const templateId = params.id as string;
 
-  // Track if this is the first time opening with an initial prompt
-  // If so, we skip the transition to make it appear instantly
-  const [enableTransition, setEnableTransition] = React.useState(
-    () => !initialPrompt
+  // ==================== LOCAL STATE (Source of truth during session) ====================
+  const [messages, setMessages] = useState<Message[]>([]);
+  const [input, setInput] = useState("");
+  const [isLoading, setIsLoading] = useState(false);
+  const [isInitialized, setIsInitialized] = useState(false);
+  
+  // Refs for tracking
+  const hasAutoSentRef = useRef(false);
+  const currentStreamingIdRef = useRef<string | null>(null);
+  const latestStreamingProgressRef = useRef<GenerationResult | null>(null);
+
+  // ==================== tRPC for persistence ====================
+  const utils = trpc.useUtils();
+  const { data: persistedMessages, isLoading: isLoadingMessages } = trpc.chat.list.useQuery(
+    { templateId },
+    { enabled: !!templateId && !!templateState.currentTemplate }
   );
 
-  // Use layoutEffect + RAF for frame-synchronized transition enabling
+  const createMessageMutation = trpc.chat.create.useMutation();
+  const updateMessageMutation = trpc.chat.update.useMutation();
+
+  // ==================== TRANSITIONS ====================
+  const [enableTransition, setEnableTransition] = useState(() => !initialPrompt);
+
   React.useLayoutEffect(() => {
-    // If we started without transition (had initialPrompt), enable it after paint
     if (!enableTransition) {
-      // Double RAF ensures the transition class is added after the initial render is painted
       requestAnimationFrame(() => {
-        requestAnimationFrame(() => {
-          setEnableTransition(true);
-        });
+        requestAnimationFrame(() => setEnableTransition(true));
       });
     }
   }, [enableTransition]);
 
-  // Check if template is a skeleton (needs generation)
-  const isNewTemplate = React.useMemo(() => {
-    if (!templateState.currentTemplate) return true;
-    // Template is new/skeleton if it doesn't have React Email code
-    return !templateState.currentTemplate.reactEmailCode;
-  }, [templateState.currentTemplate]);
-
-  const [messages, setMessages] = useState<Message[]>([]);
-  const [input, setInput] = useState("");
-  const [isLoading, setIsLoading] = useState(false);
-  const hasAutoSentRef = useRef(false);
-
-  // Initialize greeting message based on template context
+  // ==================== INITIALIZATION ====================
+  // Load messages from DB on mount (only once when data arrives)
   useEffect(() => {
-    if (messages.length === 0) {
-      setMessages([
-        {
-          id: "1",
+    if (!isInitialized && persistedMessages && !isLoadingMessages) {
+      const dbMessages: Message[] = persistedMessages.map((msg) => ({
+        id: msg.id,
+        role: msg.role as "user" | "assistant",
+        content: msg.content,
+        isStreaming: msg.isStreaming,
+        isPersisted: true,
+        generationResult: (msg.metadata as GenerationResult | null) ?? undefined,
+      }));
+
+      // If no messages, add greeting
+      if (dbMessages.length === 0) {
+        const isNewTemplate = !templateState.currentTemplate?.reactEmailCode;
+        dbMessages.push({
+          id: "greeting",
           role: "assistant",
           content: isNewTemplate
             ? 'Hi! I can help you create your email template. Try asking me to "Create a Black Friday sale template".'
             : "Hi! I can help you edit this email template. Ask me to make changes or regenerate sections.",
-        },
-      ]);
-    }
-  }, [isNewTemplate, messages.length]);
+          isPersisted: false, // Greeting doesn't need persistence
+        });
+      }
 
-  // Update streaming message content based on generation phase
+      setMessages(dbMessages);
+      setIsInitialized(true);
+    }
+  }, [persistedMessages, isLoadingMessages, isInitialized, templateState.currentTemplate]);
+
+  // ==================== STREAMING PHASE UPDATES ====================
+  // Update the streaming message content based on generation phase
   useEffect(() => {
-    if (templateState.isStreaming && templateState.generationPhase !== 'idle') {
+    if (
+      templateState.isStreaming &&
+      templateState.generationPhase !== "idle" &&
+      currentStreamingIdRef.current
+    ) {
       const phaseMessage = GENERATION_PHASE_MESSAGES[templateState.generationPhase];
       setMessages((prev) =>
         prev.map((msg) =>
-          msg.isStreaming
+          msg.id === currentStreamingIdRef.current
             ? { ...msg, content: phaseMessage }
             : msg
         )
@@ -102,97 +130,143 @@ export const ChatPanel = ({
     }
   }, [templateState.generationPhase, templateState.isStreaming]);
 
-  const handleSendWithPrompt = useCallback(
+  // Track latest streaming progress in ref (to avoid stale closure issues)
+  useEffect(() => {
+    if (templateState.streamingProgress) {
+      const code = templateState.streamingProgress.reactEmailCode;
+      latestStreamingProgressRef.current = {
+        subject: templateState.streamingProgress.subject,
+        previewText: templateState.streamingProgress.previewText,
+        // Only save a preview snippet (full code is in template)
+        codePreview: code ? code.substring(0, 500) + (code.length > 500 ? '...' : '') : undefined,
+      };
+    }
+  }, [templateState.streamingProgress]);
+
+  // ==================== SEND MESSAGE ====================
+  const handleSend = useCallback(
     async (promptText: string) => {
-      if (!promptText.trim() || isLoading) {
-        console.log("handleSendWithPrompt: Invalid prompt or already loading", {
-          promptText,
-          isLoading,
-        });
+      const trimmedPrompt = promptText.trim();
+      if (!trimmedPrompt || isLoading) return;
+
+      // Check for duplicates
+      if (messages.some((m) => m.content === trimmedPrompt && m.role === "user")) {
         return;
       }
-
-      console.log("handleSendWithPrompt: Starting to send", promptText);
-
-      const newMessage: Message = {
-        id: Date.now().toString(),
-        role: "user",
-        content: promptText,
-      };
-
-      // Use functional update to avoid dependency on messages
-      setMessages((prev) => {
-        // Check for duplicates using current state
-        if (prev.some((m) => m.content === promptText && m.role === "user")) {
-          console.log(
-            "handleSendWithPrompt: Duplicate message found, skipping"
-          );
-          return prev;
-        }
-        return [...prev, newMessage];
-      });
 
       setInput("");
       setIsLoading(true);
 
-      // Add streaming message placeholder
-      const streamingMessageId = (Date.now() + 1).toString();
-      setMessages((prev) => [
-        ...prev,
-        {
-          id: streamingMessageId,
-          role: "assistant",
-          content: GENERATION_PHASE_MESSAGES.starting,
-          isStreaming: true,
-        },
-      ]);
+      // 1. Create local messages immediately (optimistic UI)
+      const userMsgId = crypto.randomUUID();
+      const assistantMsgId = crypto.randomUUID();
+
+      const userMessage: Message = {
+        id: userMsgId,
+        role: "user",
+        content: trimmedPrompt,
+        isPersisted: false,
+      };
+
+      const assistantMessage: Message = {
+        id: assistantMsgId,
+        role: "assistant",
+        content: GENERATION_PHASE_MESSAGES.starting,
+        isStreaming: true,
+        isPersisted: false,
+      };
+
+      setMessages((prev) => [...prev, userMessage, assistantMessage]);
+      currentStreamingIdRef.current = assistantMsgId;
+
+      // 2. Determine generation type
+      const isNewTemplate = !templateState.currentTemplate?.reactEmailCode;
 
       try {
-        // Check if we're generating for the first time (skeleton template) or updating
-        const isGeneratingFirstTime =
-          !templateState.currentTemplate?.reactEmailCode;
+        // 3. Start generation immediately (don't wait for DB)
+        const generationPromise = isNewTemplate
+          ? templateActions.generateTemplateStream(trimmedPrompt)
+          : templateActions.regenerateTemplate(trimmedPrompt);
 
-        if (isGeneratingFirstTime) {
-          // Use streaming for first-time generation
-          console.log(
-            "Calling generateTemplateStream with prompt:",
-            promptText
-          );
-          await templateActions.generateTemplateStream(promptText);
+        // 4. Persist messages to DB in background (fire-and-forget)
+        const persistPromise = (async () => {
+          try {
+            // Wait a moment for template to be fully ready
+            await new Promise((resolve) => setTimeout(resolve, 100));
+            
+            await createMessageMutation.mutateAsync({
+              templateId,
+              role: "user",
+              content: trimmedPrompt,
+              isStreaming: false,
+            });
 
-          // Update message when streaming completes
-          setMessages((prev) =>
-            prev.map((msg) =>
-              msg.id === streamingMessageId
-                ? {
-                    ...msg,
-                    content:
-                      "I've created a new template based on your request. You can now edit it in the canvas!",
-                    isStreaming: false,
-                  }
-                : msg
-            )
-          );
-        } else {
-          // Use regenerate for existing templates (non-streaming for now)
-          await templateActions.regenerateTemplate(promptText);
-          setMessages((prev) =>
-            prev.map((msg) =>
-              msg.id === streamingMessageId
-                ? {
-                    ...msg,
-                    content: "I've updated the template based on your request.",
-                    isStreaming: false,
-                  }
-                : msg
-            )
-          );
-        }
-      } catch (error) {
-        console.error("Chat error:", error);
+            const dbAssistant = await createMessageMutation.mutateAsync({
+              templateId,
+              role: "assistant",
+              content: GENERATION_PHASE_MESSAGES.starting,
+              isStreaming: true,
+            });
+
+            // Update local message with DB id for future updates
+            setMessages((prev) =>
+              prev.map((msg) =>
+                msg.id === assistantMsgId
+                  ? { ...msg, id: dbAssistant.id, isPersisted: true }
+                  : msg.id === userMsgId
+                  ? { ...msg, isPersisted: true }
+                  : msg
+              )
+            );
+            currentStreamingIdRef.current = dbAssistant.id;
+
+            return dbAssistant.id;
+          } catch (error) {
+            console.error("Background persist failed:", error);
+            return null;
+          }
+        })();
+
+        // 5. Wait for generation to complete
+        await generationPromise;
+
+        // 6. Capture the generation result from ref (not state - avoids stale closure)
+        const generationResult: GenerationResult = latestStreamingProgressRef.current ?? {};
+        // Clear the ref for next generation
+        latestStreamingProgressRef.current = null;
+
+        // 7. Update local message to completion with generation result
+        const finalContent = isNewTemplate
+          ? "I've created a new template based on your request. You can now edit it in the canvas!"
+          : "I've updated the template based on your request.";
+
         setMessages((prev) =>
           prev.map((msg) =>
-            msg.id === streamingMessageId
+            msg.id === currentStreamingIdRef.current || msg.id === assistantMsgId
+              ? { ...msg, content: finalContent, isStreaming: false, generationResult }
+              : msg
+          )
+        );
+
+        // 8. Update DB in background with metadata
+        const dbId = await persistPromise;
+        if (dbId) {
+          updateMessageMutation.mutate({
+            id: dbId,
+            content: finalContent,
+            isStreaming: false,
+            metadata: generationResult,
+          });
+        }
+
+        currentStreamingIdRef.current = null;
+      } catch (error) {
+        console.error("Generation error:", error);
+
+        // Update local message with error
+        setMessages((prev) =>
+          prev.map((msg) =>
+            msg.id === currentStreamingIdRef.current || msg.id === assistantMsgId
               ? {
                   ...msg,
                   content: "Sorry, I encountered an error. Please try again.",
@@ -201,71 +275,88 @@ export const ChatPanel = ({
               : msg
           )
         );
+
+        currentStreamingIdRef.current = null;
       } finally {
         setIsLoading(false);
+        // Refresh from DB to sync state
+        utils.chat.list.invalidate({ templateId });
       }
     },
-    [templateId, templateState.currentTemplate, templateActions, isLoading]
+    [
+      isLoading,
+      messages,
+      templateId,
+      templateState.currentTemplate,
+      templateActions,
+      createMessageMutation,
+      updateMessageMutation,
+      utils.chat.list,
+    ]
   );
 
-  // Auto-send initial prompt if provided
+  // ==================== AUTO-SEND INITIAL PROMPT ====================
   useEffect(() => {
-    // Only auto-send when panel is open AND we have a prompt AND haven't sent yet
-    if (!isOpen || !initialPrompt || hasAutoSentRef.current) {
+    if (
+      !isOpen ||
+      !initialPrompt ||
+      hasAutoSentRef.current ||
+      !templateId ||
+      !templateState.currentTemplate ||
+      !isInitialized
+    ) {
       return;
     }
 
-    console.log("Auto-send triggered:", {
-      isOpen,
-      initialPrompt,
-      hasAutoSent: hasAutoSentRef.current,
-    });
-
-    // Mark as sent immediately to prevent double-send
     hasAutoSentRef.current = true;
-    console.log("Sending prompt:", initialPrompt);
+    
+    // Send the initial prompt
+    handleSend(initialPrompt);
+    onPromptConsumed?.();
+  }, [
+    isOpen,
+    initialPrompt,
+    templateId,
+    templateState.currentTemplate,
+    isInitialized,
+    handleSend,
+    onPromptConsumed,
+  ]);
 
-    // Trigger send after a small delay to ensure UI is ready
-    const timeoutId = setTimeout(async () => {
-      console.log("Timeout fired, calling handleSendWithPrompt");
-      await handleSendWithPrompt(initialPrompt);
-      // Clear the prompt from context after it's been sent
-      onPromptConsumed?.();
-    }, 500);
-
-    return () => {
-      console.log("Cleaning up auto-send timeout");
-      clearTimeout(timeoutId);
-    };
-  }, [isOpen, initialPrompt, handleSendWithPrompt, onPromptConsumed]);
-
-  const handleSend = async () => {
-    await handleSendWithPrompt(input);
-  };
-
+  // ==================== CANCEL GENERATION ====================
   const handleCancel = useCallback(() => {
     templateActions.cancelGeneration();
     setIsLoading(false);
-    
-    // Update the streaming message to show cancellation
-    setMessages((prev) =>
-      prev.map((msg) =>
-        msg.isStreaming
-          ? {
-              ...msg,
-              content: "Generation cancelled.",
-              isStreaming: false,
-            }
-          : msg
-      )
-    );
-  }, [templateActions]);
+
+    // Update local message
+    if (currentStreamingIdRef.current) {
+      setMessages((prev) =>
+        prev.map((msg) =>
+          msg.id === currentStreamingIdRef.current
+            ? { ...msg, content: "Generation cancelled.", isStreaming: false }
+            : msg
+        )
+      );
+
+      // Update DB in background
+      const msgId = currentStreamingIdRef.current;
+      updateMessageMutation.mutate({
+        id: msgId,
+        content: "Generation cancelled.",
+        isStreaming: false,
+      });
+
+      currentStreamingIdRef.current = null;
+    }
+  }, [templateActions, updateMessageMutation]);
+
+  // ==================== RENDER ====================
+  const showLoading = !isInitialized && isLoadingMessages;
 
   return (
     <div
       className={cn(
         "bg-card rounded-r-xl shadow-2xl border border-border overflow-hidden flex flex-col z-40 h-dvh",
-        // Skip transition on first render if opening with initialPrompt
         enableTransition && "transition-all duration-300 ease-in-out",
         isOpen
           ? "translate-x-0 opacity-100 w-80"
@@ -285,49 +376,70 @@ export const ChatPanel = ({
 
       {/* Messages */}
       <div className="flex-1 overflow-y-auto p-4 space-y-4">
-        {messages.map((msg, index) => (
-          <div key={msg.id}>
-            <div
-              className={cn(
-                "flex gap-3 transition-all duration-300 ease-in-out",
-                msg.role === "user" ? "flex-row-reverse" : "",
-                isOpen ? "translate-y-0 opacity-100" : "translate-y-4 opacity-0"
-              )}
-              style={{
-                transitionDelay: isOpen ? `${index * 50}ms` : "0ms",
-              }}
-            >
+        {showLoading ? (
+          <div className="flex items-center justify-center h-full">
+            <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+          </div>
+        ) : (
+          messages.map((msg, index) => (
+            <div key={msg.id}>
               <div
                 className={cn(
-                  "p-3 rounded-lg text-sm max-w-[80%]",
-                  msg.role === "assistant"
-                    ? "text-muted-foreground"
-                    : "bg-secondary text-secondary-foreground"
+                  "flex gap-3 transition-all duration-300 ease-in-out",
+                  msg.role === "user" ? "flex-row-reverse" : "",
+                  isOpen ? "translate-y-0 opacity-100" : "translate-y-4 opacity-0"
                 )}
+                style={{ transitionDelay: isOpen ? `${index * 50}ms` : "0ms" }}
               >
-                {msg.isStreaming && (
-                  <div className="flex items-center gap-2">
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                    <span>{msg.content}</span>
-                  </div>
-                )}
-                {!msg.isStreaming && msg.content}
-              </div>
-            </div>
-
-            {/* Show streaming progress for assistant messages */}
-            {msg.isStreaming &&
-              msg.role === "assistant" &&
-              templateState.isStreaming &&
-              templateState.streamingProgress && (
-                <div className="mt-3 space-y-2 animate-in fade-in slide-in-from-bottom-4">
-                  <StreamingProgress
-                    progress={templateState.streamingProgress}
-                  />
+                <div
+                  className={cn(
+                    "p-3 rounded-lg text-sm max-w-[80%]",
+                    msg.role === "assistant"
+                      ? "text-muted-foreground"
+                      : "bg-secondary text-secondary-foreground"
+                  )}
+                >
+                  {msg.isStreaming ? (
+                    <div className="flex items-center gap-2">
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                      <span>{msg.content}</span>
+                    </div>
+                  ) : (
+                    msg.content
+                  )}
                 </div>
+              </div>
+
+              {/* Generation result - show live progress while streaming, or saved result after completion */}
+              {msg.role === "assistant" && (
+                <>
+                  {/* While streaming: show live progress with full code */}
+                  {msg.isStreaming && templateState.streamingProgress?.reactEmailCode && (
+                    <div className="mt-3 space-y-2 animate-in fade-in slide-in-from-bottom-4">
+                      <StreamingProgress
+                        progress={templateState.streamingProgress}
+                        isComplete={false}
+                      />
+                    </div>
+                  )}
+                  {/* After completion: show saved generation result with code preview */}
+                  {!msg.isStreaming && msg.generationResult?.codePreview && (
+                    <div className="mt-3 space-y-2">
+                      <StreamingProgress
+                        progress={{
+                          subject: msg.generationResult.subject,
+                          previewText: msg.generationResult.previewText,
+                          reactEmailCode: msg.generationResult.codePreview, // Use preview for display
+                        }}
+                        isComplete={true}
+                      />
+                    </div>
+                  )}
+                </>
               )}
-          </div>
-        ))}
+            </div>
+          ))
+        )}
       </div>
 
       {/* Input */}
@@ -336,9 +448,7 @@ export const ChatPanel = ({
           "border-t border-border transition-all duration-300 ease-in-out",
           isOpen ? "translate-y-0 opacity-100" : "translate-y-4 opacity-0"
         )}
-        style={{
-          transitionDelay: isOpen ? "150ms" : "0ms",
-        }}
+        style={{ transitionDelay: isOpen ? "150ms" : "0ms" }}
       >
         <div className="relative px-2 pb-2">
           <Textarea
@@ -347,9 +457,7 @@ export const ChatPanel = ({
             onKeyDown={(e) => {
               if (e.key === "Enter" && !e.shiftKey) {
                 e.preventDefault();
-                if (!isLoading) {
-                  handleSend();
-                }
+                if (!isLoading) handleSend(input);
               }
             }}
             placeholder={isLoading ? "Generating..." : "Write your message..."}
@@ -370,7 +478,7 @@ export const ChatPanel = ({
             </Button>
           ) : (
             <Button
-              onClick={handleSend}
+              onClick={() => handleSend(input)}
               size="icon"
               disabled={!input.trim()}
               className="absolute right-3 bottom-3 w-8 h-8"
@@ -384,7 +492,113 @@ export const ChatPanel = ({
   );
 };
 
-// Code preview with proper syntax highlighting
+// ==================== STREAMING PROGRESS COMPONENT ====================
+function StreamingProgress({
+  progress,
+  isComplete = false,
+}: {
+  progress: {
+    subject?: string;
+    previewText?: string;
+    reactEmailCode?: string;
+    styleType?: string;
+  };
+  isComplete?: boolean;
+}) {
+  const sections = [
+    {
+      key: "subject",
+      label: "Subject Line",
+      icon: Type,
+      value: progress.subject,
+      color: "text-blue-400",
+    },
+    {
+      key: "previewText",
+      label: "Preview Text",
+      icon: FileText,
+      value: progress.previewText,
+      color: "text-purple-400",
+    },
+    {
+      key: "reactEmailCode",
+      label: "React Email Code",
+      icon: Code2,
+      value: progress.reactEmailCode,
+      color: "text-green-400",
+      isCode: true,
+    },
+  ];
+
+  const completedSections = sections.filter((s) => s.value);
+  const currentSection = completedSections[completedSections.length - 1];
+
+  return (
+    <div className="p-4 space-y-4">
+      <div className="space-y-3 max-h-[400px] overflow-y-auto">
+        {sections.map((section) => {
+          const isCompleted = !!section.value;
+          const isCurrent = currentSection?.key === section.key;
+          const Icon = section.icon;
+
+          if (!isCompleted) return null;
+
+          return (
+            <div
+              key={section.key}
+              className={`space-y-2 transition-all duration-300 ${
+                isCurrent && !isComplete ? "animate-in slide-in-from-bottom-2" : ""
+              }`}
+            >
+              <div className="flex items-center gap-2">
+                <Icon className={`h-3.5 w-3.5 ${section.color}`} />
+                <span className="text-xs font-medium text-muted-foreground">
+                  {section.label}
+                </span>
+                {/* Show bouncing dots only while streaming, checkmark when complete */}
+                {isCurrent && !isComplete && (
+                  <div className="flex gap-1 ml-auto">
+                    {[0, 150, 300].map((delay) => (
+                      <div
+                        key={delay}
+                        className="w-1 h-1 bg-primary rounded-full animate-bounce"
+                        style={{ animationDelay: `${delay}ms` }}
+                      />
+                    ))}
+                  </div>
+                )}
+                {isComplete && (
+                  <span className="text-xs text-green-500 ml-auto">✓</span>
+                )}
+              </div>
+
+              {section.isCode && section.value ? (
+                <CodePreview code={section.value} />
+              ) : (
+                <div className="bg-card/50 rounded-lg p-3 border border-border/50">
+                  <p className="text-sm leading-relaxed">{section.value}</p>
+                </div>
+              )}
+
+              {section.key === "reactEmailCode" && section.value && (
+                <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                  <div className="flex items-center gap-1">
+                    <div className="w-2 h-2 rounded-full bg-green-500" />
+                    <span>{section.value.split("\n").length} lines</span>
+                  </div>
+                  <div className="w-1 h-1 rounded-full bg-muted-foreground/30" />
+                  <span>{(section.value.length / 1024).toFixed(1)} KB</span>
+                </div>
+              )}
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+// ==================== CODE PREVIEW COMPONENT ====================
 function CodePreview({ code }: { code: string }) {
   const lines = code.split("\n");
   const previewLines = lines.slice(0, 12);
@@ -420,124 +634,6 @@ function CodePreview({ code }: { code: string }) {
             ... {lines.length - 12} more lines
           </div>
         )}
-      </div>
-    </div>
-  );
-}
-
-// Main streaming progress component
-function StreamingProgress({
-  progress,
-}: {
-  progress: {
-    subject?: string;
-    previewText?: string;
-    reactEmailCode?: string;
-    styleType?: string;
-  };
-}) {
-  const [dots, setDots] = useState("");
-
-  // Animated dots effect
-  useEffect(() => {
-    const interval = setInterval(() => {
-      setDots((prev) => (prev.length >= 3 ? "" : prev + "."));
-    }, 500);
-    return () => clearInterval(interval);
-  }, []);
-
-  const sections = [
-    {
-      key: "subject",
-      label: "Subject Line",
-      icon: Type,
-      value: progress.subject,
-      color: "text-blue-400",
-    },
-    {
-      key: "previewText",
-      label: "Preview Text",
-      icon: FileText,
-      value: progress.previewText,
-      color: "text-purple-400",
-    },
-    {
-      key: "reactEmailCode",
-      label: "React Email Code",
-      icon: Code2,
-      value: progress.reactEmailCode,
-      color: "text-green-400",
-      isCode: true,
-    },
-  ];
-
-  const completedSections = sections.filter((s) => s.value);
-  const currentSection = completedSections[completedSections.length - 1];
-
-  return (
-    <div className="">
-      <div className="p-4 space-y-4">
-        {/* Sections */}
-        <div className="space-y-3 max-h-[400px] overflow-y-auto">
-          {sections.map((section) => {
-            const isCompleted = !!section.value;
-            const isCurrent = currentSection?.key === section.key;
-            const Icon = section.icon;
-
-            if (!isCompleted) return null;
-
-            return (
-              <div
-                key={section.key}
-                className={`space-y-2 transition-all duration-300 ${
-                  isCurrent ? "animate-in slide-in-from-bottom-2" : ""
-                }`}
-              >
-                <div className="flex items-center gap-2">
-                  <Icon className={`h-3.5 w-3.5 ${section.color}`} />
-                  <span className="text-xs font-medium text-muted-foreground">
-                    {section.label}
-                  </span>
-                  {isCurrent && (
-                    <div className="flex gap-1 ml-auto">
-                      <div
-                        className="w-1 h-1 bg-primary rounded-full animate-bounce"
-                        style={{ animationDelay: "0ms" }}
-                      />
-                      <div
-                        className="w-1 h-1 bg-primary rounded-full animate-bounce"
-                        style={{ animationDelay: "150ms" }}
-                      />
-                      <div
-                        className="w-1 h-1 bg-primary rounded-full animate-bounce"
-                        style={{ animationDelay: "300ms" }}
-                      />
-                    </div>
-                  )}
-                </div>
-
-                {section.isCode && section.value ? (
-                  <CodePreview code={section.value} />
-                ) : (
-                  <div className="bg-card/50 rounded-lg p-3 border border-border/50">
-                    <p className="text-sm leading-relaxed">{section.value}</p>
-                  </div>
-                )}
-
-                {section.key === "reactEmailCode" && section.value && (
-                  <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                    <div className="flex items-center gap-1">
-                      <div className="w-2 h-2 rounded-full bg-green-500" />
-                      <span>{section.value.split("\n").length} lines</span>
-                    </div>
-                    <div className="w-1 h-1 rounded-full bg-muted-foreground/30" />
-                    <span>{(section.value.length / 1024).toFixed(1)} KB</span>
-                  </div>
-                )}
-              </div>
-            );
-          })}
-        </div>
       </div>
     </div>
   );

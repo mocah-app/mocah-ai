@@ -66,3 +66,8 @@ enum StyleType {
   STYLE_OBJECTS       // const heroStyle = { ... }
 }
 
+enum ChatMessageRole {
+  user
+  assistant
+}
+

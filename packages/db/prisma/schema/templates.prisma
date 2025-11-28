@@ -31,6 +31,7 @@ model Template {
   versions          TemplateVersion[]
   exports           Export[]
   categoryRelations TemplateCategoryRelation[]
+  messages          ChatMessage[]
 
   @@index([organizationId])
   @@index([category])
@@ -177,5 +178,23 @@ model Export {
   @@index([format])
   @@index([createdAt])
   @@map("export")
+}
+
+model ChatMessage {
+  id          String   @id @default(uuid())
+  templateId String
+  role       ChatMessageRole
+  content    String   @db.Text
+  isStreaming Boolean  @default(false)
+  metadata   Json?    // Store generation result: { subject, previewText, reactEmailCode }
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  // Relations
+  template   Template @relation(fields: [templateId], references: [id], onDelete: Cascade)
+
+  @@index([templateId])
+  @@index([createdAt])
+  @@map("chat_message")
 }
 

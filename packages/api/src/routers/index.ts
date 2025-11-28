@@ -3,6 +3,7 @@ import { storageRouter } from "./storage";
 import { organizationRouter } from "./organization";
 import { brandKitRouter } from "./brand-kit";
 import { templateRouter } from "./template";
+import { chatRouter } from "./chat";
 
 export const appRouter = router({
   healthCheck: publicProcedure.query(() => {
@@ -20,6 +21,7 @@ export const appRouter = router({
   organization: organizationRouter,
   brandKit: brandKitRouter,
   template: templateRouter,
+  chat: chatRouter,
 });
 
 export type AppRouter = typeof appRouter;

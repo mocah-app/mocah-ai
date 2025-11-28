@@ -240,10 +240,12 @@ function EditorContent() {
     // Check if content actually changed (avoid infinite updates)
     const currentContent = JSON.stringify(existingNode.data.template);
     const newContent = JSON.stringify(templateContent);
+    const loadingChanged = existingNode.data.isLoading !== templateState.isStreaming;
 
     if (
       currentContent === newContent &&
-      existingNode.data.name === template.name
+      existingNode.data.name === template.name &&
+      !loadingChanged
     ) {
       return; // No changes, skip update
     }
