@@ -16,26 +16,36 @@ import {
     Redo2,
     Undo2
 } from "lucide-react";
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 
 interface CustomCanvasControlProps {
   isHandMode?: boolean;
   setIsHandMode?: (value: boolean) => void;
+  zoomLevel?: number;
+  onZoomLevelChange?: (zoom: number) => void;
 }
 
-export function CustomCanvasControl({ isHandMode = false, setIsHandMode = () => {} }: CustomCanvasControlProps) {
+export function CustomCanvasControl({ 
+  isHandMode = false, 
+  setIsHandMode = () => {}, 
+  zoomLevel: externalZoomLevel,
+  onZoomLevelChange 
+}: CustomCanvasControlProps) {
   const { zoomIn, zoomOut, fitView, getZoom, setViewport } = useReactFlow();
-  const [zoomLevel, setZoomLevel] = useState(100);
+  const [internalZoomLevel, setInternalZoomLevel] = useState(100);
+  
+  // Use external zoom level if provided, otherwise use internal state
+  const zoomLevel = externalZoomLevel ?? internalZoomLevel;
 
-  // Update zoom level when zoom changes
-  React.useEffect(() => {
-    const updateZoom = () => {
-      const currentZoom = getZoom();
-      setZoomLevel(Math.round(currentZoom * 100));
-    };
-    
-    updateZoom();
-  }, [getZoom]);
+  // Initialize zoom level on mount
+  useEffect(() => {
+    const currentZoom = getZoom();
+    const initialZoom = Math.round(currentZoom * 100);
+    if (externalZoomLevel === undefined) {
+      setInternalZoomLevel(initialZoom);
+    }
+    onZoomLevelChange?.(initialZoom);
+  }, [getZoom, externalZoomLevel, onZoomLevelChange]);
 
   // Keyboard shortcuts
   React.useEffect(() => {
@@ -73,22 +83,25 @@ export function CustomCanvasControl({ isHandMode = false, setIsHandMode = () => 
 
   const handleZoomIn = () => {
     zoomIn({ duration: 200 });
-    setTimeout(() => setZoomLevel(Math.round(getZoom() * 100)), 250);
+    // Zoom level will be updated via onMove callback
   };
 
   const handleZoomOut = () => {
     zoomOut({ duration: 200 });
-    setTimeout(() => setZoomLevel(Math.round(getZoom() * 100)), 250);
+    // Zoom level will be updated via onMove callback
   };
 
   const handleFitView = () => {
     fitView({ duration: 200, padding: 0.2 });
-    setTimeout(() => setZoomLevel(Math.round(getZoom() * 100)), 250);
+    // Zoom level will be updated via onMove callback
   };
 
   const handleZoomTo100 = () => {
     setViewport({ x: 0, y: 0, zoom: 1 }, { duration: 200 });
-    setZoomLevel(100);
+    if (externalZoomLevel === undefined) {
+      setInternalZoomLevel(100);
+    }
+    onZoomLevelChange?.(100);
   };
 
   const toggleMode = () => {

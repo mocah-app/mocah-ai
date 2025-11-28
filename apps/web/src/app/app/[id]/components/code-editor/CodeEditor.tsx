@@ -1,11 +1,23 @@
 'use client';
 
 import { useRef, useEffect, useImperativeHandle, forwardRef } from 'react';
-import Editor from '@monaco-editor/react';
+import dynamic from 'next/dynamic';
 import type { editor } from 'monaco-editor';
-import { loader } from '@monaco-editor/react';
 import { validateReactEmailCode } from '@/lib/react-email';
 import Loader from '@/components/loader';
+
+// Dynamically import Monaco Editor to avoid bloating initial bundle
+const Editor = dynamic(
+  () => import('@monaco-editor/react').then((mod) => mod.default),
+  { 
+    ssr: false, 
+    loading: () => (
+      <div className="flex h-full items-center justify-center bg-background">
+        <Loader />
+      </div>
+    )
+  }
+);
 
 interface CodeEditorProps {
   code: string;
@@ -43,43 +55,46 @@ export const CodeEditor = forwardRef<CodeEditorRef, CodeEditorProps>(function Co
 
   // Configure Monaco TypeScript settings
   useEffect(() => {
-    loader.init().then((monaco) => {
-      // Configure TypeScript compiler options for TSX files
-      monaco.languages.typescript.typescriptDefaults.setCompilerOptions({
-        jsx: monaco.languages.typescript.JsxEmit.React,
-        jsxFactory: 'React.createElement',
-        jsxFragmentFactory: 'React.Fragment',
-        reactNamespace: 'React',
-        allowNonTsExtensions: true,
-        allowJs: true,
-        target: monaco.languages.typescript.ScriptTarget.Latest,
-        moduleResolution: monaco.languages.typescript.ModuleResolutionKind.NodeJs,
-        module: monaco.languages.typescript.ModuleKind.ESNext,
-        noSemanticValidation: false,
-        noSyntaxValidation: false,
-        allowSyntheticDefaultImports: true,
-        esModuleInterop: true,
-        lib: ['es2020', 'dom'],
-      });
+    // Dynamically import loader to avoid bundling it in initial load
+    import('@monaco-editor/react').then(({ loader }) => {
+      loader.init().then((monaco) => {
+        // Configure TypeScript compiler options for TSX files
+        monaco.languages.typescript.typescriptDefaults.setCompilerOptions({
+          jsx: monaco.languages.typescript.JsxEmit.React,
+          jsxFactory: 'React.createElement',
+          jsxFragmentFactory: 'React.Fragment',
+          reactNamespace: 'React',
+          allowNonTsExtensions: true,
+          allowJs: true,
+          target: monaco.languages.typescript.ScriptTarget.Latest,
+          moduleResolution: monaco.languages.typescript.ModuleResolutionKind.NodeJs,
+          module: monaco.languages.typescript.ModuleKind.ESNext,
+          noSemanticValidation: false,
+          noSyntaxValidation: false,
+          allowSyntheticDefaultImports: true,
+          esModuleInterop: true,
+          lib: ['es2020', 'dom'],
+        });
 
-      // Reduce diagnostic severity - only show real errors, not missing type definitions
-      monaco.languages.typescript.typescriptDefaults.setDiagnosticsOptions({
-        noSemanticValidation: false,
-        noSyntaxValidation: false,
-        diagnosticCodesToIgnore: [
-          2304, // Cannot find name
-          2552, // Cannot find name, did you mean
-          2307, // Cannot find module
-          2345, // Argument of type X is not assignable to parameter of type Y
-          2583, // Cannot find name 'X'. Do you need to install type definitions?
-          2686, // 'X' refers to a UMD global, but the current file is a module
-          2792, // Cannot find module 'X'. Did you mean to set the 'moduleResolution' option?
-          6133, // Variable is declared but never read
-          7006, // Parameter implicitly has an 'any' type
-          7016, // Could not find a declaration file for module
-          17004, // Cannot use JSX unless the '--jsx' flag is provided
-          2354, // This JSX tag requires the module path 'react/jsx-runtime' to exist
-        ],
+        // Reduce diagnostic severity - only show real errors, not missing type definitions
+        monaco.languages.typescript.typescriptDefaults.setDiagnosticsOptions({
+          noSemanticValidation: false,
+          noSyntaxValidation: false,
+          diagnosticCodesToIgnore: [
+            2304, // Cannot find name
+            2552, // Cannot find name, did you mean
+            2307, // Cannot find module
+            2345, // Argument of type X is not assignable to parameter of type Y
+            2583, // Cannot find name 'X'. Do you need to install type definitions?
+            2686, // 'X' refers to a UMD global, but the current file is a module
+            2792, // Cannot find module 'X'. Did you mean to set the 'moduleResolution' option?
+            6133, // Variable is declared but never read
+            7006, // Parameter implicitly has an 'any' type
+            7016, // Could not find a declaration file for module
+            17004, // Cannot use JSX unless the '--jsx' flag is provided
+            2354, // This JSX tag requires the module path 'react/jsx-runtime' to exist
+          ],
+        });
       });
     });
   }, []);

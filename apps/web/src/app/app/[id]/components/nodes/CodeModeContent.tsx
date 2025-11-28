@@ -241,7 +241,7 @@ export function CodeModeContent({
               </div>
               <div>
                 <h3 className="font-semibold text-foreground">
-                  Smart Changes to edit
+                  Save Design Changes
                 </h3>
                 <p className="text-sm text-muted-foreground">
                   You have unsaved changes from the design editor

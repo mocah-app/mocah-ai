@@ -1,43 +1,25 @@
-import { NextRequest, NextResponse } from "next/server";
+/**
+ * Client-Side React Email Renderer
+ * 
+ * Renders React Email JSX to HTML entirely in the browser.
+ * This eliminates server-side RCE risk since code executes in the browser's sandbox.
+ * 
+ */
+
 import { render } from "@react-email/render";
 import { createElement } from "react";
 import * as ReactEmail from "@react-email/components";
 import * as Babel from "@babel/standalone";
 
 /**
- * Render React Email JSX to HTML (Server-Side)
- * POST /api/template/render
+ * Render React Email JSX to HTML (Client-Side)
+ * Safe to execute arbitrary code - runs in browser sandbox
  */
-export async function POST(req: NextRequest) {
+export async function renderReactEmailClientSide(
+  code: string
+): Promise<string> {
   try {
-    const { reactEmailCode, withIds } = await req.json();
-
-    if (!reactEmailCode) {
-      return NextResponse.json(
-        { error: "reactEmailCode is required" },
-        { status: 400 }
-      );
-    }
-
-    // Create a safe component from the code string
-    const html = await renderReactEmailComponent(reactEmailCode);
-
-    return NextResponse.json({ html });
-  } catch (error) {
-    console.error("Failed to render React Email:", error);
-    return NextResponse.json(
-      { error: "Failed to render React Email", details: String(error) },
-      { status: 500 }
-    );
-  }
-}
-
-/**
- * Render React Email component from code string
- */
-async function renderReactEmailComponent(code: string): Promise<string> {
-  try {
-    // Step 1: Remove import statements
+    // Step 1: Remove import statements (we provide components directly)
     let cleanedCode = code;
     cleanedCode = cleanedCode.replace(
       /import\s+.*?from\s+['"].*?['"];?\s*/g,
@@ -53,7 +35,6 @@ async function renderReactEmailComponent(code: string): Promise<string> {
     );
 
     // Step 2: Transform TypeScript/JSX to JavaScript using Babel
-    // Use both TypeScript and React presets to handle full React Email syntax
     const transformedResult = Babel.transform(cleanedCode, {
       presets: [
         ["typescript", { isTSX: true, allExtensions: true }],
@@ -76,7 +57,7 @@ async function renderReactEmailComponent(code: string): Promise<string> {
     jsCode = jsCode.replace(/export\s+default\s+/, "return ");
 
     // Step 4: Create and execute function
-    // Provide React and React Email components as context
+    // In browser context, this is safe - sandboxed by browser
     const componentFactory = new Function(
       "React",
       ...Object.keys(ReactEmail),
@@ -97,13 +78,22 @@ async function renderReactEmailComponent(code: string): Promise<string> {
     }
 
     // Step 5: Render to HTML
-    const html = render(createElement(Component), {
+    const html = await render(createElement(Component), {
       pretty: true,
     });
 
     return html;
   } catch (error) {
-    console.error("Failed to render component:", error);
+    console.error("Client-side render failed:", error);
     throw new Error(`Rendering failed: ${error}`);
   }
 }
+
+/**
+ * Check if client-side rendering is available
+ * (Babel must be loaded)
+ */
+export function isClientRenderingAvailable(): boolean {
+  return typeof Babel !== "undefined" && typeof Babel.transform === "function";
+}
+

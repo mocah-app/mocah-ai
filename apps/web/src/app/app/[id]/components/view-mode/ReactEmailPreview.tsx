@@ -1,8 +1,10 @@
 "use client";
 
 import React, { useState, useEffect, useRef, useCallback } from "react";
-import { Loader2 } from "lucide-react";
-import { injectElementIds } from "@/lib/react-email";
+import {
+  injectElementIds,
+  renderReactEmailClientSide,
+} from "@/lib/react-email";
 import type { ElementData } from "@/lib/react-email";
 import Loader from "@/components/loader";
 
@@ -76,38 +78,37 @@ export const ReactEmailPreview = ({
   }, []);
 
   // Update selection visual indicator
-  const updateSelectionIndicator = useCallback((
-    doc: Document,
-    element: Element | null,
-    elementType: string | null
-  ) => {
-    // Remove existing selection classes and labels
-    doc.querySelectorAll(".mocah-selected-element").forEach((el) => {
-      el.classList.remove("mocah-selected-element");
-    });
-    doc.querySelectorAll(".mocah-selection-label").forEach((el) => {
-      el.remove();
-    });
+  const updateSelectionIndicator = useCallback(
+    (doc: Document, element: Element | null, elementType: string | null) => {
+      // Remove existing selection classes and labels
+      doc.querySelectorAll(".mocah-selected-element").forEach((el) => {
+        el.classList.remove("mocah-selected-element");
+      });
+      doc.querySelectorAll(".mocah-selection-label").forEach((el) => {
+        el.remove();
+      });
 
-    if (!element || !elementType) return;
+      if (!element || !elementType) return;
 
-    // Add selection class
-    element.classList.add("mocah-selected-element");
+      // Add selection class
+      element.classList.add("mocah-selected-element");
 
-    // Create label
-    const label = doc.createElement("div");
-    label.className = "mocah-selection-label";
-    label.textContent = elementType;
+      // Create label
+      const label = doc.createElement("div");
+      label.className = "mocah-selection-label";
+      label.textContent = elementType;
 
-    // Make parent relative if needed for label positioning
-    const htmlElement = element as HTMLElement;
-    const computedStyle = doc.defaultView?.getComputedStyle(htmlElement);
-    if (computedStyle?.position === "static") {
-      htmlElement.style.position = "relative";
-    }
+      // Make parent relative if needed for label positioning
+      const htmlElement = element as HTMLElement;
+      const computedStyle = doc.defaultView?.getComputedStyle(htmlElement);
+      if (computedStyle?.position === "static") {
+        htmlElement.style.position = "relative";
+      }
 
-    element.appendChild(label);
-  }, []);
+      element.appendChild(label);
+    },
+    []
+  );
 
   useEffect(() => {
     async function renderEmail() {
@@ -125,21 +126,9 @@ export const ReactEmailPreview = ({
           ? injectElementIds(reactEmailCode)
           : reactEmailCode;
 
-        const response = await fetch("/api/template/render", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            reactEmailCode: codeToRender,
-            renderOptions: { pretty: true },
-          }),
-        });
-
-        if (!response.ok) {
-          throw new Error("Failed to render email");
-        }
-
-        const data = await response.json();
-        setHtml(data.html);
+        // Client-side rendering - runs in browser sandbox
+        const renderedHtml = await renderReactEmailClientSide(codeToRender);
+        setHtml(renderedHtml);
       } catch (err) {
         console.error("Failed to render React Email:", err);
         setError(err instanceof Error ? err.message : "Rendering failed");
@@ -204,7 +193,14 @@ export const ReactEmailPreview = ({
         element.classList.remove("mocah-hover-element");
       });
     });
-  }, [enableSelection, onElementSelect, reactEmailCode, styleDefinitions, injectStyles, updateSelectionIndicator]);
+  }, [
+    enableSelection,
+    onElementSelect,
+    reactEmailCode,
+    styleDefinitions,
+    injectStyles,
+    updateSelectionIndicator,
+  ]);
 
   if (isLoading) {
     return (

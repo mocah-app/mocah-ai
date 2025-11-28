@@ -1,5 +1,5 @@
 "use client";
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useCallback } from "react";
 import BrandKitSetupBanner from "@/components/brand-kit/BrandKitSetupBanner";
 import { Button } from "@/components/ui/button";
 import {
@@ -17,6 +17,7 @@ import { useRouter } from "next/navigation";
 import { formatDistanceToNow } from "date-fns";
 import { trpc } from "@/utils/trpc";
 import { Textarea } from "@/components/ui/textarea";
+import Loader from "@/components/loader";
 
 interface TemplateCardProps {
   template: {
@@ -94,6 +95,8 @@ const StatsSkeleton = () => (
     ))}
   </div>
 );
+const TEMPLATES_PER_PAGE = 6;
+
 export default function Dashboard() {
   const router = useRouter();
   const utils = trpc.useUtils();
@@ -107,10 +110,19 @@ export default function Dashboard() {
   const displayOrg =
     activeOrganization || (organizations.length > 0 ? organizations[0] : null);
 
-  // Single query for templates - gets both list and count
-  const { data: templatesData, isLoading: templatesLoading } = trpc.template.list.useQuery(
-    { limit: 6 },
-    { enabled: !!activeOrganization?.id }
+  // Infinite query for templates with cursor-based pagination
+  const {
+    data: templatesData,
+    isLoading: templatesLoading,
+    fetchNextPage,
+    hasNextPage,
+    isFetchingNextPage,
+  } = trpc.template.list.useInfiniteQuery(
+    { limit: TEMPLATES_PER_PAGE },
+    {
+      enabled: !!activeOrganization?.id,
+      getNextPageParam: (lastPage) => lastPage.nextCursor,
+    }
   );
 
   // Invalidate templates only when org actually changes (not on mount)
@@ -122,8 +134,36 @@ export default function Dashboard() {
     prevOrgIdRef.current = activeOrganization?.id;
   }, [activeOrganization?.id, utils]);
 
-  const templates = templatesData?.templates ?? [];
-  const templateCount = templatesData?.totalCount ?? 0;
+  // Flatten all pages into a single array
+  const templates = templatesData?.pages.flatMap((page) => page.templates) ?? [];
+  const templateCount = templatesData?.pages[0]?.totalCount ?? 0;
+
+  // Intersection observer for infinite scroll
+  const loadMoreRef = useRef<HTMLDivElement>(null);
+  
+  const handleObserver = useCallback(
+    (entries: IntersectionObserverEntry[]) => {
+      const [target] = entries;
+      if (target.isIntersecting && hasNextPage && !isFetchingNextPage) {
+        fetchNextPage();
+      }
+    },
+    [fetchNextPage, hasNextPage, isFetchingNextPage]
+  );
+
+  useEffect(() => {
+    const element = loadMoreRef.current;
+    if (!element) return;
+
+    const observer = new IntersectionObserver(handleObserver, {
+      root: null,
+      rootMargin: "100px",
+      threshold: 0,
+    });
+
+    observer.observe(element);
+    return () => observer.disconnect();
+  }, [handleObserver]);
   
   // Combined loading state - also loading if activeOrganization isn't set yet but we have orgs
   const isQueryPending = !activeOrganization?.id && organizations.length > 0;
@@ -232,12 +272,38 @@ export default function Dashboard() {
         <Card className="relative z-10">
           <CardHeader className="flex flex-row items-center justify-between">
             <CardTitle>Recent Templates</CardTitle>
+            <span className="text-sm text-muted-foreground">
+              {templates.length} of {templateCount}
+            </span>
           </CardHeader>
           <CardContent>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               {templates.map((template) => (
                 <TemplateCard key={template.id} template={template} />
               ))}
+            </div>
+
+            {/* Load more trigger */}
+            <div ref={loadMoreRef} className="mt-6 flex justify-center">
+              {isFetchingNextPage ? (
+                <div className="flex items-center gap-2 text-muted-foreground py-4">
+                  <Loader />
+                  <span className="sr-only">Loading more...</span>
+                </div>
+              ) : hasNextPage ? (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => fetchNextPage()}
+                  className="text-muted-foreground"
+                >
+                  Load more templates
+                </Button>
+              ) : templates.length > TEMPLATES_PER_PAGE ? (
+                <p className="text-sm text-muted-foreground py-4">
+                  All templates loaded
+                </p>
+              ) : null}
             </div>
           </CardContent>
         </Card>

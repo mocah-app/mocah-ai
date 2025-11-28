@@ -7,7 +7,7 @@ import {
   ReactFlow,
 } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { TemplateNode } from "../nodes/TemplateNode";
 import { useCanvas } from "../providers/CanvasProvider";
 import { CustomCanvasControl } from "./CustomCanvasControl";
@@ -19,7 +19,15 @@ const nodeTypes = {
 
 export function InfiniteCanvas() {
   const { state, actions } = useCanvas();
-  // const [isHandMode, setIsHandMode] = useState(false);
+  // Initialize zoom level to match defaultViewport zoom (0.8 = 80%)
+  const [zoomLevel, setZoomLevel] = useState(80);
+
+  // Handle viewport changes (zoom, pan) from React Flow events
+  // This listens to all zoom changes including mouse wheel, pinch, and programmatic changes
+  const handleMove = useCallback((_: any, viewport: { zoom: number }) => {
+    const newZoom = Math.round(viewport.zoom * 100);
+    setZoomLevel(newZoom);
+  }, []);
 
   // Fit view on mount
   useEffect(() => {
@@ -37,6 +45,7 @@ export function InfiniteCanvas() {
         onNodesChange={actions.onNodesChange}
         onEdgesChange={actions.onEdgesChange}
         onConnect={actions.onConnect}
+        onMove={handleMove}
         nodeTypes={nodeTypes}
         proOptions={{ hideAttribution: true }}
         fitView
@@ -63,6 +72,8 @@ export function InfiniteCanvas() {
           }}
         >
           <CustomCanvasControl
+            zoomLevel={zoomLevel}
+            onZoomLevelChange={setZoomLevel}
           // isHandMode={isHandMode}
           // setIsHandMode={setIsHandMode}
           />

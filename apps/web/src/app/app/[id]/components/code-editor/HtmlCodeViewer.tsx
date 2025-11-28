@@ -1,8 +1,9 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
-import { CodeEditor } from './CodeEditor';
+import { renderReactEmailClientSide } from '@/lib/react-email';
 import { logger } from '@mocah/shared';
+import { useEffect, useState } from 'react';
+import { CodeEditor } from './CodeEditor';
 
 interface HtmlCodeViewerProps {
   reactEmailCode: string;
@@ -37,14 +38,14 @@ export function HtmlCodeViewer({
     onErrorChange?.(error);
   }, [error, onErrorChange]);
 
-  // Fetch rendered HTML
+  // Render HTML client-side
   const fetchRenderedHtml = async (forceRefresh = false) => {
     if (!reactEmailCode) {
       setRenderedHtml('<!-- No React Email code to render -->');
       return;
     }
 
-    // Check cache first - only fetch if code changed or forced refresh
+    // Check cache first - only render if code changed or forced refresh
     if (!forceRefresh && cachedHtml && cachedHtml.code === reactEmailCode) {
       setRenderedHtml(cachedHtml.html);
       return;
@@ -54,29 +55,15 @@ export function HtmlCodeViewer({
     setError(null);
 
     try {
-      const response = await fetch('/api/template/render', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          reactEmailCode,
-          renderOptions: { pretty: true },
-        }),
-      });
-
-      if (response.ok) {
-        const data = await response.json();
-        setRenderedHtml(data.html);
-        // Update cache via callback
-        if (onHtmlRendered) {
-          onHtmlRendered(data.html);
-        }
-      } else {
-        const errorData = await response.json();
-        setError(errorData.error || 'Failed to render');
-        setRenderedHtml(`<!-- Rendering failed: ${errorData.error} -->`);
+      // Client-side rendering - runs in browser sandbox
+      const html = await renderReactEmailClientSide(reactEmailCode);
+      setRenderedHtml(html);
+      // Update cache via callback
+      if (onHtmlRendered) {
+        onHtmlRendered(html);
       }
     } catch (err) {
-      logger.error(`Failed to fetch rendered HTML: ${err}`);
+      logger.error(`Failed to render HTML: ${err}`);
       setError(String(err));
       setRenderedHtml(`<!-- Error: ${err} -->`);
     } finally {

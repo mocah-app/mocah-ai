@@ -36,7 +36,7 @@ export {
 } from './code-updater';
 export type { ElementUpdates } from './code-updater';
 
-// React Email Renderer
+// React Email Renderer (client-side only)
 export {
   renderReactEmail,
   renderReactEmailWithIds,
@@ -46,3 +46,9 @@ export {
   extractPreviewText,
   getEmailMetadata,
 } from './react-email-renderer';
+
+// Client-Side Renderer
+export {
+  renderReactEmailClientSide,
+  isClientRenderingAvailable,
+} from './client-renderer';

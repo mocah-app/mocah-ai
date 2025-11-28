@@ -2,39 +2,21 @@
  * React Email Renderer
  * Utilities for rendering React Email JSX to HTML
  *
- * Uses server-side API route for actual rendering since React components
- * can't be safely executed from strings on the client.
+ * All rendering happens client-side in the browser sandbox (secure).
  */
 
 import { injectElementIds } from "./jsx-parser";
 import { validateReactEmailCode as validateReactEmailCodeShared } from "@mocah/shared";
+import { renderReactEmailClientSide } from "./client-renderer";
 
 /**
- * Render React Email JSX to HTML using server-side API
+ * Render React Email JSX to HTML (Client-Side)
+ * Uses browser sandbox
  */
 export async function renderReactEmail(
   reactEmailCode: string
 ): Promise<string> {
-  try {
-    const response = await fetch("/api/template/render", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({ reactEmailCode }),
-    });
-
-    if (!response.ok) {
-      const error = await response.json();
-      throw new Error(error.details || "Failed to render React Email");
-    }
-
-    const { html } = await response.json();
-    return html;
-  } catch (error) {
-    console.error("Failed to render React Email:", error);
-    throw error;
-  }
+  return renderReactEmailClientSide(reactEmailCode);
 }
 
 /**
