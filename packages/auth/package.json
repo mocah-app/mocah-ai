@@ -23,6 +23,7 @@
   },
   "dependencies": {
     "@better-auth/stripe": "catalog:",
+    "@mocah/config": "workspace:*",
     "@mocah/db": "workspace:*",
     "better-auth": "catalog:",
     "dotenv": "catalog:",

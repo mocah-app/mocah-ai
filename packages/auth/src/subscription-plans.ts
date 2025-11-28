@@ -1,10 +1,12 @@
 // subscription-plans.ts
 // Subscription plan configuration for Better Auth Stripe plugin
 
+import { serverEnv } from "@mocah/config/env";
+
 export const subscriptionPlans = [
   {
     name: "free",
-    priceId: process.env.STRIPE_PRICE_ID_FREE || "",
+    priceId: serverEnv.STRIPE_PRICE_ID_FREE || "",
     limits: {
       textGenerations: 5,
       imageGenerations: 3,
@@ -13,7 +15,7 @@ export const subscriptionPlans = [
   },
   {
     name: "starter",
-    priceId: process.env.STRIPE_PRICE_ID_STARTER || "",
+    priceId: serverEnv.STRIPE_PRICE_ID_STARTER || "",
     limits: {
       textGenerations: 50,
       imageGenerations: 20,
@@ -22,8 +24,8 @@ export const subscriptionPlans = [
   },
   {
     name: "pro",
-    priceId: process.env.STRIPE_PRICE_ID_PRO || "",
-    annualDiscountPriceId: process.env.STRIPE_PRICE_ID_PRO_ANNUAL || "",
+    priceId: serverEnv.STRIPE_PRICE_ID_PRO || "",
+    annualDiscountPriceId: serverEnv.STRIPE_PRICE_ID_PRO_ANNUAL || "",
     limits: {
       textGenerations: -1, // -1 = unlimited
       imageGenerations: 100,
@@ -35,8 +37,8 @@ export const subscriptionPlans = [
   },
   {
     name: "scale",
-    priceId: process.env.STRIPE_PRICE_ID_SCALE || "",
-    annualDiscountPriceId: process.env.STRIPE_PRICE_ID_SCALE_ANNUAL || "",
+    priceId: serverEnv.STRIPE_PRICE_ID_SCALE || "",
+    annualDiscountPriceId: serverEnv.STRIPE_PRICE_ID_SCALE_ANNUAL || "",
     limits: {
       textGenerations: -1, // -1 = unlimited
       imageGenerations: 300,

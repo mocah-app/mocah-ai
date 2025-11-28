@@ -2,19 +2,20 @@ import { createOpenRouter } from "@openrouter/ai-sdk-provider";
 import { generateObject, generateText, streamObject, streamText } from "ai";
 import { z } from "zod";
 import { logger } from "@mocah/shared/logger";
+import { serverEnv } from "@mocah/config/env";
 
 // Initialize OpenRouter provider
 const openrouter = createOpenRouter({
-  apiKey: process.env.OPENROUTER_API_KEY,
+  apiKey: serverEnv.OPENROUTER_API_KEY,
 });
 
 // Default model from environment or fallback
 export const DEFAULT_MODEL =
-  process.env.OPENROUTER_DEFAULT_MODEL || "anthropic/claude-3.5-sonnet";
+  serverEnv.OPENROUTER_DEFAULT_MODEL || "anthropic/claude-3.5-sonnet";
 
 // Template generation model (optional, falls back to DEFAULT_MODEL)
 export const TEMPLATE_GENERATION_MODEL =
-  process.env.OPENROUTER_TEMPLATE_MODEL || DEFAULT_MODEL;
+  serverEnv.OPENROUTER_TEMPLATE_MODEL || DEFAULT_MODEL;
 
 /**
  * Options for structured generation with enhanced reliability

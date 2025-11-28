@@ -3,31 +3,38 @@ import {
   createVerificationEmail,
   createPasswordResetEmail,
 } from "./email-templates";
+import { serverEnv } from "@mocah/config/env";
 
 // Lazy initialization to avoid build-time errors
 let resend: Resend | null = null;
 
 const getResendClient = () => {
   if (!resend) {
-    const apiKey = process.env.RESEND_API_KEY;
-    if (!apiKey) {
-      throw new Error("RESEND_API_KEY environment variable is not set");
-    }
-    resend = new Resend(apiKey);
+    resend = new Resend(serverEnv.RESEND_API_KEY);
   }
   return resend;
 };
 
-const FROM_EMAIL = `Mocah AI <${process.env.RESEND_FROM_EMAIL}>` || ``;
-const APP_NAME = process.env.APP_NAME || "Mocah AI";
+const FROM_EMAIL: string | undefined = serverEnv.RESEND_FROM_EMAIL
+  ? `Mocah AI <${serverEnv.RESEND_FROM_EMAIL}>`
+  : undefined;
+const APP_NAME = serverEnv.APP_NAME || "Mocah AI";
+
+if (!FROM_EMAIL) {
+  throw new Error(
+    "RESEND_FROM_EMAIL environment variable is required for sending emails"
+  );
+}
 
 /**
  * Get the logo URL for email templates
  * Uses the dark logo by default, can be overridden via environment variable
  */
 const getLogoUrl = (): string | undefined => {
-  const logoPath = process.env.EMAIL_LOGO_URL || `https://nmh1ggfgcamqailu.public.blob.vercel-storage.com/mocah-logo.png`;
-  return logoPath;
+  return (
+    serverEnv.EMAIL_LOGO_URL ||
+    `https://nmh1ggfgcamqailu.public.blob.vercel-storage.com/mocah-logo.png`
+  );
 };
 
 interface SendEmailOptions {
@@ -48,7 +55,7 @@ export class EmailService {
     try {
       const resendClient = getResendClient();
       const result = await resendClient.emails.send({
-        from: FROM_EMAIL,
+        from: FROM_EMAIL!, // Non-null assertion: validated at module load time
         to,
         subject,
         html,

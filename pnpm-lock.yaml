@@ -198,6 +198,9 @@ importers:
       '@react-email/render':
         specifier: ^2.0.0
         version: 2.0.0(react-dom@19.2.0(react@19.2.0))(react@19.2.0)
+      '@t3-oss/env-nextjs':
+        specifier: ^0.13.8
+        version: 0.13.8(typescript@5.9.3)(valibot@1.1.0(typescript@5.9.3))(zod@4.1.12)
       '@tanstack/react-form':
         specifier: ^1.12.3
         version: 1.25.0(react-dom@19.2.0(react@19.2.0))(react@19.2.0)
@@ -361,6 +364,9 @@ importers:
       '@mocah/auth':
         specifier: workspace:*
         version: link:../auth
+      '@mocah/config':
+        specifier: workspace:*
+        version: link:../config
       '@mocah/db':
         specifier: workspace:*
         version: link:../db
@@ -392,9 +398,6 @@ importers:
         specifier: 'catalog:'
         version: 4.1.12
     devDependencies:
-      '@mocah/config':
-        specifier: workspace:*
-        version: link:../config
       tsdown:
         specifier: 'catalog:'
         version: 0.15.12(ms@2.1.3)(typescript@5.9.3)
@@ -404,6 +407,9 @@ importers:
       '@better-auth/stripe':
         specifier: 'catalog:'
         version: 1.3.34(@better-auth/core@1.3.34(@better-auth/utils@0.3.0)(@better-fetch/fetch@1.1.18)(better-call@1.0.19)(jose@6.1.1)(kysely@0.28.8)(nanostores@1.0.1))(better-auth@1.3.34(react-dom@19.2.0(react@19.2.0))(react@19.2.0))(stripe@19.3.1(@types/node@22.19.1))
+      '@mocah/config':
+        specifier: workspace:*
+        version: link:../config
       '@mocah/db':
         specifier: workspace:*
         version: link:../db
@@ -426,17 +432,24 @@ importers:
         specifier: 'catalog:'
         version: 4.1.12
     devDependencies:
-      '@mocah/config':
-        specifier: workspace:*
-        version: link:../config
       tsdown:
         specifier: 'catalog:'
         version: 0.15.12(ms@2.1.3)(typescript@5.9.3)
 
-  packages/config: {}
+  packages/config:
+    dependencies:
+      '@t3-oss/env-core':
+        specifier: ^0.13.8
+        version: 0.13.8(typescript@5.9.3)(valibot@1.1.0(typescript@5.9.3))(zod@4.1.12)
+      zod:
+        specifier: 'catalog:'
+        version: 4.1.12
 
   packages/db:
     dependencies:
+      '@mocah/config':
+        specifier: workspace:*
+        version: link:../config
       '@prisma/adapter-pg':
         specifier: ^7.0.0
         version: 7.0.0
@@ -458,10 +471,6 @@ importers:
       zod:
         specifier: 'catalog:'
         version: 4.1.12
-    devDependencies:
-      '@mocah/config':
-        specifier: workspace:*
-        version: link:../config
 
   packages/shared:
     dependencies:
@@ -2457,6 +2466,40 @@ packages:
 
   '@swc/helpers@0.5.15':
     resolution: {integrity: sha512-JQ5TuMi45Owi4/BIMAJBoSQoOJu12oOk/gADqlcUL9JEdHB8vyjUSsxqeNXnmXHjYKMi2WcYtezGEEhqUI/E2g==}
+
+  '@t3-oss/env-core@0.13.8':
+    resolution: {integrity: sha512-L1inmpzLQyYu4+Q1DyrXsGJYCXbtXjC4cICw1uAKv0ppYPQv656lhZPU91Qd1VS6SO/bou1/q5ufVzBGbNsUpw==}
+    peerDependencies:
+      arktype: ^2.1.0
+      typescript: '>=5.0.0'
+      valibot: ^1.0.0-beta.7 || ^1.0.0
+      zod: ^3.24.0 || ^4.0.0-beta.0
+    peerDependenciesMeta:
+      arktype:
+        optional: true
+      typescript:
+        optional: true
+      valibot:
+        optional: true
+      zod:
+        optional: true
+
+  '@t3-oss/env-nextjs@0.13.8':
+    resolution: {integrity: sha512-QmTLnsdQJ8BiQad2W2nvV6oUpH4oMZMqnFEjhVpzU0h3sI9hn8zb8crjWJ1Amq453mGZs6A4v4ihIeBFDOrLeQ==}
+    peerDependencies:
+      arktype: ^2.1.0
+      typescript: '>=5.0.0'
+      valibot: ^1.0.0-beta.7 || ^1.0.0
+      zod: ^3.24.0 || ^4.0.0-beta.0
+    peerDependenciesMeta:
+      arktype:
+        optional: true
+      typescript:
+        optional: true
+      valibot:
+        optional: true
+      zod:
+        optional: true
 
   '@tailwindcss/node@4.1.17':
     resolution: {integrity: sha512-csIkHIgLb3JisEFQ0vxr2Y57GUNYh447C8xzwj89U/8fdW8LhProdxvnVH6U8M2Y73QKiTIH+LWbK3V2BBZsAg==}
@@ -6666,6 +6709,20 @@ snapshots:
   '@swc/helpers@0.5.15':
     dependencies:
       tslib: 2.8.1
+
+  '@t3-oss/env-core@0.13.8(typescript@5.9.3)(valibot@1.1.0(typescript@5.9.3))(zod@4.1.12)':
+    optionalDependencies:
+      typescript: 5.9.3
+      valibot: 1.1.0(typescript@5.9.3)
+      zod: 4.1.12
+
+  '@t3-oss/env-nextjs@0.13.8(typescript@5.9.3)(valibot@1.1.0(typescript@5.9.3))(zod@4.1.12)':
+    dependencies:
+      '@t3-oss/env-core': 0.13.8(typescript@5.9.3)(valibot@1.1.0(typescript@5.9.3))(zod@4.1.12)
+    optionalDependencies:
+      typescript: 5.9.3
+      valibot: 1.1.0(typescript@5.9.3)
+      zod: 4.1.12
 
   '@tailwindcss/node@4.1.17':
     dependencies:

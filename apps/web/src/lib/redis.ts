@@ -5,18 +5,16 @@
 
 import { Redis } from "@upstash/redis";
 import { logger } from "@mocah/shared";
+import { serverEnv } from "@mocah/config/env";
 
 // Initialize Redis client (will be null if env vars not set)
 let redis: Redis | null = null;
 
 try {
-  if (
-    process.env.UPSTASH_REDIS_REST_URL &&
-    process.env.UPSTASH_REDIS_REST_TOKEN
-  ) {
+  if (serverEnv.UPSTASH_REDIS_REST_URL && serverEnv.UPSTASH_REDIS_REST_TOKEN) {
     redis = new Redis({
-      url: process.env.UPSTASH_REDIS_REST_URL,
-      token: process.env.UPSTASH_REDIS_REST_TOKEN,
+      url: serverEnv.UPSTASH_REDIS_REST_URL,
+      token: serverEnv.UPSTASH_REDIS_REST_TOKEN,
     });
     logger.info("Redis client initialized successfully");
   } else {

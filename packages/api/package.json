@@ -24,6 +24,7 @@
   "dependencies": {
     "@aws-sdk/client-s3": "catalog:",
     "@mocah/auth": "workspace:*",
+    "@mocah/config": "workspace:*",
     "@mocah/db": "workspace:*",
     "@mocah/shared": "workspace:*",
     "@openrouter/ai-sdk-provider": "^1.2.5",
