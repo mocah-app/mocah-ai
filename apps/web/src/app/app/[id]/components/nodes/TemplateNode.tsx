@@ -8,6 +8,7 @@ import { CodeModeContent } from "./CodeModeContent";
 import { NodeHeader } from "./NodeHeader";
 import { ViewModeContent } from "./ViewModeContent";
 import MocahLoadingIcon from "@/components/mocah-brand/MocahLoadingIcon";
+import { useTemplate, GENERATION_PHASE_MESSAGES } from "../providers/TemplateProvider";
 
 export interface TemplateNodeData {
   version: number;
@@ -84,17 +85,20 @@ export function TemplateNode({ data, id }: TemplateNodeProps) {
 }
 
 function LoadingState() {
+  const { state } = useTemplate();
+  const message = GENERATION_PHASE_MESSAGES[state.generationPhase] || 'Mocah is doing its magic...';
+  
   return (
     <div className="bg-background w-full relative">
       {/* Loading Content */}
       <div className="min-h-[500px] flex flex-col items-center justify-center p-12">
         <div className="relative mb-4">
-          <MocahLoadingIcon isLoading={true} />
+          <MocahLoadingIcon isLoading={true} size="sm" />
         </div>
 
         {/* Text */}
-        <p className="text-muted-foreground text-sm">
-          Mocah is doing its magic...
+        <p className="text-muted-foreground text-sm animate-pulse">
+          {message}
         </p>
       </div>
     </div>

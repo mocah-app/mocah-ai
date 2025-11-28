@@ -221,6 +221,15 @@ export function BrandSettingsForm() {
         logo: logoUrl,
       });
 
+      // Invalidate server-side brand kit cache so AI uses fresh data
+      await fetch("/api/cache/invalidate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          organizationId: activeOrganization.id,
+        }),
+      }).catch(() => {}); // Non-critical, don't block on failure
+
       // Refresh organizations list to get updated data
       await refreshOrganizations();
     } catch (error: any) {

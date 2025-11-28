@@ -16,7 +16,7 @@ import {
 } from "lucide-react";
 import { useParams } from "next/navigation";
 import React, { useCallback, useEffect, useRef, useState } from "react";
-import { useTemplate } from "../providers/TemplateProvider";
+import { useTemplate, GENERATION_PHASE_MESSAGES } from "../providers/TemplateProvider";
 import { Prism as SyntaxHighlighter } from "react-syntax-highlighter";
 import { vscDarkPlus } from "react-syntax-highlighter/dist/esm/styles/prism";
 
@@ -88,6 +88,20 @@ export const ChatPanel = ({
     }
   }, [isNewTemplate, messages.length]);
 
+  // Update streaming message content based on generation phase
+  useEffect(() => {
+    if (templateState.isStreaming && templateState.generationPhase !== 'idle') {
+      const phaseMessage = GENERATION_PHASE_MESSAGES[templateState.generationPhase];
+      setMessages((prev) =>
+        prev.map((msg) =>
+          msg.isStreaming
+            ? { ...msg, content: phaseMessage }
+            : msg
+        )
+      );
+    }
+  }, [templateState.generationPhase, templateState.isStreaming]);
+
   const handleSendWithPrompt = useCallback(
     async (promptText: string) => {
       if (!promptText.trim() || isLoading) {
@@ -128,7 +142,7 @@ export const ChatPanel = ({
         {
           id: streamingMessageId,
           role: "assistant",
-          content: "Generating your template...",
+          content: GENERATION_PHASE_MESSAGES.starting,
           isStreaming: true,
         },
       ]);
@@ -229,6 +243,24 @@ export const ChatPanel = ({
     await handleSendWithPrompt(input);
   };
 
+  const handleCancel = useCallback(() => {
+    templateActions.cancelGeneration();
+    setIsLoading(false);
+    
+    // Update the streaming message to show cancellation
+    setMessages((prev) =>
+      prev.map((msg) =>
+        msg.isStreaming
+          ? {
+              ...msg,
+              content: "Generation cancelled.",
+              isStreaming: false,
+            }
+          : msg
+      )
+    );
+  }, [templateActions]);
+
   return (
     <div
       className={cn(
@@ -315,7 +347,9 @@ export const ChatPanel = ({
             onKeyDown={(e) => {
               if (e.key === "Enter" && !e.shiftKey) {
                 e.preventDefault();
-                handleSend();
+                if (!isLoading) {
+                  handleSend();
+                }
               }
             }}
             placeholder={isLoading ? "Generating..." : "Write your message..."}
@@ -324,14 +358,26 @@ export const ChatPanel = ({
             disabled={isLoading}
             className="focus:outline-none focus:ring-[0.2px] rounded-none focus:ring-teal-500 focus:ring-offset-0 focus:ring-offset-transparent resize-none max-h-[180px] disabled:opacity-50"
           />
-          <Button
-            onClick={handleSend}
-            size="icon"
-            disabled={isLoading || !input.trim()}
-            className="absolute right-3 bottom-3 w-8 h-8"
-          >
-            {isLoading ? <StopCircleIcon /> : <Send size={14} />}
-          </Button>
+          {isLoading ? (
+            <Button
+              onClick={handleCancel}
+              size="icon"
+              variant="destructive"
+              className="absolute right-3 bottom-3 w-8 h-8"
+              title="Cancel generation"
+            >
+              <StopCircleIcon size={14} />
+            </Button>
+          ) : (
+            <Button
+              onClick={handleSend}
+              size="icon"
+              disabled={!input.trim()}
+              className="absolute right-3 bottom-3 w-8 h-8"
+            >
+              <Send size={14} />
+            </Button>
+          )}
         </div>
       </div>
     </div>

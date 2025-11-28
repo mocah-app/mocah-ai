@@ -7,6 +7,17 @@ import {
 import { auth } from "@mocah/auth";
 import prisma from "@mocah/db";
 import { logger } from "@mocah/shared";
+import {
+  getCachedMembership,
+  cacheMembership,
+  getCachedBrandKit,
+  cacheBrandKit,
+} from "./cache";
+
+// Schema metadata for AI reliability (also exported from prompts.ts after rebuild)
+const TEMPLATE_SCHEMA_NAME = "ReactEmailTemplate";
+const TEMPLATE_SCHEMA_DESCRIPTION =
+  "A complete React Email template with subject line, preview text, and valid React Email component code. The code must use only @react-email/components, no HTML tags.";
 
 // AI SDK streaming works in both Edge and Node.js runtimes
 export const runtime = "nodejs";
@@ -19,64 +30,103 @@ export async function POST(req: NextRequest) {
     });
 
     if (!session?.user) {
-      return new Response("Unauthorized", { status: 401 });
+      return new Response(JSON.stringify({ error: "Unauthorized" }), {
+        status: 401,
+        headers: { "Content-Type": "application/json" },
+      });
     }
 
     // 2. Parse request body
     const { prompt, organizationId } = await req.json();
 
     if (!prompt || !organizationId) {
-      return new Response("Missing required fields", { status: 400 });
+      return new Response(JSON.stringify({ error: "Missing required fields" }), {
+        status: 400,
+        headers: { "Content-Type": "application/json" },
+      });
     }
 
-    // 3. Verify organization membership
-    const membership = await prisma.member.findFirst({
-      where: {
-        userId: session.user.id,
-        organizationId: organizationId,
-      },
-    });
+    const userId = session.user.id;
 
-    if (!membership) {
-      return new Response("Forbidden", { status: 403 });
+    // 3. Check cache first, then DB if needed
+    let isMember = await getCachedMembership(userId, organizationId);
+    let brandKit = await getCachedBrandKit(organizationId);
+
+    // Collect promises for any cache misses
+    const dbQueries: Promise<void>[] = [];
+
+    if (isMember === null) {
+      dbQueries.push(
+        prisma.member.findFirst({
+          where: { userId, organizationId },
+        }).then(async (membership) => {
+          isMember = !!membership;
+          await cacheMembership(userId, organizationId, isMember);
+        })
+      );
     }
 
-    // 4. Get organization brand kit
-    const organization = await prisma.organization.findUnique({
-      where: { id: organizationId },
-      select: { brandKit: true },
-    });
+    if (brandKit === null) {
+      dbQueries.push(
+        prisma.organization.findUnique({
+          where: { id: organizationId },
+          select: { brandKit: true },
+        }).then(async (org) => {
+          brandKit = org?.brandKit ?? null;
+          await cacheBrandKit(organizationId, brandKit);
+        })
+      );
+    }
 
-    // 5. Build React Email prompt
-    const promptText = buildReactEmailPrompt(prompt, organization?.brandKit as any);
+    // Wait for any needed DB queries
+    if (dbQueries.length > 0) {
+      await Promise.all(dbQueries);
+    }
 
-    // Log complete AI request details for streaming
-    // logger.info("\n" + "=".repeat(80));
-    // logger.info("🌊 AI STREAMING REQUEST");
-    // logger.info("=".repeat(80));
-    // logger.info("\n📝 USER PROMPT:", { prompt });
-    // logger.info("\n🎨 BRAND KIT:", { brandKit: organization?.brandKit || {} });
-    // logger.info("\n📋 COMPLETE SYSTEM PROMPT:", { systemPrompt: promptText });
-    // logger.info("\n🔧 GENERATION CONFIG:", {
-    //   model: TEMPLATE_GENERATION_MODEL,
-    //   schemaFields: Object.keys(reactEmailGenerationSchema.shape),
-    //   streaming: true,
-    //   user: session.user.email || session.user.id,
-    //   organizationId,
-    // });
-    // logger.info("\n" + "=".repeat(80) + "\n");
+    if (!isMember) {
+      return new Response(JSON.stringify({ error: "Forbidden" }), {
+        status: 403,
+        headers: { "Content-Type": "application/json" },
+      });
+    }
 
-    // 6. Start streaming with AI SDK
+    // 4. Build React Email prompt
+    const promptText = buildReactEmailPrompt(prompt, brandKit as any);
+
+    // 5. Start streaming with AI SDK (enhanced reliability)
     const result = aiClient.streamStructured(
       reactEmailGenerationSchema,
       promptText,
-      TEMPLATE_GENERATION_MODEL
+      TEMPLATE_GENERATION_MODEL,
+      {
+        schemaName: TEMPLATE_SCHEMA_NAME,
+        schemaDescription: TEMPLATE_SCHEMA_DESCRIPTION,
+        temperature: 0.7,
+        maxRetries: 3,
+        onError: (error: unknown) => {
+          logger.error("Stream error in template generation", {
+            error: String(error),
+            userId: session.user.id,
+            organizationId,
+            promptPreview: prompt.substring(0, 100),
+          });
+        },
+      }
     );
 
-    // 7. Return streaming response using AI SDK's built-in method
+    // 6. Return streaming response
     return result.toTextStreamResponse();
   } catch (error) {
     logger.error("Template generation error:", { error });
-    return new Response("Internal server error", { status: 500 });
+    return new Response(
+      JSON.stringify({
+        error: "Internal server error",
+        message: error instanceof Error ? error.message : "Unknown error",
+      }),
+      {
+        status: 500,
+        headers: { "Content-Type": "application/json" },
+      }
+    );
   }
 }

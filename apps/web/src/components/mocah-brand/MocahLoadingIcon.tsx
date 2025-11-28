@@ -11,14 +11,25 @@ interface MocahLoadingIconProps
     | "onDragEnd"
     | "onDrag"
     | "values"
+    | "width"
+    | "height"
   > {
   isLoading?: boolean;
+  size?: "sm" | "md" | "lg";
 }
+
+const sizeMap = {
+  sm: { width: 140, height: 108 },
+  md: { width: 210, height: 162 },
+  lg: { width: 280, height: 216 },
+} as const;
 
 const MocahLoadingIcon = ({
   isLoading = true,
+  size = "md",
   ...props
 }: MocahLoadingIconProps) => {
+  const dimensions = sizeMap[size];
   // Assembly animation variants
   const containerVariants = {
     hidden: { opacity: 0 },
@@ -73,8 +84,8 @@ const MocahLoadingIcon = ({
 
   return (
     <motion.svg
-      width={210}
-      height={162}
+      width={dimensions.width}
+      height={dimensions.height}
       viewBox="0 0 210 162"
       fill="none"
       xmlns="http://www.w3.org/2000/svg"
@@ -341,30 +352,3 @@ const MocahLoadingIcon = ({
 };
 
 export default MocahLoadingIcon;
-
-// Demo component
-// export default function App() {
-//   return (
-//     <div className="min-h-screen bg-background flex items-center justify-center p-8">
-//       <div className="space-y-8 text-center">
-//         <div>
-//           <MocahLoadingIcon className="mx-auto" />
-//           <p className="mt-4 text-sm text-muted-foreground">Loading...</p>
-//         </div>
-
-//         <div className="pt-8 border-t border-border">
-//           <p className="text-xs text-muted-foreground mb-2">
-//             Animation Sequence:
-//           </p>
-//           <ol className="text-xs text-muted-foreground space-y-1">
-//             <li>1. Left pillar slides up</li>
-//             <li>2. Center V-shape slides up</li>
-//             <li>3. Right pillar slides up</li>
-//             <li>4. Decorative squares pop in</li>
-//             <li>5. Breathing pulse (infinite loop)</li>
-//           </ol>
-//         </div>
-//       </div>
-//     </div>
-//   );
-// }

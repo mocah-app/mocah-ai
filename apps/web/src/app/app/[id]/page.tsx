@@ -308,7 +308,7 @@ function EditorContent() {
             <EdgeRayLoader />
             <div className="absolute inset-0 flex flex-col items-center justify-center p-12">
               <div className="relative mb-4">
-                <MocahLoadingIcon isLoading={true} />
+                <MocahLoadingIcon isLoading={true} size="sm" />
               </div>
               <p className="text-muted-foreground text-sm">
                 Loading template...

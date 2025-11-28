@@ -13,21 +13,14 @@ import { convertDates, logger } from "@mocah/shared";
 import { useStreamTemplate } from "@/hooks/use-stream-template";
 import { useOrganization } from "@/contexts/organization-context";
 import { useRouter } from "next/navigation";
+import {
+  type GenerationPhase,
+  type StreamingProgress,
+  getNextPhase,
+} from "./generation-phases";
 
-// Partial template for streaming progress
-interface StreamingProgress {
-  subject?: string;
-  previewText?: string;
-  reactEmailCode?: string;
-  styleType?: 'inline' | 'predefined-classes' | 'style-objects';
-  styleDefinitionsJson?: string;
-  metadata?: {
-    emailType?: string;
-    generatedAt?: string;
-    model?: string;
-    tokensUsed?: number;
-  };
-}
+// Re-export for consumers
+export { GENERATION_PHASE_MESSAGES, type GenerationPhase } from "./generation-phases";
 
 interface TemplateState {
   currentTemplate: Template | null;
@@ -38,6 +31,7 @@ interface TemplateState {
   isLoading: boolean;
   isStreaming: boolean;
   streamingProgress: StreamingProgress | null;
+  generationPhase: GenerationPhase;
   
   // React Email specific state
   reactEmailCode: string | null;
@@ -55,6 +49,7 @@ interface TemplateActions {
   regenerateTemplate: (prompt: string) => Promise<void>;
   generateTemplate: (prompt: string) => Promise<Template | null>;
   generateTemplateStream: (prompt: string) => Promise<void>;
+  cancelGeneration: () => void;
   setIsDirty: (dirty: boolean) => void;
   
   // React Email specific actions
@@ -98,6 +93,7 @@ export function TemplateProvider({
     isLoading: false,
     isStreaming: false,
     streamingProgress: null,
+    generationPhase: 'idle',
     reactEmailCode: null,
     styleDefinitions: {},
   });
@@ -106,6 +102,7 @@ export function TemplateProvider({
   const {
     partialTemplate,
     generate: generateStream,
+    cancel: cancelStream,
     isGenerating,
     error: streamError,
   } = useStreamTemplate({
@@ -165,6 +162,12 @@ export function TemplateProvider({
           styleDefinitionsKeys: Object.keys(styleDefinitions),
         });
 
+        // Set finalizing phase while saving
+        setState((prev) => ({
+          ...prev,
+          generationPhase: 'finalizing',
+        }));
+
         const result = await updateMutation.mutateAsync(updatePayload);
 
         const processedResult = convertDates(result);
@@ -177,6 +180,7 @@ export function TemplateProvider({
           isStreaming: false,
           streamingProgress: null,
           isLoading: false,
+          generationPhase: 'complete',
         }));
 
         // Refetch to get the latest data
@@ -197,6 +201,7 @@ export function TemplateProvider({
           ...prev,
           isStreaming: false,
           isLoading: false,
+          generationPhase: 'idle',
         }));
       }
     },
@@ -207,20 +212,42 @@ export function TemplateProvider({
         isStreaming: false,
         streamingProgress: null,
         isLoading: false,
+        generationPhase: 'idle',
       }));
     },
   });
 
-  // Update streaming progress in state
+  // Update streaming progress and generation phase in state
   useEffect(() => {
-    if (partialTemplate) {
-      setState((prev) => ({
-        ...prev,
-        streamingProgress: partialTemplate as StreamingProgress,
-        isStreaming: isGenerating,
-      }));
-    }
+    if (!isGenerating && !partialTemplate) return;
+
+    const progress = partialTemplate as StreamingProgress | null;
+
+    setState((prev) => ({
+      ...prev,
+      streamingProgress: progress || prev.streamingProgress,
+      isStreaming: isGenerating,
+      generationPhase: getNextPhase(prev.generationPhase, isGenerating, progress),
+    }));
   }, [partialTemplate, isGenerating]);
+
+  // Auto-transition from 'starting' to 'analyzing' after brief delay
+  // This gives users visual feedback during server-side processing
+  useEffect(() => {
+    if (state.generationPhase !== 'starting') return;
+
+    const timer = setTimeout(() => {
+      setState((prev) => {
+        // Only transition if still in starting phase
+        if (prev.generationPhase === 'starting') {
+          return { ...prev, generationPhase: 'analyzing' };
+        }
+        return prev;
+      });
+    }, 800);
+
+    return () => clearTimeout(timer);
+  }, [state.generationPhase]);
 
   // tRPC utils for cache invalidation
   const utils = trpc.useUtils();
@@ -491,6 +518,7 @@ export function TemplateProvider({
         isStreaming: true,
         isLoading: true,
         streamingProgress: null,
+        generationPhase: 'starting',
       }));
 
       try {
@@ -501,12 +529,24 @@ export function TemplateProvider({
           ...prev,
           isStreaming: false,
           isLoading: false,
+          generationPhase: 'idle',
         }));
         throw error;
       }
     },
     [generateStream, activeOrganization?.id]
   );
+
+  const cancelGeneration = useCallback(() => {
+    cancelStream();
+    setState((prev) => ({
+      ...prev,
+      isStreaming: false,
+      isLoading: false,
+      streamingProgress: null,
+      generationPhase: 'idle',
+    }));
+  }, [cancelStream]);
 
   const actions: TemplateActions = {
     loadTemplate,
@@ -519,6 +559,7 @@ export function TemplateProvider({
     regenerateTemplate,
     generateTemplate,
     generateTemplateStream,
+    cancelGeneration,
     setIsDirty,
     updateReactEmailCode,
     saveReactEmailCode,

@@ -18,7 +18,7 @@ export default function DashboardPage() {
   if (isPending) {
     return (
       <div className="flex flex-1 items-center justify-center min-h-full h-full">
-        <MocahLoadingIcon isLoading={true} />
+        <MocahLoadingIcon isLoading={true} size="sm" />
       </div>
     );
   }

@@ -251,8 +251,11 @@ TIGRIS_PUBLIC_URL=storage.mocah.ai
 # Email (Resend)
 RESEND_API_KEY=
 
-# OpenAI (for AI generation)
-OPENAI_API_KEY=
+
+# Upstash Redis (for serverless caching)
+# Get these from: https://console.upstash.com/
+UPSTASH_REDIS_REST_URL=
+UPSTASH_REDIS_REST_TOKEN=
 ```
 
 ### Getting Started

@@ -402,33 +402,76 @@ If any check fails, DO NOT output the code. Fix the issues first.`;
 /**
  * Zod schema for React Email JSX generation output
  * Optimized for streaming with early fields first
+ * Enhanced descriptions improve AI reliability
  */
 export const reactEmailGenerationSchema = z.object({
-  subject: z.string().describe("Email subject line - generate this first"),
-  previewText: z.string().describe("Email preview text (50-100 characters)"),
-  
-  reactEmailCode: z.string().describe(
-    "Complete React Email component code including imports, style objects, and JSX. This is the canonical source."
-  ),
-  
+  subject: z
+    .string()
+    .min(1)
+    .max(100)
+    .describe(
+      "Email subject line (1-100 chars). Generate FIRST. Be concise, compelling, and relevant to the email content."
+    ),
+
+  previewText: z
+    .string()
+    .min(30)
+    .max(200)
+    .describe(
+      "Email preview text shown in inbox (30-200 chars). MUST be under 200 characters. Summarize the email's main value proposition concisely."
+    ),
+
+  reactEmailCode: z
+    .string()
+    .min(500)
+    .describe(
+      `Complete React Email component code. MUST include:
+1. Imports: import { Html, Head, Body, Container, Section, Text, Heading, Button, Img, Link, Hr, Row, Column } from '@react-email/components';
+2. React: import * as React from 'react';
+3. Style objects with 'as const' for string literals
+4. Export: export default function ComponentName() { return (...) }
+
+FORBIDDEN: HTML tags (div, span, p, h1-h6, a), nested <Text>, display CSS, 'as' prop on Heading.`
+    ),
+
   styleType: z
     .enum(["inline", "predefined-classes", "style-objects"])
-    .describe("Primary styling approach used in the component"),
-  
+    .default("style-objects")
+    .describe(
+      "Styling approach. Use 'style-objects' (default) for best maintainability."
+    ),
+
   styleDefinitionsJson: z
     .string()
     .optional()
     .describe(
-      "Style object definitions as a JSON string (e.g., '{\"headingStyle\":{\"fontSize\":\"48px\"}}'). Optional - styles are already in reactEmailCode."
+      'Optional JSON string of style objects. Format: \'{"styleName":{"property":"value"}}\'. Only if extracting styles separately.'
     ),
-  
-  metadata: z.object({
-    generatedAt: z.string(),
-    model: z.string(),
-    tokensUsed: z.number(),
-    emailType: z.string().nullish(),
-  }),
+
+  metadata: z
+    .object({
+      generatedAt: z
+        .string()
+        .describe("ISO 8601 timestamp (e.g., '2024-01-15T10:30:00Z')"),
+      model: z.string().describe("Model identifier used for generation"),
+      tokensUsed: z.number().int().min(0).describe("Total tokens consumed"),
+      emailType: z
+        .string()
+        .nullish()
+        .describe(
+          "Email category: 'welcome', 'newsletter', 'promotional', 'transactional', 'notification', etc."
+        ),
+    })
+    .describe("Generation metadata for tracking and debugging"),
 });
+
+/**
+ * Schema name and description for AI context
+ * Used by streamStructured/generateStructured for better reliability
+ */
+export const TEMPLATE_SCHEMA_NAME = "ReactEmailTemplate";
+export const TEMPLATE_SCHEMA_DESCRIPTION =
+  "A complete React Email template with subject line, preview text, and valid React Email component code. The code must use only @react-email/components, no HTML tags.";
 
 export type ReactEmailGenerationOutput = z.infer<
   typeof reactEmailGenerationSchema
