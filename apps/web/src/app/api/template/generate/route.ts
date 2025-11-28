@@ -51,20 +51,20 @@ export async function POST(req: NextRequest) {
     const promptText = buildReactEmailPrompt(prompt, organization?.brandKit as any);
 
     // Log complete AI request details for streaming
-    logger.info("\n" + "=".repeat(80));
-    logger.info("🌊 AI STREAMING REQUEST");
-    logger.info("=".repeat(80));
-    logger.info("\n📝 USER PROMPT:", { prompt });
-    logger.info("\n🎨 BRAND KIT:", { brandKit: organization?.brandKit || {} });
-    logger.info("\n📋 COMPLETE SYSTEM PROMPT:", { systemPrompt: promptText });
-    logger.info("\n🔧 GENERATION CONFIG:", {
-      model: TEMPLATE_GENERATION_MODEL,
-      schemaFields: Object.keys(reactEmailGenerationSchema.shape),
-      streaming: true,
-      user: session.user.email || session.user.id,
-      organizationId,
-    });
-    logger.info("\n" + "=".repeat(80) + "\n");
+    // logger.info("\n" + "=".repeat(80));
+    // logger.info("🌊 AI STREAMING REQUEST");
+    // logger.info("=".repeat(80));
+    // logger.info("\n📝 USER PROMPT:", { prompt });
+    // logger.info("\n🎨 BRAND KIT:", { brandKit: organization?.brandKit || {} });
+    // logger.info("\n📋 COMPLETE SYSTEM PROMPT:", { systemPrompt: promptText });
+    // logger.info("\n🔧 GENERATION CONFIG:", {
+    //   model: TEMPLATE_GENERATION_MODEL,
+    //   schemaFields: Object.keys(reactEmailGenerationSchema.shape),
+    //   streaming: true,
+    //   user: session.user.email || session.user.id,
+    //   organizationId,
+    // });
+    // logger.info("\n" + "=".repeat(80) + "\n");
 
     // 6. Start streaming with AI SDK
     const result = aiClient.streamStructured(

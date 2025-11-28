@@ -1,5 +1,5 @@
 "use client";
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 import BrandKitSetupBanner from "@/components/brand-kit/BrandKitSetupBanner";
 import { Button } from "@/components/ui/button";
 import {
@@ -110,21 +110,24 @@ export default function Dashboard() {
   // Single query for templates - gets both list and count
   const { data: templatesData, isLoading: templatesLoading } = trpc.template.list.useQuery(
     { limit: 6 },
-    { enabled: !!displayOrg?.id }
+    { enabled: !!activeOrganization?.id }
   );
 
-  // Invalidate templates when org changes
+  // Invalidate templates only when org actually changes (not on mount)
+  const prevOrgIdRef = useRef<string | undefined>(undefined);
   useEffect(() => {
-    if (displayOrg?.id) {
+    if (activeOrganization?.id && prevOrgIdRef.current && prevOrgIdRef.current !== activeOrganization.id) {
       utils.template.list.invalidate();
     }
-  }, [displayOrg?.id, utils.template.list]);
+    prevOrgIdRef.current = activeOrganization?.id;
+  }, [activeOrganization?.id, utils]);
 
   const templates = templatesData?.templates ?? [];
   const templateCount = templatesData?.totalCount ?? 0;
   
-  // Combined loading state
-  const isDataLoading = orgLoading || templatesLoading;
+  // Combined loading state - also loading if activeOrganization isn't set yet but we have orgs
+  const isQueryPending = !activeOrganization?.id && organizations.length > 0;
+  const isDataLoading = orgLoading || templatesLoading || isQueryPending;
 
   if (!displayOrg && !orgLoading) {
     return (

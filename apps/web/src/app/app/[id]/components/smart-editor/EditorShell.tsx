@@ -38,15 +38,21 @@ export function EditorShell({
 }: EditorShellProps) {
   const { actions: editorActions, state: editorState } = useEditorMode();
   
-  // Local state for accumulated changes
+  // Local state for accumulated changes (within current session for this element)
   const [localUpdates, setLocalUpdates] = useState<ElementUpdates>({});
   
+  // Get pending changes for the current element from the Map
+  const elementPendingChanges = elementData?.id 
+    ? editorActions.getPendingChangesForElement(elementData.id) 
+    : undefined;
+
   // Compute current styles with local updates applied
   const currentStyles = useMemo(() => {
     if (!elementData) return {};
     
     const baseStyles = getCurrentStyles(elementData, styleDefinitions);
-    const pendingStyles = editorState.pendingChanges?.updates.styles || {};
+    // Apply pending styles from the Map for this element
+    const pendingStyles = elementPendingChanges?.updates.styles || {};
     const localStyles = localUpdates.styles || {};
     
     return {
@@ -54,27 +60,28 @@ export function EditorShell({
       ...pendingStyles,
       ...localStyles,
     };
-  }, [elementData, styleDefinitions, editorState.pendingChanges, localUpdates.styles]);
+  }, [elementData, styleDefinitions, elementPendingChanges, localUpdates.styles]);
 
   // Compute current content with local updates applied
   const currentContent = useMemo(() => {
     if (!elementData) return "";
     
-    // Priority: local updates > pending changes > original
+    // Priority: local updates > pending changes from Map > original
     if (localUpdates.content !== undefined) {
       return localUpdates.content;
     }
-    if (editorState.pendingChanges?.updates.content !== undefined) {
-      return editorState.pendingChanges.updates.content;
+    if (elementPendingChanges?.updates.content !== undefined) {
+      return elementPendingChanges.updates.content;
     }
     return elementData.content;
-  }, [elementData, editorState.pendingChanges, localUpdates.content]);
+  }, [elementData, elementPendingChanges, localUpdates.content]);
 
   // Compute current attributes with local updates applied
   const currentAttributes = useMemo(() => {
     if (!elementData) return {};
     
-    const pendingAttrs = editorState.pendingChanges?.updates.attributes || {};
+    // Apply pending attributes from the Map for this element
+    const pendingAttrs = elementPendingChanges?.updates.attributes || {};
     const localAttrs = localUpdates.attributes || {};
     
     return {
@@ -82,7 +89,7 @@ export function EditorShell({
       ...pendingAttrs,
       ...localAttrs,
     };
-  }, [elementData, editorState.pendingChanges, localUpdates.attributes]);
+  }, [elementData, elementPendingChanges, localUpdates.attributes]);
 
   // Reset local updates when element changes
   useEffect(() => {

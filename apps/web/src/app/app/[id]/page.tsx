@@ -35,65 +35,72 @@ function EditorContent() {
   const [initialPrompt] = React.useState<string | null>(promptFromStorage);
   const [isSaving, setIsSaving] = useState(false);
 
-  // Check if there are pending changes
-  const hasPendingChanges = editorState.pendingChanges !== null;
+  // Check if there are ANY pending changes across all elements
+  const hasPendingChanges = editorState.allPendingChanges.size > 0;
 
   // Get active node for save operations
   const activeNode =
     canvasState.nodes.find((n) => n.data.isCurrent) ||
     canvasState.nodes.find((n) => n.type === "template");
 
-  // Handle save design changes - persists to database
+  // Handle save design changes - persists ALL pending changes to database
   const handleSaveChanges = useCallback(async () => {
-    if (!editorState.pendingChanges || !activeNode) return;
+    const allChanges = editorActions.getAllPendingChanges();
+    if (allChanges.size === 0 || !activeNode) return;
 
     setIsSaving(true);
 
     try {
       const { updateReactEmailCode } = await import("@/lib/react-email");
 
-      // Parse element data
-      const elementData: ElementData = JSON.parse(
-        editorState.pendingChanges.originalElement
-      );
-
-      const currentCode = (activeNode.data as TemplateNodeData).template
+      let currentCode = (activeNode.data as TemplateNodeData).template
         .reactEmailCode!;
-      const currentStyleDefs =
+      let currentStyleDefs =
         (activeNode.data as TemplateNodeData).template.styleDefinitions || {};
 
-      // Update React Email code based on pending changes
-      const { updatedCode, updatedStyleDefinitions } = updateReactEmailCode(
+      // Apply ALL pending changes sequentially
+      for (const [_elementId, pendingChange] of allChanges) {
+        // Parse element data
+        const elementData: ElementData = JSON.parse(
+          pendingChange.originalElement
+        );
+
+        // Update React Email code based on this element's changes
+        const { updatedCode, updatedStyleDefinitions } = updateReactEmailCode(
+          currentCode,
+          elementData,
+          pendingChange.updates,
+          currentStyleDefs
+        );
+
+        // Use the updated code/styles as the base for the next iteration
+        currentCode = updatedCode;
+        currentStyleDefs = updatedStyleDefinitions;
+      }
+
+      // Save the final accumulated result to database
+      await templateActions.saveReactEmailCode(
         currentCode,
-        elementData,
-        editorState.pendingChanges.updates,
         currentStyleDefs
       );
 
-      // Save to database and revalidate
-      await templateActions.saveReactEmailCode(
-        updatedCode,
-        updatedStyleDefinitions
-      );
-
-      // Clear pending changes after successful save
-      editorActions.clearPendingChanges();
+      // Clear ALL pending changes after successful save
+      editorActions.clearAllPendingChanges();
     } catch (error) {
       console.error("Failed to save design changes:", error);
     } finally {
       setIsSaving(false);
     }
   }, [
-    editorState.pendingChanges,
+    editorActions,
     activeNode,
     templateActions,
-    editorActions,
   ]);
 
-  // Handle reset changes
+  // Handle reset changes - clears ALL pending changes
   const handleResetChanges = useCallback(() => {
-    // Clear pending changes
-    editorActions.clearPendingChanges();
+    // Clear ALL pending changes
+    editorActions.clearAllPendingChanges();
 
     // Force the preview to re-render with original content
     // This reverts any live DOM changes made during editing

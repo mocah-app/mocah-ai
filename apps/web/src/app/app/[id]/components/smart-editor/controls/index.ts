@@ -9,4 +9,5 @@ export { ToggleGroupControl } from './ToggleGroupControl';
 export { ColorControl } from './ColorControl';
 export { TextInputControl } from './TextInputControl';
 export { TextareaControl } from './TextareaControl';
+export { SpacingControl } from './SpacingControl';
 

@@ -13,6 +13,9 @@ export interface PendingElementChanges {
   originalElement: string; // JSON string of ElementData
 }
 
+// Map of elementId -> pending changes for that element
+export type PendingChangesMap = Map<string, PendingElementChanges>;
+
 interface EditorModeState {
   globalMode: EditorMode;
   nodeOverrides: Record<string, EditorMode>;
@@ -20,7 +23,8 @@ interface EditorModeState {
   selectedNode: string | null;
   codeTab: CodeTab;
   designMode: boolean; // Controls whether elements are selectable
-  pendingChanges: PendingElementChanges | null; // Unsaved changes
+  pendingChanges: PendingElementChanges | null; // Current element's pending changes (for backward compat)
+  allPendingChanges: PendingChangesMap; // All pending changes across all elements
   previewRenderKey: number; // Increment to force preview re-render
 }
 
@@ -36,7 +40,11 @@ interface EditorModeActions {
   setPendingChanges: (changes: PendingElementChanges | null) => void;
   updatePendingChanges: (updates: ElementUpdates) => void;
   hasPendingChanges: () => boolean;
+  hasAnyPendingChanges: () => boolean;
   clearPendingChanges: () => void;
+  clearAllPendingChanges: () => void;
+  getAllPendingChanges: () => PendingChangesMap;
+  getPendingChangesForElement: (elementId: string) => PendingElementChanges | undefined;
   // Preview re-render
   refreshPreview: () => void;
 }
@@ -67,6 +75,7 @@ export function EditorModeProvider({ children }: { children: React.ReactNode }) 
     codeTab: "react",
     designMode: false, // Default: elements not selectable
     pendingChanges: null,
+    allPendingChanges: new Map(),
     previewRenderKey: 0,
   });
 
@@ -130,17 +139,27 @@ export function EditorModeProvider({ children }: { children: React.ReactNode }) 
     setState((prev) => {
       if (!prev.selectedElement) return prev;
 
-      const existingChanges = prev.pendingChanges;
+      // Parse the element ID from the selected element JSON
+      let elementId: string;
+      try {
+        const parsed = JSON.parse(prev.selectedElement);
+        elementId = parsed.id;
+      } catch {
+        elementId = prev.selectedElement;
+      }
+
+      // Get existing changes for this specific element from the Map
+      const existingElementChanges = prev.allPendingChanges.get(elementId);
       
-      // Merge with existing pending changes
+      // Merge with existing pending changes for THIS element
       const mergedUpdates: ElementUpdates = {
-        content: updates.content ?? existingChanges?.updates.content,
+        content: updates.content ?? existingElementChanges?.updates.content,
         styles: {
-          ...existingChanges?.updates.styles,
+          ...existingElementChanges?.updates.styles,
           ...updates.styles,
         },
         attributes: {
-          ...existingChanges?.updates.attributes,
+          ...existingElementChanges?.updates.attributes,
           ...updates.attributes,
         },
       };
@@ -153,27 +172,68 @@ export function EditorModeProvider({ children }: { children: React.ReactNode }) 
         delete mergedUpdates.attributes;
       }
 
+      const newPendingChange: PendingElementChanges = {
+        elementId,
+        updates: mergedUpdates,
+        originalElement: existingElementChanges?.originalElement || prev.selectedElement,
+      };
+
+      // Update the Map with changes for this element
+      const newAllPendingChanges = new Map(prev.allPendingChanges);
+      newAllPendingChanges.set(elementId, newPendingChange);
+
       return {
         ...prev,
-        pendingChanges: {
-          elementId: existingChanges?.elementId || prev.selectedElement,
-          updates: mergedUpdates,
-          originalElement: existingChanges?.originalElement || prev.selectedElement,
-        },
+        pendingChanges: newPendingChange, // Keep backward compat for current element
+        allPendingChanges: newAllPendingChanges,
       };
     });
   }, []);
 
+  // Check if current element has pending changes
   const hasPendingChanges = useCallback(() => {
     return state.pendingChanges !== null;
   }, [state.pendingChanges]);
 
+  // Check if ANY element has pending changes
+  const hasAnyPendingChanges = useCallback(() => {
+    return state.allPendingChanges.size > 0;
+  }, [state.allPendingChanges]);
+
+  // Clear pending changes for current element only
   const clearPendingChanges = useCallback(() => {
+    setState((prev) => {
+      if (!prev.pendingChanges) return prev;
+      
+      const newAllPendingChanges = new Map(prev.allPendingChanges);
+      newAllPendingChanges.delete(prev.pendingChanges.elementId);
+      
+      return {
+        ...prev,
+        pendingChanges: null,
+        allPendingChanges: newAllPendingChanges,
+      };
+    });
+  }, []);
+
+  // Clear ALL pending changes across all elements
+  const clearAllPendingChanges = useCallback(() => {
     setState((prev) => ({
       ...prev,
       pendingChanges: null,
+      allPendingChanges: new Map(),
     }));
   }, []);
+
+  // Get all pending changes
+  const getAllPendingChanges = useCallback(() => {
+    return state.allPendingChanges;
+  }, [state.allPendingChanges]);
+
+  // Get pending changes for a specific element
+  const getPendingChangesForElement = useCallback((elementId: string) => {
+    return state.allPendingChanges.get(elementId);
+  }, [state.allPendingChanges]);
 
   const refreshPreview = useCallback(() => {
     setState((prev) => ({
@@ -225,7 +285,11 @@ export function EditorModeProvider({ children }: { children: React.ReactNode }) 
     setPendingChanges,
     updatePendingChanges,
     hasPendingChanges,
+    hasAnyPendingChanges,
     clearPendingChanges,
+    clearAllPendingChanges,
+    getAllPendingChanges,
+    getPendingChangesForElement,
     refreshPreview,
   };
 

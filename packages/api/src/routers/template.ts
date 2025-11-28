@@ -152,17 +152,17 @@ export const templateRouter = router({
       );
 
       // Log complete AI request details
-      logger.info("\n" + "=".repeat(80));
-      logger.info("🤖 AI GENERATION REQUEST");
-      logger.info("=".repeat(80));
-      logger.info("\n📝 USER PROMPT:", { prompt: input.prompt });
-      logger.info("\n🎨 BRAND KIT:", { brandKit: organization?.brandKit || {} });
-      logger.info("\n📋 COMPLETE SYSTEM PROMPT:", { systemPrompt: prompt });
-      logger.info("\n🔧 GENERATION CONFIG:", {
-        model: TEMPLATE_GENERATION_MODEL,
-        schemaFields: Object.keys(reactEmailGenerationSchema.shape),
-      });
-      logger.info("\n" + "=".repeat(80) + "\n");
+      // logger.info("\n" + "=".repeat(80));
+      // logger.info("🤖 AI GENERATION REQUEST");
+      // logger.info("=".repeat(80));
+      // logger.info("\n📝 USER PROMPT:", { prompt: input.prompt });
+      // logger.info("\n🎨 BRAND KIT:", { brandKit: organization?.brandKit || {} });
+      // logger.info("\n📋 COMPLETE SYSTEM PROMPT:", { systemPrompt: prompt });
+      // logger.info("\n🔧 GENERATION CONFIG:", {
+      //   model: TEMPLATE_GENERATION_MODEL,
+      //   schemaFields: Object.keys(reactEmailGenerationSchema.shape),
+      // });
+      // logger.info("\n" + "=".repeat(80) + "\n");
 
       const result = await aiClient.generateStructured(
         reactEmailGenerationSchema,

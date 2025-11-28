@@ -12,11 +12,16 @@ import { toast } from "sonner";
 
 export default function NewTemplatePage() {
   const router = useRouter();
+  const utils = trpc.useUtils();
   const { activeOrganization } = useOrganization();
   const { setPrompt: setCreationPrompt } = useTemplateCreation();
   const [prompt, setPrompt] = useState("");
 
-  const createSkeletonMutation = trpc.template.create.useMutation();
+  const createSkeletonMutation = trpc.template.create.useMutation({
+    onSuccess: () => {
+      utils.template.list.invalidate();
+    },
+  });
 
   const handleGenerate = () => {
     if (!prompt.trim()) {

@@ -5,6 +5,13 @@ import type { AppRouter } from "@mocah/api";
 import { toast } from "sonner";
 
 export const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      staleTime: 1000 * 60, // 1 minute before data is considered stale
+      gcTime: 1000 * 60 * 5, // 5 minutes before unused data is garbage collected
+      refetchOnWindowFocus: false, // Don't refetch on window focus
+    },
+  },
   queryCache: new QueryCache({
     onError: (error) => {
       toast.error(error.message, {

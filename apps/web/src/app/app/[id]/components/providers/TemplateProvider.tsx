@@ -222,10 +222,21 @@ export function TemplateProvider({
     }
   }, [partialTemplate, isGenerating]);
 
+  // tRPC utils for cache invalidation
+  const utils = trpc.useUtils();
+
   // tRPC mutations
   const regenerateMutation = trpc.template.regenerate.useMutation();
-  const generateMutation = trpc.template.generate.useMutation();
-  const createMutation = trpc.template.create.useMutation();
+  const generateMutation = trpc.template.generate.useMutation({
+    onSuccess: () => {
+      utils.template.list.invalidate();
+    },
+  });
+  const createMutation = trpc.template.create.useMutation({
+    onSuccess: () => {
+      utils.template.list.invalidate();
+    },
+  });
   const updateMutation = trpc.template.update.useMutation();
 
   // tRPC queries - fetch template data with retry for optimistic creation
