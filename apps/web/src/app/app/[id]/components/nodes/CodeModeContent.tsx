@@ -7,7 +7,7 @@ import type { CodeEditorRef } from "../code-editor/CodeEditor";
 import { HtmlCodeViewer } from "../code-editor/HtmlCodeViewer";
 import { CodeAlertsDrawer } from "../code-editor/CodeAlertsDrawer";
 import { Button } from "@/components/ui/button";
-import { Copy, RefreshCw } from "lucide-react";
+import { Copy, RefreshCw, AlertTriangle, Save, RotateCcw } from "lucide-react";
 import Loader from "@/components/loader";
 import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
@@ -21,9 +21,20 @@ interface CodeModeContentProps {
     styleDefinitions?: Record<string, React.CSSProperties>;
   };
   nodeId: string;
+  hasUnsavedSmartEditorChanges?: boolean;
+  onSaveSmartEditorChanges?: () => void;
+  onResetSmartEditorChanges?: () => void;
+  isSaving?: boolean;
 }
 
-export function CodeModeContent({ template, nodeId }: CodeModeContentProps) {
+export function CodeModeContent({
+  template,
+  nodeId,
+  hasUnsavedSmartEditorChanges = false,
+  onSaveSmartEditorChanges,
+  onResetSmartEditorChanges,
+  isSaving = false,
+}: CodeModeContentProps) {
   const [activeTab, setActiveTab] = useState<"react" | "html">("react");
   // Cache rendered HTML to prevent unnecessary re-renders when switching tabs
   const [cachedHtml, setCachedHtml] = useState<{
@@ -68,15 +79,18 @@ export function CodeModeContent({ template, nodeId }: CodeModeContentProps) {
   }, [reactEmailCode]);
 
   // Handle validation state updates from the editor
-  const handleValidationStateChange = useCallback((errors: string[], warnings: string[]) => {
-    setValidationErrors(errors);
-    setValidationWarnings(warnings);
-  }, []);
+  const handleValidationStateChange = useCallback(
+    (errors: string[], warnings: string[]) => {
+      setValidationErrors(errors);
+      setValidationWarnings(warnings);
+    },
+    []
+  );
 
   const totalAlerts = validationErrors.length + validationWarnings.length;
 
   return (
-    <div className="h-full flex flex-col">
+    <div className="h-full flex flex-col relative">
       {/* Tab Selector */}
       <div className="flex items-center justify-between border-b border-border bg-muted/50 px-3 py-2">
         <div className="flex items-center gap-2">
@@ -100,17 +114,19 @@ export function CodeModeContent({ template, nodeId }: CodeModeContentProps) {
 
         {/* Tab actions */}
         <div className="flex items-center gap-2">
-          <Button 
-            variant="outline" 
-            size="sm" 
+          <Button
+            variant="outline"
+            size="sm"
             className="text-xs relative"
             onClick={() => setIsAlertsDrawerOpen(true)}
           >
             Alerts
             {totalAlerts > 0 && (
-              <Badge 
+              <Badge
                 className="absolute -top-1 -right-2 h-4 min-w-4 px-1 text-[9px] font-medium"
-                variant={validationErrors.length > 0 ? "destructive" : "default"}
+                variant={
+                  validationErrors.length > 0 ? "destructive" : "default"
+                }
               >
                 {totalAlerts}
               </Badge>
@@ -186,6 +202,7 @@ export function CodeModeContent({ template, nodeId }: CodeModeContentProps) {
             styleDefinitions={template.styleDefinitions}
             nodeId={nodeId}
             onValidationStateChange={handleValidationStateChange}
+            readOnly={hasUnsavedSmartEditorChanges}
           />
         ) : (
           <HtmlCodeViewer
@@ -213,6 +230,45 @@ export function CodeModeContent({ template, nodeId }: CodeModeContentProps) {
         reactEmailCode={reactEmailCode}
         onGoToLine={handleGoToLine}
       />
+
+      {/* Overlay when smart editor has unsaved changes */}
+      {hasUnsavedSmartEditorChanges && (
+        <div className="absolute top-16 left-1/2 -translate-x-1/2 w-full z-50 flex items-center justify-center">
+          <div className="bg-card border border-border rounded-lg shadow-xl p-6 max-w-md mx-4 space-y-4">
+            <div className="flex items-center gap-3">
+              <div className="shrink-0 w-10 h-10 rounded-full bg-destructive/10 flex items-center justify-center">
+                <AlertTriangle className="h-5 w-5 text-destructive" />
+              </div>
+              <div>
+                <h3 className="font-semibold text-foreground">
+                  Smart Changes to edit
+                </h3>
+                <p className="text-sm text-muted-foreground">
+                  You have unsaved changes from the design editor
+                </p>
+              </div>
+            </div>
+
+            <div className="flex items-center justify-end gap-3 pt-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={onResetSmartEditorChanges}
+                disabled={isSaving}
+              >
+                Reset
+              </Button>
+              <Button
+                size="sm"
+                onClick={onSaveSmartEditorChanges}
+                disabled={isSaving}
+              >
+                {isSaving ? <Loader /> : <span>Save</span>}
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

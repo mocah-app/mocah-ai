@@ -7,6 +7,7 @@ import {
   useTemplate,
 } from "./components/providers/TemplateProvider";
 import { EditorModeProvider } from "./components/providers/EditorModeProvider";
+import { DesignChangesProvider } from "./components/providers/DesignChangesProvider";
 import { InfiniteCanvas } from "./components/canvas/InfiniteCanvas";
 import { SmartEditorPanel } from "./components/floating-panels/SmartEditorPanel";
 import { ChatPanel } from "./components/floating-panels/ChatPanel";
@@ -35,8 +36,16 @@ function EditorContent() {
   const [initialPrompt] = React.useState<string | null>(promptFromStorage);
   const [isSaving, setIsSaving] = useState(false);
 
-  // Check if there are ANY pending changes across all elements
-  const hasPendingChanges = editorState.allPendingChanges.size > 0;
+  // Check if there are ANY pending changes across all elements (smart editor)
+  const hasSmartEditorChanges = editorState.allPendingChanges.size > 0;
+  // Check if code editor has unsaved changes
+  const hasCodeEditorChanges = templateState.isDirty && !hasSmartEditorChanges;
+  // Check if code editor overlay is handling the save (code mode + smart editor changes)
+  const isCodeModeWithSmartEditorChanges = editorState.globalMode === "code" && hasSmartEditorChanges;
+  // Show SaveDesignEdit bar only when overlay is NOT handling the save
+  const hasPendingChanges = isCodeModeWithSmartEditorChanges 
+    ? false  // Overlay handles save in code mode
+    : (hasSmartEditorChanges || hasCodeEditorChanges);
 
   // Get active node for save operations
   const activeNode =
@@ -45,6 +54,83 @@ function EditorContent() {
 
   // Handle save design changes - persists ALL pending changes to database
   const handleSaveChanges = useCallback(async () => {
+    setIsSaving(true);
+
+    try {
+      const allChanges = editorActions.getAllPendingChanges();
+      
+      // Handle smart editor changes
+      if (allChanges.size > 0 && activeNode) {
+        const { updateReactEmailCode } = await import("@/lib/react-email");
+
+        let currentCode = (activeNode.data as TemplateNodeData).template
+          .reactEmailCode!;
+        let currentStyleDefs =
+          (activeNode.data as TemplateNodeData).template.styleDefinitions || {};
+
+        // Apply ALL pending changes sequentially
+        for (const [_elementId, pendingChange] of allChanges) {
+          // Parse element data
+          const elementData: ElementData = JSON.parse(
+            pendingChange.originalElement
+          );
+
+          // Update React Email code based on this element's changes
+          const { updatedCode, updatedStyleDefinitions } = updateReactEmailCode(
+            currentCode,
+            elementData,
+            pendingChange.updates,
+            currentStyleDefs
+          );
+
+          // Use the updated code/styles as the base for the next iteration
+          currentCode = updatedCode;
+          currentStyleDefs = updatedStyleDefinitions;
+        }
+
+        // Save the final accumulated result to database
+        await templateActions.saveReactEmailCode(
+          currentCode,
+          currentStyleDefs
+        );
+
+        // Clear ALL pending changes after successful save
+        editorActions.clearAllPendingChanges();
+      } 
+      // Handle code editor changes (when no smart editor changes)
+      else if (templateState.isDirty) {
+        await templateActions.saveTemplate();
+      }
+    } catch (error) {
+      console.error("Failed to save changes:", error);
+    } finally {
+      setIsSaving(false);
+    }
+  }, [
+    editorActions,
+    activeNode,
+    templateActions,
+    templateState.isDirty,
+  ]);
+
+  // Handle reset changes - clears ALL pending changes (no API calls)
+  const handleResetChanges = useCallback(() => {
+    // Handle smart editor changes
+    if (editorState.allPendingChanges.size > 0) {
+      // Clear ALL pending changes
+      editorActions.clearAllPendingChanges();
+      // Force the preview to re-render with original content
+      editorActions.refreshPreview();
+    }
+    
+    // Handle code editor changes - reset to last saved version (no API call)
+    if (templateState.isDirty) {
+      templateActions.resetReactEmailCode();
+    }
+  }, [editorActions, editorState.allPendingChanges.size, templateState.isDirty, templateActions]);
+
+  // Handle save for smart editor changes only (used by code editor overlay)
+  const handleSaveSmartEditorChanges = useCallback(async () => {
     const allChanges = editorActions.getAllPendingChanges();
     if (allChanges.size === 0 || !activeNode) return;
 
@@ -60,12 +146,10 @@ function EditorContent() {
 
       // Apply ALL pending changes sequentially
       for (const [_elementId, pendingChange] of allChanges) {
-        // Parse element data
         const elementData: ElementData = JSON.parse(
           pendingChange.originalElement
         );
 
-        // Update React Email code based on this element's changes
         const { updatedCode, updatedStyleDefinitions } = updateReactEmailCode(
           currentCode,
           elementData,
@@ -73,37 +157,25 @@ function EditorContent() {
           currentStyleDefs
         );
 
-        // Use the updated code/styles as the base for the next iteration
         currentCode = updatedCode;
         currentStyleDefs = updatedStyleDefinitions;
       }
 
-      // Save the final accumulated result to database
-      await templateActions.saveReactEmailCode(
-        currentCode,
-        currentStyleDefs
-      );
+      // Save to database
+      await templateActions.saveReactEmailCode(currentCode, currentStyleDefs);
 
-      // Clear ALL pending changes after successful save
+      // Clear pending changes
       editorActions.clearAllPendingChanges();
     } catch (error) {
-      console.error("Failed to save design changes:", error);
+      console.error("Failed to save smart editor changes:", error);
     } finally {
       setIsSaving(false);
     }
-  }, [
-    editorActions,
-    activeNode,
-    templateActions,
-  ]);
+  }, [editorActions, activeNode, templateActions]);
 
-  // Handle reset changes - clears ALL pending changes
-  const handleResetChanges = useCallback(() => {
-    // Clear ALL pending changes
+  // Handle reset for smart editor changes only (used by code editor overlay)
+  const handleResetSmartEditorChanges = useCallback(() => {
     editorActions.clearAllPendingChanges();
-
-    // Force the preview to re-render with original content
-    // This reverts any live DOM changes made during editing
     editorActions.refreshPreview();
   }, [editorActions]);
 
@@ -281,53 +353,59 @@ function EditorContent() {
   );
 
   return (
-    <div className="h-screen w-full relative overflow-hidden flex">
-      <div className="flex h-dvh">
-        <FloatingNav activePanel={activePanel} onTogglePanel={handlePanelToggle} />
-        <ChatPanel
-          isOpen={activePanel === "chat"}
-          onClose={() => {
-            setActivePanel(null);
-          }}
-          initialPrompt={initialPrompt || undefined}
-          onPromptConsumed={clearPrompt}
-        />
-        <SmartEditorPanel
-          isOpen={activePanel === "editor"}
-          onClose={() => {
-            setActivePanel(null);
-            editorActions.selectElement(null);
-            editorActions.setDesignMode(false);
-          }}
-        />
-      </div>
-      <InfiniteCanvas />
-      
-      {/* Loading overlay when opening template from dashboard */}
-      {isLoadingTemplate && !hasTemplateNode && (
-        <div className="absolute inset-0 z-50 bg-background/80 backdrop-blur-sm flex items-center justify-center">
-          <div className="relative w-full h-full">
-            <EdgeRayLoader />
-            <div className="absolute inset-0 flex flex-col items-center justify-center p-12">
-              <div className="relative mb-4">
-                <MocahLoadingIcon isLoading={true} size="sm" />
+    <DesignChangesProvider
+      onSaveSmartEditorChanges={handleSaveSmartEditorChanges}
+      onResetSmartEditorChanges={handleResetSmartEditorChanges}
+      isSaving={isSaving}
+    >
+      <div className="h-screen w-full relative overflow-hidden flex">
+        <div className="flex h-dvh">
+          <FloatingNav activePanel={activePanel} onTogglePanel={handlePanelToggle} />
+          <ChatPanel
+            isOpen={activePanel === "chat"}
+            onClose={() => {
+              setActivePanel(null);
+            }}
+            initialPrompt={initialPrompt || undefined}
+            onPromptConsumed={clearPrompt}
+          />
+          <SmartEditorPanel
+            isOpen={activePanel === "editor"}
+            onClose={() => {
+              setActivePanel(null);
+              editorActions.selectElement(null);
+              editorActions.setDesignMode(false);
+            }}
+          />
+        </div>
+        <InfiniteCanvas />
+        
+        {/* Loading overlay when opening template from dashboard */}
+        {isLoadingTemplate && !hasTemplateNode && (
+          <div className="absolute inset-0 z-50 bg-background/80 backdrop-blur-sm flex items-center justify-center">
+            <div className="relative w-full h-full">
+              <EdgeRayLoader />
+              <div className="absolute inset-0 flex flex-col items-center justify-center p-12">
+                <div className="relative mb-4">
+                  <MocahLoadingIcon isLoading={true} size="sm" />
+                </div>
+                <p className="text-muted-foreground text-sm">
+                  Loading template...
+                </p>
               </div>
-              <p className="text-muted-foreground text-sm">
-                Loading template...
-              </p>
             </div>
           </div>
-        </div>
-      )}
-      
-      {/* Floating save bar for unsaved design changes */}
-      <SaveDesignEdit
-        isVisible={hasPendingChanges}
-        onSave={handleSaveChanges}
-        onReset={handleResetChanges}
-        isSaving={isSaving}
-      />
-    </div>
+        )}
+        
+        {/* Floating save bar for unsaved design changes */}
+        <SaveDesignEdit
+          isVisible={hasPendingChanges}
+          onSave={handleSaveChanges}
+          onReset={handleResetChanges}
+          isSaving={isSaving}
+        />
+      </div>
+    </DesignChangesProvider>
   );
 }
 

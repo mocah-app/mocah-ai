@@ -55,6 +55,7 @@ interface TemplateActions {
   // React Email specific actions
   updateReactEmailCode: (code: string, styleDefinitions?: Record<string, React.CSSProperties>) => void;
   saveReactEmailCode: (code: string, styleDefinitions?: Record<string, React.CSSProperties>) => Promise<void>;
+  resetReactEmailCode: () => void;
   refetchTemplate: () => Promise<void>;
 }
 
@@ -470,6 +471,16 @@ export function TemplateProvider({
     }));
   }, []);
 
+  // Reset React Email code to the last saved version (no API call)
+  const resetReactEmailCode = useCallback(() => {
+    setState((prev) => ({
+      ...prev,
+      reactEmailCode: prev.currentTemplate?.reactEmailCode || null,
+      styleDefinitions: (prev.currentTemplate?.styleDefinitions as Record<string, React.CSSProperties>) || {},
+      isDirty: false,
+    }));
+  }, []);
+
   // Save React Email code to database
   const saveReactEmailCode = useCallback(async (
     code: string,
@@ -563,6 +574,7 @@ export function TemplateProvider({
     setIsDirty,
     updateReactEmailCode,
     saveReactEmailCode,
+    resetReactEmailCode,
     refetchTemplate,
   };
 

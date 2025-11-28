@@ -4,6 +4,7 @@ import { Handle, Position } from "@xyflow/react";
 import { Plus } from "lucide-react";
 import React from "react";
 import { useEditorMode } from "../providers/EditorModeProvider";
+import { useDesignChanges } from "../providers/DesignChangesProvider";
 import { CodeModeContent } from "./CodeModeContent";
 import { NodeHeader } from "./NodeHeader";
 import { ViewModeContent } from "./ViewModeContent";
@@ -38,7 +39,11 @@ interface TemplateNodeProps {
 export function TemplateNode({ data, id }: TemplateNodeProps) {
   const nodeId = id;
   const { actions, state } = useEditorMode();
+  const { onSaveSmartEditorChanges, onResetSmartEditorChanges, isSaving } = useDesignChanges();
   const mode = actions.getNodeMode(nodeId);
+  
+  // Code editor should be blocked when smart editor has pending changes
+  const hasSmartEditorPendingChanges = state.allPendingChanges.size > 0;
 
   return (
     <div className="bg-background rounded-lg shadow-lg border border-border w-[600px] relative">
@@ -74,7 +79,14 @@ export function TemplateNode({ data, id }: TemplateNodeProps) {
           {mode === "view" ? (
             <ViewModeContent template={data.template} />
           ) : (
-            <CodeModeContent template={data.template} nodeId={nodeId} />
+            <CodeModeContent 
+              template={data.template} 
+              nodeId={nodeId} 
+              hasUnsavedSmartEditorChanges={hasSmartEditorPendingChanges}
+              onSaveSmartEditorChanges={onSaveSmartEditorChanges}
+              onResetSmartEditorChanges={onResetSmartEditorChanges}
+              isSaving={isSaving}
+            />
           )}
         </div>
       )}

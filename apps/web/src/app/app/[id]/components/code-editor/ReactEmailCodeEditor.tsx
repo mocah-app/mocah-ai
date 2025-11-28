@@ -11,6 +11,7 @@ interface ReactEmailCodeEditorProps {
   styleDefinitions?: Record<string, React.CSSProperties>;
   nodeId: string;
   onValidationStateChange?: (errors: string[], warnings: string[]) => void;
+  readOnly?: boolean;
 }
 
 export const ReactEmailCodeEditor = forwardRef<CodeEditorRef, ReactEmailCodeEditorProps>(
@@ -19,6 +20,7 @@ export const ReactEmailCodeEditor = forwardRef<CodeEditorRef, ReactEmailCodeEdit
     styleDefinitions,
     nodeId,
     onValidationStateChange,
+    readOnly = false,
   }, ref) {
   const { actions: canvasActions } = useCanvas();
   const { actions: templateActions } = useTemplate();
@@ -66,6 +68,7 @@ export const ReactEmailCodeEditor = forwardRef<CodeEditorRef, ReactEmailCodeEdit
           onChange={handleCodeChange}
           onValidationChange={handleValidationChange}
           language="typescript"
+          readOnly={readOnly}
         />
       </div>
     </div>

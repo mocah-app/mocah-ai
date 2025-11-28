@@ -5,6 +5,7 @@ import Editor from '@monaco-editor/react';
 import type { editor } from 'monaco-editor';
 import { loader } from '@monaco-editor/react';
 import { validateReactEmailCode } from '@/lib/react-email';
+import Loader from '@/components/loader';
 
 interface CodeEditorProps {
   code: string;
@@ -122,6 +123,7 @@ export const CodeEditor = forwardRef<CodeEditorRef, CodeEditorProps>(function Co
         language="typescript"
         path="email-template.tsx"
         value={code}
+        loading={<div className="flex h-full items-center justify-center bg-background"><Loader /></div>}
         onChange={handleEditorChange}
         onMount={handleEditorDidMount}
         theme="vs-dark"
