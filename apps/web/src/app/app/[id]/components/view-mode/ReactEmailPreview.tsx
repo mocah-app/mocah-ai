@@ -4,9 +4,33 @@ import React, { useState, useEffect, useRef, useCallback } from "react";
 import {
   injectElementIds,
   renderReactEmailClientSide,
+  clearRenderCache,
+  RenderError,
+  RenderErrorCode,
 } from "@/lib/react-email";
 import type { ElementData } from "@/lib/react-email";
 import Loader from "@/components/loader";
+
+/** Map error codes to user-friendly messages */
+function getErrorMessage(error: unknown): string {
+  if (error instanceof RenderError) {
+    switch (error.code) {
+      case RenderErrorCode.TIMEOUT:
+        return "Preview took too long to render. Try simplifying your template.";
+      case RenderErrorCode.COMPONENT_NOT_FOUND:
+        return "No valid component found. Make sure you export a default function.";
+      case RenderErrorCode.BABEL_TRANSFORM_FAILED:
+        return "Syntax error in your code. Check for typos or invalid JSX.";
+      case RenderErrorCode.INPUT_TOO_LARGE:
+        return "Template is too large to render. Try reducing the code size.";
+      case RenderErrorCode.BABEL_UNAVAILABLE:
+        return "Rendering engine not available. Please refresh the page.";
+      default:
+        return error.message;
+    }
+  }
+  return error instanceof Error ? error.message : "Rendering failed";
+}
 
 interface ReactEmailPreviewProps {
   reactEmailCode: string;
@@ -121,6 +145,11 @@ export const ReactEmailPreview = ({
       setError(null);
 
       try {
+        // If renderKey changed, clear cache to force fresh render
+        if (renderKey > 0) {
+          clearRenderCache();
+        }
+
         // If selection is enabled, inject element IDs
         const codeToRender = enableSelection
           ? injectElementIds(reactEmailCode)
@@ -131,7 +160,7 @@ export const ReactEmailPreview = ({
         setHtml(renderedHtml);
       } catch (err) {
         console.error("Failed to render React Email:", err);
-        setError(err instanceof Error ? err.message : "Rendering failed");
+        setError(getErrorMessage(err));
       } finally {
         setIsLoading(false);
       }

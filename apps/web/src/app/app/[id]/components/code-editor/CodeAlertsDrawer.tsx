@@ -19,7 +19,6 @@ import {
   AlertCircle,
   ExternalLink,
   Wand2,
-  Loader2,
   CheckCircle2,
   Mail,
   Shield,
@@ -27,6 +26,7 @@ import {
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useTemplate } from "../providers/TemplateProvider";
+import Loader from "@/components/loader";
 
 interface AlertItem {
   id: string;
@@ -381,7 +381,7 @@ Fix all issues in a single pass.`;
                 >
                   {fixingIssueId === "all" ? (
                     <>
-                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                      <Loader />
                       Fixing all issues...
                     </>
                   ) : (

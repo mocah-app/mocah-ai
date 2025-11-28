@@ -4,7 +4,6 @@ import { cn } from "@/lib/utils";
 import {
   Code2,
   FileText,
-  Loader2,
   MessageCircle,
   Send,
   StopCircleIcon,
@@ -17,6 +16,7 @@ import { useTemplate, GENERATION_PHASE_MESSAGES } from "../providers/TemplatePro
 import { Prism as SyntaxHighlighter } from "react-syntax-highlighter";
 import { vscDarkPlus } from "react-syntax-highlighter/dist/esm/styles/prism";
 import { trpc } from "@/utils/trpc";
+import Loader from "@/components/loader";
 
 interface GenerationResult {
   subject?: string;
@@ -378,7 +378,7 @@ export const ChatPanel = ({
       <div className="flex-1 overflow-y-auto p-4 space-y-4">
         {showLoading ? (
           <div className="flex items-center justify-center h-full">
-            <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+            <Loader />
           </div>
         ) : (
           messages.map((msg, index) => (
@@ -401,7 +401,7 @@ export const ChatPanel = ({
                 >
                   {msg.isStreaming ? (
                     <div className="flex items-center gap-2">
-                      <Loader2 className="h-4 w-4 animate-spin" />
+                      <Loader />
                       <span>{msg.content}</span>
                     </div>
                   ) : (

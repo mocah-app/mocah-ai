@@ -45,10 +45,18 @@ export {
   validateReactEmailCode,
   extractPreviewText,
   getEmailMetadata,
+  clearCache,
 } from './react-email-renderer';
 
 // Client-Side Renderer
 export {
   renderReactEmailClientSide,
+  renderReactEmailWithMetadata,
   isClientRenderingAvailable,
+  clearRenderCache,
+  getCacheStats,
+  prewarmCache,
+  RenderError,
+  RenderErrorCode,
 } from './client-renderer';
+export type { RenderResult, RenderOptions } from './client-renderer';

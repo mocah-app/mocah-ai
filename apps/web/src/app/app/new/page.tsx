@@ -1,5 +1,6 @@
 "use client";
 
+import DashboardHeader from "@/components/dashboardHeader";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { useOrganization } from "@/contexts/organization-context";
@@ -106,10 +107,13 @@ export default function NewTemplatePage() {
   ];
 
   return (
-    <div className="min-h-screen w-full flex items-center relative justify-center p-4">
+    <div className="min-h-screen w-full flex flex-col items-center relative">
+      <div className="w-full">
+        <DashboardHeader />
+      </div>
       {/* gradient shape background */}
       <div className="absolute w-2xl h-1/2 bg-linear-to-b z-0 from-primary-transparent dark:from-primary-foreground/40 to-blue-500/30 dark:to-blue-950 rounded-full blur-3xl left-1/2 -translate-x-1/2 top-0"></div>
-      <div className="w-full max-w-4xl space-y-8 z-10">
+      <div className="w-full max-w-4xl space-y-8 z-10 flex flex-col items-center justify-center">
         {/* Header */}
         <div className="text-center space-y-4">
           <h1 className="text-2xl md:text-4xl font-bold text-foreground tracking-tight">
@@ -122,7 +126,7 @@ export default function NewTemplatePage() {
         </div>
 
         {/* Main Input Area */}
-        <div className="bg-card border border-border rounded-2xl shadow-2xl max-w-3xl mx-auto has-focus-visible:border-blue-500/30 transition-colors">
+        <div className="bg-card border border-border rounded-2xl shadow-2xl max-w-3xl w-full mx-auto has-focus-visible:border-blue-500/30 transition-colors">
           <div className="relative">
             <Textarea
               value={prompt}

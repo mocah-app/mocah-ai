@@ -7,68 +7,84 @@
 
 import { injectElementIds } from "./jsx-parser";
 import { validateReactEmailCode as validateReactEmailCodeShared } from "@mocah/shared";
-import { renderReactEmailClientSide } from "./client-renderer";
+import { 
+  renderReactEmailClientSide, 
+  RenderError, 
+  RenderErrorCode,
+  clearRenderCache,
+} from "./client-renderer";
+import type { RenderOptions } from "./client-renderer";
 
 /**
  * Render React Email JSX to HTML (Client-Side)
  * Uses browser sandbox
+ * 
+ * @param reactEmailCode - The React Email JSX code to render
+ * @param options - Optional render options (timeout, cache, pretty)
  */
 export async function renderReactEmail(
-  reactEmailCode: string
+  reactEmailCode: string,
+  options?: RenderOptions
 ): Promise<string> {
-  return renderReactEmailClientSide(reactEmailCode);
+  return renderReactEmailClientSide(reactEmailCode, options);
 }
 
 /**
  * Render with element IDs injected for selection (used in Visual Editor)
+ * 
+ * @param reactEmailCode - The React Email JSX code to render
+ * @param options - Optional render options
  */
 export async function renderReactEmailWithIds(
-  reactEmailCode: string
+  reactEmailCode: string,
+  options?: RenderOptions
 ): Promise<string> {
-  try {
-    // Inject data-element-id attributes before rendering
-    const codeWithIds = injectElementIds(reactEmailCode);
-    return renderReactEmail(codeWithIds);
-  } catch (error) {
-    console.error("Failed to render React Email with IDs:", error);
-    throw error;
-  }
+  // Inject data-element-id attributes before rendering
+  const codeWithIds = injectElementIds(reactEmailCode);
+  return renderReactEmail(codeWithIds, options);
 }
 
 /**
  * Convert React Email JSX to plain HTML (for email clients)
  * Same as renderReactEmail but explicitly for email export
+ * 
+ * @param reactEmailCode - The React Email JSX code to convert
+ * @param skipCache - Force fresh render without cache
  */
 export async function convertToEmailHTML(
-  reactEmailCode: string
+  reactEmailCode: string,
+  skipCache = false
 ): Promise<string> {
-  try {
-    // Use the same rendering endpoint
-    // This produces HTML optimized for email clients
-    return renderReactEmail(reactEmailCode);
-  } catch (error) {
-    console.error("Failed to convert to email HTML:", error);
-    throw error;
-  }
+  // For export, we might want to skip cache to ensure fresh output
+  return renderReactEmail(reactEmailCode, { skipCache, pretty: true });
 }
 
 /**
  * Convert React Email to table-based HTML (for maximum email client compatibility)
  * This ensures compatibility with older email clients like Outlook
  * Uses the same rendering as convertToEmailHTML (React Email already handles table conversion)
+ * 
+ * @param reactEmailCode - The React Email JSX code to convert
+ * @param skipCache - Force fresh render without cache
  */
 export async function convertToTableHTML(
-  reactEmailCode: string
+  reactEmailCode: string,
+  skipCache = false
 ): Promise<string> {
-  try {
-    // React Email's render() already produces table-based HTML for compatibility
-    // So we can use the same endpoint
-    return renderReactEmail(reactEmailCode);
-  } catch (error) {
-    console.error("Failed to convert to table HTML:", error);
-    throw error;
-  }
+  // React Email's render() already produces table-based HTML for compatibility
+  return renderReactEmail(reactEmailCode, { skipCache, pretty: true });
 }
+
+/**
+ * Force clear the render cache
+ * Useful when making code changes that should reflect immediately
+ */
+export function clearCache(): void {
+  clearRenderCache();
+}
+
+// Re-export error types for consumers
+export { RenderError, RenderErrorCode };
 
 /**
  * Validate React Email JSX code

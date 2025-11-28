@@ -9,6 +9,23 @@ import {
 } from "../lib/prompts";
 import { validateReactEmailCode, logger } from "@mocah/shared";
 
+// Valid style type values for templates
+const VALID_STYLE_TYPES = ["INLINE", "PREDEFINED_CLASSES", "STYLE_OBJECTS"] as const;
+type StyleType = (typeof VALID_STYLE_TYPES)[number];
+
+/**
+ * Validates and normalizes a style type string to a valid StyleType.
+ * Uppercases the input, checks membership, logs warning and returns default if invalid.
+ */
+function validateStyleType(styleType: string): StyleType {
+  const uppercased = styleType.toUpperCase();
+  if (VALID_STYLE_TYPES.includes(uppercased as StyleType)) {
+    return uppercased as StyleType;
+  }
+  logger.warn(`⚠️ Invalid styleType "${styleType}", defaulting to STYLE_OBJECTS`);
+  return "STYLE_OBJECTS";
+}
+
 export const templateRouter = router({
   /**
    * Get a single template by ID
@@ -229,7 +246,7 @@ export const templateRouter = router({
           subject: result.subject,
           description: `Generated from prompt: ${input.prompt}`,
           reactEmailCode: result.reactEmailCode,
-          styleType: result.styleType.toUpperCase() as any,
+          styleType: validateStyleType(result.styleType),
           styleDefinitions,
           previewText: result.previewText,
         },
@@ -245,7 +262,7 @@ export const templateRouter = router({
           isCurrent: true,
           createdBy: ctx.session?.user?.id,
           reactEmailCode: result.reactEmailCode,
-          styleType: result.styleType.toUpperCase() as any,
+          styleType: validateStyleType(result.styleType),
           styleDefinitions,
           previewText: result.previewText,
           metadata: {
@@ -366,7 +383,7 @@ export const templateRouter = router({
           isCurrent: true,
           createdBy: ctx.session.user.id,
           reactEmailCode: result.reactEmailCode,
-          styleType: result.styleType.toUpperCase() as any,
+          styleType: validateStyleType(result.styleType),
           styleDefinitions,
           previewText: result.previewText,
           metadata: {
@@ -384,7 +401,7 @@ export const templateRouter = router({
           currentVersionId: version.id,
           subject: result.subject,
           reactEmailCode: result.reactEmailCode,
-          styleType: result.styleType.toUpperCase() as any,
+          styleType: validateStyleType(result.styleType),
           styleDefinitions,
           previewText: result.previewText,
         },

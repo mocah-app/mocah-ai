@@ -1,9 +1,31 @@
 'use client';
 
-import { renderReactEmailClientSide } from '@/lib/react-email';
+import { 
+  renderReactEmailClientSide, 
+  clearRenderCache,
+  RenderError, 
+  RenderErrorCode 
+} from '@/lib/react-email';
 import { logger } from '@mocah/shared';
 import { useEffect, useState } from 'react';
 import { CodeEditor } from './CodeEditor';
+
+/** Map error codes to user-friendly messages */
+function getErrorMessage(error: unknown): string {
+  if (error instanceof RenderError) {
+    switch (error.code) {
+      case RenderErrorCode.TIMEOUT:
+        return "Render timeout - template too complex";
+      case RenderErrorCode.COMPONENT_NOT_FOUND:
+        return "No valid component found";
+      case RenderErrorCode.BABEL_TRANSFORM_FAILED:
+        return "Syntax error in code";
+      default:
+        return error.message;
+    }
+  }
+  return String(error);
+}
 
 interface HtmlCodeViewerProps {
   reactEmailCode: string;
@@ -51,6 +73,11 @@ export function HtmlCodeViewer({
       return;
     }
 
+    // Clear render cache on forced refresh
+    if (forceRefresh) {
+      clearRenderCache();
+    }
+
     setIsLoading(true);
     setError(null);
 
@@ -63,9 +90,10 @@ export function HtmlCodeViewer({
         onHtmlRendered(html);
       }
     } catch (err) {
-      logger.error(`Failed to render HTML: ${err}`);
-      setError(String(err));
-      setRenderedHtml(`<!-- Error: ${err} -->`);
+      const errorMsg = getErrorMessage(err);
+      logger.error(`Failed to render HTML: ${errorMsg}`);
+      setError(errorMsg);
+      setRenderedHtml(`<!-- Error: ${errorMsg} -->`);
     } finally {
       setIsLoading(false);
     }

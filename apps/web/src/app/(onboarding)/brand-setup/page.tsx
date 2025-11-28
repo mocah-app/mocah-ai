@@ -31,12 +31,13 @@ import { cn } from "@/lib/utils";
 import { trpcClient } from "@/utils/trpc";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useMutation } from "@tanstack/react-query";
-import { ArrowRight, Check, Loader2, Upload } from "lucide-react";
+import { ArrowRight, Check, Upload } from "lucide-react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Suspense, useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
 import { toast } from "sonner";
 import { z } from "zod";
+
 
 // LocalStorage key for tracking the onboarding organization
 const ONBOARDING_ORG_KEY = "mocah_onboarding_org_id";
@@ -812,7 +813,7 @@ function BrandSetupContent() {
                       >
                         {isLoading ? (
                           <>
-                            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                            <Loader />
                             Finishing...
                           </>
                         ) : (

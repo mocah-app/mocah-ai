@@ -18,6 +18,7 @@ import { formatDistanceToNow } from "date-fns";
 import { trpc } from "@/utils/trpc";
 import { Textarea } from "@/components/ui/textarea";
 import Loader from "@/components/loader";
+import { toast } from "sonner";
 
 interface TemplateCardProps {
   template: {
@@ -38,8 +39,10 @@ const TemplateCard = ({ template }: TemplateCardProps) => {
         <CardHeader className="p-0">
           <div className="flex items-start justify-between">
             <div className="flex-1">
-              <div className="flex items-center gap-2 w-full h-28 bg-primary/10 bg-dot opacity-25" >
-              <span className="text-muted-foreground w-full text-center">Preview</span>
+              <div className="flex items-center gap-2 w-full h-28 bg-primary/10 bg-dot opacity-25">
+                <span className="text-muted-foreground w-full text-center">
+                  Preview
+                </span>
               </div>
               <CardTitle className="group-hover:text-primary transition-colors duration-300 p-4 text-lg lg:text-xl">
                 {template.name}
@@ -128,19 +131,24 @@ export default function Dashboard() {
   // Invalidate templates only when org actually changes (not on mount)
   const prevOrgIdRef = useRef<string | undefined>(undefined);
   useEffect(() => {
-    if (activeOrganization?.id && prevOrgIdRef.current && prevOrgIdRef.current !== activeOrganization.id) {
+    if (
+      activeOrganization?.id &&
+      prevOrgIdRef.current &&
+      prevOrgIdRef.current !== activeOrganization.id
+    ) {
       utils.template.list.invalidate();
     }
     prevOrgIdRef.current = activeOrganization?.id;
   }, [activeOrganization?.id, utils]);
 
   // Flatten all pages into a single array
-  const templates = templatesData?.pages.flatMap((page) => page.templates) ?? [];
+  const templates =
+    templatesData?.pages.flatMap((page) => page.templates) ?? [];
   const templateCount = templatesData?.pages[0]?.totalCount ?? 0;
 
   // Intersection observer for infinite scroll
   const loadMoreRef = useRef<HTMLDivElement>(null);
-  
+
   const handleObserver = useCallback(
     (entries: IntersectionObserverEntry[]) => {
       const [target] = entries;
@@ -164,7 +172,17 @@ export default function Dashboard() {
     observer.observe(element);
     return () => observer.disconnect();
   }, [handleObserver]);
-  
+
+  const handleCreateTemplate = () => {
+    if (!activeOrganization) {
+      toast.error("Please select a workspace first");
+      return;
+    }
+
+    // Navigate to new template page with AI streaming
+    router.push("/app/new");
+  };
+
   // Combined loading state - also loading if activeOrganization isn't set yet but we have orgs
   const isQueryPending = !activeOrganization?.id && organizations.length > 0;
   const isDataLoading = orgLoading || templatesLoading || isQueryPending;
@@ -235,28 +253,25 @@ export default function Dashboard() {
         </div>
       )}
 
-      {/* Stats */}
-      {isDataLoading ? (
-        <StatsSkeleton />
-      ) : (
-        <div className="grid gap-4 md:grid-cols-3 relative z-10">
-          {topStats.map((stat) => (
-            <Card key={stat.title} className="gap-2 py-4">
-              <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">
-                  {stat.title}
-                </CardTitle>
-                <div className="text-2xl font-bold relative">{stat.value}</div>
-              </CardHeader>
-              <CardContent>
-                <p className="text-xs text-muted-foreground mt-1">
-                  {stat.description}
-                </p>
-              </CardContent>
-            </Card>
-          ))}
-        </div>
-      )}
+      {/* Your Templates */}
+      <Card className="relative z-10 p-2 px-6">
+        <CardHeader className="flex flex-row items-center justify-between p-0">
+          <CardTitle>
+            <h1 className="text-lg font-bold">Your Templates</h1>
+          </CardTitle>
+          {isDataLoading ? (
+            <Skeleton className="h-6 w-20" />
+          ) : (
+            <span className="text-base font-bold text-muted-foreground">
+              {templates.length} of {templateCount}
+            </span>
+          )}
+          <Button onClick={handleCreateTemplate} className="self-end ml-auto">
+            <Plus className="h-4 w-4" />
+            Create
+          </Button>
+        </CardHeader>
+      </Card>
 
       {/* Recent Templates */}
       {isDataLoading ? (
@@ -270,12 +285,6 @@ export default function Dashboard() {
         </Card>
       ) : templateCount > 0 ? (
         <Card className="relative z-10">
-          <CardHeader className="flex flex-row items-center justify-between">
-            <CardTitle>Recent Templates</CardTitle>
-            <span className="text-sm text-muted-foreground">
-              {templates.length} of {templateCount}
-            </span>
-          </CardHeader>
           <CardContent>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               {templates.map((template) => (
@@ -312,11 +321,11 @@ export default function Dashboard() {
           <CardContent className="py-10 text-center space-y-4">
             <div className="text-muted-foreground">
               <p className="text-lg font-semibold mb-2">No templates yet</p>
-              <p>Create your first template to get started!</p>
+              <p>Create your first template</p>
             </div>
-            <Button onClick={() => router.push("/app/new")}>
-              <Plus className="mr-2 h-4 w-4" />
-              New Template
+            <Button onClick={handleCreateTemplate} size={"lg"}>
+              <Plus className="h-4 w-4" />
+              Create
             </Button>
           </CardContent>
         </Card>
@@ -333,20 +342,20 @@ const PromptInput = () => {
     <div className="mx-auto max-w-2xl flex flex-col items-center justify-center gap-4 py-8">
       <h2 className="text-2xl font-bold">What do you want to create?</h2>
       <div className="w-full relative">
-      <Textarea
-        placeholder="Describe the email template you want to generate..."
-        rows={4}
-        maxLength={1000}
-        className="w-full bg-card focus:ring-0 focus-visible:ring-0 focus-visible:ring-offset-2 focus-visible:ring-offset-ring/5 focus:outline-none focus-visible:border-ring outline-none resize-none max-h-[180px] disabled:opacity-50 shadow-2xl"
-      />
-      <Button
-        size="icon"
-        onClick={handleGenerate}
-        className="absolute bottom-0.5 right-0.5 rounded-md w-10 h-8"
-        aria-label="Generate template"
-      >
-        <Send className="size-4" />
-      </Button>
+        <Textarea
+          placeholder="Describe the email template you want to generate..."
+          rows={4}
+          maxLength={1000}
+          className="w-full bg-card focus:ring-0 focus-visible:ring-0 focus-visible:ring-offset-2 focus-visible:ring-offset-ring/5 focus:outline-none focus-visible:border-ring outline-none resize-none max-h-[180px] disabled:opacity-50 shadow-2xl"
+        />
+        <Button
+          size="icon"
+          onClick={handleGenerate}
+          className="absolute bottom-0.5 right-0.5 rounded-md w-10 h-8"
+          aria-label="Generate template"
+        >
+          <Send className="size-4" />
+        </Button>
       </div>
     </div>
   );

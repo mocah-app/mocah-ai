@@ -1,9 +1,31 @@
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
-import { renderReactEmailWithIds, extractElementData } from '@/lib/react-email';
+import { 
+  renderReactEmailWithIds, 
+  extractElementData,
+  RenderError,
+  RenderErrorCode,
+} from '@/lib/react-email';
 import type { ElementData } from '@/lib/react-email';
 import Loader from '@/components/loader';
+
+/** Map error codes to user-friendly messages */
+function getErrorMessage(error: unknown): string {
+  if (error instanceof RenderError) {
+    switch (error.code) {
+      case RenderErrorCode.TIMEOUT:
+        return "Preview took too long to render. Try simplifying your template.";
+      case RenderErrorCode.COMPONENT_NOT_FOUND:
+        return "No valid component found. Make sure you export a default function.";
+      case RenderErrorCode.BABEL_TRANSFORM_FAILED:
+        return "Syntax error in your code. Check for typos or invalid JSX.";
+      default:
+        return error.message;
+    }
+  }
+  return String(error);
+}
 
 interface VisualEditorProps {
   reactEmailCode: string;
@@ -41,7 +63,7 @@ export function VisualEditor({
         setHtml(renderedHtml);
       } catch (err) {
         console.error('Failed to render React Email:', err);
-        setError(String(err));
+        setError(getErrorMessage(err));
       } finally {
         setIsLoading(false);
       }
