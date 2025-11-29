@@ -11,12 +11,12 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { Check, ChevronsUpDown, Plus, Loader2 } from "lucide-react";
+import { Check, ChevronsUpDown, Plus } from "lucide-react";
 import { useRouter } from "next/navigation";
-import Image from "next/image";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import { Skeleton } from "./ui/skeleton";
 import Link from "next/link";
+import Loader from "./loader";
 
 export function WorkspaceSwitcher() {
   const router = useRouter();
@@ -30,7 +30,7 @@ export function WorkspaceSwitcher() {
   if (isLoading) {
     return (
       <Button variant="outline" disabled className="w-[200px]">
-        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+        <Loader />
         <Skeleton className="w-[200px] h-10" />
       </Button>
     );

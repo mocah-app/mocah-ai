@@ -24,7 +24,7 @@ export const navigationConfig: {
       links: [
         {
           label: "Templates",
-          href: "/dashboard",
+          href: "/app",
           icon: LayoutGrid,
         },
         {
@@ -42,12 +42,12 @@ export const navigationConfig: {
     links: [
       {
         label: "Settings",
-        href: "/dashboard/settings",
+        href: "/app/settings",
         icon: Settings2,
       },
       {
         label: "Billing",
-        href: "/dashboard/billing",
+        href: "/app/billing",
         icon: DollarSign,
       }
     ],

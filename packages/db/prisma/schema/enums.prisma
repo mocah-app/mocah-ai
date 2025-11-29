@@ -26,17 +26,6 @@ enum AIModel {
   claude_3_haiku
 }
 
-enum TemplateSectionType {
-  header
-  body
-  footer
-  cta
-  divider
-  image
-  text
-  button
-}
-
 enum ExportFormat {
   html
   pdf
@@ -69,5 +58,16 @@ enum ImageVariationType {
   variation     // Variation of existing image (DALL-E variations)
   upscale       // Upscaled version
   edit          // Edited/modified version
+}
+
+enum StyleType {
+  INLINE              // style={{ ... }} directly on elements
+  PREDEFINED_CLASSES  // className="hero-section"
+  STYLE_OBJECTS       // const heroStyle = { ... }
+}
+
+enum ChatMessageRole {
+  user
+  assistant
 }
 

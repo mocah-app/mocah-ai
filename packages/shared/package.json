@@ -18,6 +18,9 @@
   "scripts": {
     "build": "tsdown"
   },
+  "dependencies": {
+    "@upstash/redis": "catalog:"
+  },
   "devDependencies": {
     "@mocah/config": "workspace:*",
     "tsdown": "catalog:"

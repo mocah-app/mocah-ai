@@ -212,9 +212,10 @@ const { url } = await trpc.storage.uploadLogo.mutate({
 ```
 bucket/
   └── logos/
-      └── {organizationId}/
+      └── {randomUUID}/
           └── {timestamp}-{filename}
 ```
+*Note: Random UUIDs are used for privacy. Organization/user IDs are stored in S3 object metadata.*
 
 ## Environment Setup
 
@@ -241,16 +242,20 @@ STRIPE_WEBHOOK_SECRET=
 NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY=
 
 # Tigris S3 Storage
-TIGRIS_AWS_ENDPOINT_URL_S3=https://fly.storage.tigris.dev
-TIGRIS_AWS_ACCESS_KEY_ID=
-TIGRIS_AWS_SECRET_ACCESS_KEY=
-AWS_S3_BUCKET_NAME=
+TIGRIS_ENDPOINT_URL=https://fly.storage.tigris.dev
+TIGRIS_ACCESS_KEY_ID=
+TIGRIS_SECRET_ACCESS_KEY=
+TIGRIS_BUCKET_NAME=
+TIGRIS_PUBLIC_URL=storage.mocah.ai
 
 # Email (Resend)
 RESEND_API_KEY=
 
-# OpenAI (for AI generation)
-OPENAI_API_KEY=
+
+# Upstash Redis (for serverless caching)
+# Get these from: https://console.upstash.com/
+UPSTASH_REDIS_REST_URL=
+UPSTASH_REDIS_REST_TOKEN=
 ```
 
 ### Getting Started

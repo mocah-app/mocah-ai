@@ -83,6 +83,7 @@ TIGRIS_ENDPOINT_URL=https://fly.storage.tigris.dev
 TIGRIS_ACCESS_KEY_ID=tid_...
 TIGRIS_SECRET_ACCESS_KEY=tsec_...
 TIGRIS_BUCKET_NAME=your-bucket-name
+TIGRIS_PUBLIC_URL=storage.mocah.ai
 ```
 
 ### 3. Deployment Flow

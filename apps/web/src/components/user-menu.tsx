@@ -47,7 +47,7 @@ export default function UserMenu() {
         </DropdownMenuLabel>
         <DropdownMenuSeparator />
         <DropdownMenuItem asChild>
-          <Link href="/dashboard/settings" className="w-full justify-start">
+          <Link href="/app/settings" className="w-full justify-start">
             <Settings className="size-4" />
             Settings
           </Link>

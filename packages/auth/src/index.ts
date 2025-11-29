@@ -7,8 +7,9 @@ import Stripe from "stripe";
 import { subscriptionPlans } from "./subscription-plans";
 import { EmailService } from "./email-service";
 import prisma from "@mocah/db";
+import { serverEnv } from "@mocah/config/env";
 
-const stripeClient = new Stripe(process.env.STRIPE_SECRET_KEY || "", {
+const stripeClient = new Stripe(serverEnv.STRIPE_SECRET_KEY, {
   apiVersion: "2025-10-29.clover",
 });
 
@@ -16,7 +17,7 @@ export const auth = betterAuth<BetterAuthOptions>({
   database: prismaAdapter(prisma, {
     provider: "postgresql",
   }),
-  trustedOrigins: [process.env.CORS_ORIGIN || ""],
+  trustedOrigins: [serverEnv.CORS_ORIGIN || ""],
   emailVerification: {
     sendVerificationEmail: async ({ user, url, token }) => {
       await EmailService.sendVerificationEmail({ user, url, token });
@@ -35,8 +36,8 @@ export const auth = betterAuth<BetterAuthOptions>({
   },
   socialProviders: {
     google: {
-      clientId: process.env.GOOGLE_CLIENT_ID as string,
-      clientSecret: process.env.GOOGLE_CLIENT_SECRET as string,
+      clientId: serverEnv.GOOGLE_CLIENT_ID,
+      clientSecret: serverEnv.GOOGLE_CLIENT_SECRET,
     },
   },
   plugins: [
@@ -69,7 +70,7 @@ export const auth = betterAuth<BetterAuthOptions>({
     }),
     stripe({
       stripeClient,
-      stripeWebhookSecret: process.env.STRIPE_WEBHOOK_SECRET || "",
+      stripeWebhookSecret: serverEnv.STRIPE_WEBHOOK_SECRET,
       createCustomerOnSignUp: true,
       subscription: {
         enabled: true,

@@ -20,7 +20,7 @@ function BrandKitSetupBanner() {
         </CardTitle>
 
         <Button
-          onClick={() => router.push("/dashboard/settings")}
+          onClick={() => router.push("/app/settings")}
           className="justify-end "
         >
           Complete

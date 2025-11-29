@@ -20,7 +20,7 @@ Added a comprehensive brand settings system that allows users to update their cu
 - ✅ Reset and save buttons
 
 ### 2. Settings Page
-**File:** `apps/web/src/app/dashboard/settings/page.tsx`
+**File:** `apps/web/src/app/app/settings/page.tsx`
 
 **Features:**
 - ✅ Tab-based layout with 4 sections:
@@ -44,7 +44,7 @@ Added a comprehensive brand settings system that allows users to update their cu
 
 ## User Flow
 
-1. User navigates to Settings (from sidebar or `/dashboard/settings`)
+1. User navigates to Settings (from sidebar or `/app/settings`)
 2. Default "Brand" tab is selected
 3. Form is pre-populated with current active organization data
 4. User can modify any field:
@@ -129,7 +129,7 @@ All fields are validated using Zod:
 
 Settings page is accessible via:
 - Sidebar footer "Settings" link
-- Direct URL: `/dashboard/settings`
+- Direct URL: `/app/settings`
 - Already configured in `config/navigation.ts`
 
 ## Future Enhancements

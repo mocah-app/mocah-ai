@@ -132,7 +132,7 @@ SENDGRID_API_KEY=your_sendgrid_api_key
 2. **Google OAuth:**
    - Click "Sign In with Google"
    - Complete Google authentication
-   - Should redirect to `/dashboard`
+   - Should redirect to `/app`
 
 3. **Password Reset:**
    - Click "Reset your password" on sign-in page

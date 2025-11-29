@@ -1,15 +1,10 @@
 import { S3Client } from "@aws-sdk/client-s3";
+import { serverEnv } from "@mocah/config/env";
 
-const endpoint = process.env.TIGRIS_ENDPOINT_URL;
-const accessKeyId = process.env.TIGRIS_ACCESS_KEY_ID;
-const secretAccessKey = process.env.TIGRIS_SECRET_ACCESS_KEY;
-const bucketName = process.env.TIGRIS_BUCKET_NAME;
-
-if (!endpoint || !accessKeyId || !secretAccessKey || !bucketName) {
-  throw new Error(
-    "TIGRIS_ENDPOINT_URL, TIGRIS_ACCESS_KEY_ID, TIGRIS_SECRET_ACCESS_KEY, and TIGRIS_BUCKET_NAME must be set"
-  );
-}
+const endpoint = serverEnv.TIGRIS_ENDPOINT_URL;
+const accessKeyId = serverEnv.TIGRIS_ACCESS_KEY_ID;
+const secretAccessKey = serverEnv.TIGRIS_SECRET_ACCESS_KEY;
+const bucketName = serverEnv.TIGRIS_BUCKET_NAME;
 
 export const s3Client = new S3Client({
   region: "auto",
@@ -56,15 +51,16 @@ export function sanitizeFilename(filename: string): string {
 }
 
 export function generateStoragePath(
-  userId: string,
   filename: string,
   prefix: string = "logos"
 ): string {
+  const randomId = crypto.randomUUID();
   const timestamp = Date.now();
   const sanitized = sanitizeFilename(filename);
-  return `${prefix}/${userId}/${timestamp}-${sanitized}`;
+  return `${prefix}/${randomId}/${timestamp}-${sanitized}`;
 }
 
 export function getPublicUrl(filePath: string): string {
-  return `https://${TIGRIS_BUCKET}.fly.storage.tigris.dev/${filePath}`;
+  const customDomain = serverEnv.TIGRIS_PUBLIC_URL || "storage.mocah.ai";
+  return `https://${customDomain}/${filePath}`;
 }

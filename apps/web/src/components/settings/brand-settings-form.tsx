@@ -5,7 +5,7 @@ import { useMutation } from "@tanstack/react-query";
 import { useOrganization } from "@/contexts/organization-context";
 import { logger } from "@mocah/shared";
 import type { OrganizationMetadata } from "@/types/organization";
-import { trpc } from "@/utils/trpc";
+import { trpcClient } from "@/utils/trpc";
 import { fileToApiFormat, validateImageFile } from "@/lib/file-utils";
 import { LiveEmailPreview } from "@/components/onboarding/live-email-preview";
 import { toast } from "sonner";
@@ -28,7 +28,9 @@ export function BrandSettingsForm() {
     brandVoice: "professional",
     logo: "",
   });
-  const [originalValues, setOriginalValues] = useState<Partial<BrandFormValues>>({
+  const [originalValues, setOriginalValues] = useState<
+    Partial<BrandFormValues>
+  >({
     brandName: "",
     primaryColor: "#3B82F6",
     secondaryColor: "#10B981",
@@ -42,7 +44,7 @@ export function BrandSettingsForm() {
     if (activeOrganization) {
       // Prefer brandKit data over metadata (brandKit is the source of truth)
       const brandKit = activeOrganization.brandKit;
-      
+
       const values = {
         brandName: activeOrganization.name,
         primaryColor: brandKit?.primaryColor || "#3B82F6",
@@ -51,7 +53,7 @@ export function BrandSettingsForm() {
         brandVoice: (brandKit?.brandVoice as any) || "professional",
         logo: brandKit?.logo || activeOrganization.logo || "",
       };
-      
+
       setDefaultValues(values);
       setOriginalValues(values);
     }
@@ -65,7 +67,7 @@ export function BrandSettingsForm() {
   // tRPC mutations
   const uploadLogoMutation = useMutation({
     mutationFn: (data: { file: any; organizationId: string }) =>
-      trpc.storage.uploadLogo.mutate(data),
+      trpcClient.storage.uploadLogo.mutate(data),
     onError: (error: Error) => {
       logger.error(
         "Failed to upload logo",
@@ -96,7 +98,7 @@ export function BrandSettingsForm() {
         brandVoice?: string;
         logo?: string;
       };
-    }) => trpc.organization.updateWithBrandKit.mutate(data),
+    }) => trpcClient.organization.updateWithBrandKit.mutate(data),
     onSuccess: () => {
       logger.info("Brand settings updated successfully", {
         component: "BrandSettingsForm",
@@ -219,6 +221,15 @@ export function BrandSettingsForm() {
         logo: logoUrl,
       });
 
+      // Invalidate server-side brand kit cache so AI uses fresh data
+      await fetch("/api/cache/invalidate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          organizationId: activeOrganization.id,
+        }),
+      }).catch(() => {}); // Non-critical, don't block on failure
+
       // Refresh organizations list to get updated data
       await refreshOrganizations();
     } catch (error: any) {
@@ -265,15 +276,13 @@ export function BrandSettingsForm() {
       <div className="hidden lg:block bg-card p-6 shadow-2xl">
         <LiveEmailPreview
           brand={{
-            brandName:
-              formData?.values.brandName || activeOrganization?.name,
+            brandName: formData?.values.brandName || activeOrganization?.name,
             primaryColor:
               formData?.values.primaryColor ||
               defaultValues.primaryColor ||
               "#3B82F6",
             secondaryColor:
-              formData?.values.secondaryColor ||
-              defaultValues.secondaryColor,
+              formData?.values.secondaryColor || defaultValues.secondaryColor,
             fontFamily:
               formData?.values.fontFamily ||
               defaultValues.fontFamily ||

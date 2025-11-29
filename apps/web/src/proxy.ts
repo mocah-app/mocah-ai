@@ -6,20 +6,18 @@ export async function proxy(request: NextRequest) {
   const sessionCookie = getSessionCookie(request);
 
   const authRoutes = ["/login", "/register", "/reset-password"];
+  const publicRoutes = ["/privacy", "/terms", "/contact"];
 
-  // Protect dashboard routes
-  if (request.nextUrl.pathname.startsWith("/dashboard")) {
+  // Protect dashboard routes - protect all paths under /app
+  if (request.nextUrl.pathname.startsWith("/app")) {
     if (!sessionCookie) {
       return NextResponse.redirect(new URL("/login", request.url));
     }
   }
 
   // Redirect authenticated users away from auth pages
-  if (
-    sessionCookie &&
-    authRoutes.includes(request.nextUrl.pathname)
-  ) {
-    return NextResponse.redirect(new URL("/dashboard", request.url));
+  if (sessionCookie && authRoutes.includes(request.nextUrl.pathname)) {
+    return NextResponse.redirect(new URL("/app", request.url));
   }
 
   return NextResponse.next();

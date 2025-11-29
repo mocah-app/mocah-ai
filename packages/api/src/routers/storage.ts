@@ -52,12 +52,8 @@ export const storageRouter = router({
         // Convert base64 string to Buffer
         const buffer = Buffer.from(file.base64Data, "base64");
 
-        // Generate file path
-        const filePath = generateStoragePath(
-          ctx.session.user.id,
-          file.name,
-          "logos"
-        );
+        // Generate file path with random UUID for privacy
+        const filePath = generateStoragePath(file.name, "logos");
 
         // Upload to Tigris S3
         const putCommand = new PutObjectCommand({

@@ -12,10 +12,13 @@ Add the following environment variables to your `.env` file:
 
 ```bash
 # Tigris S3 Configuration
-TIGRIS_AWS_ENDPOINT_URL_S3=https://fly.storage.tigris.dev
-TIGRIS_AWS_ACCESS_KEY_ID=your-tigris-access-key-id
-TIGRIS_AWS_SECRET_ACCESS_KEY=your-tigris-secret-access-key
-AWS_S3_BUCKET_NAME=your-bucket-name
+TIGRIS_ENDPOINT_URL=https://fly.storage.tigris.dev
+TIGRIS_ACCESS_KEY_ID=your-tigris-access-key-id
+TIGRIS_SECRET_ACCESS_KEY=your-tigris-secret-access-key
+TIGRIS_BUCKET_NAME=your-bucket-name
+
+# Optional: Custom public URL domain (defaults to storage.mocah.ai)
+TIGRIS_PUBLIC_URL=storage.mocah.ai
 ```
 
 ## Getting Tigris Credentials
@@ -54,21 +57,22 @@ Handles file uploads with the following features:
 - **Validation**: 
   - File type validation (PNG, JPG, SVG only)
   - File size limit (5MB max)
-- **Upload**: Stores files in Tigris with path structure: `logos/{userId}/{timestamp}-{filename}`
-- **Metadata**: Stores user ID, original filename, and upload timestamp as S3 object metadata
-- **Public URL**: Returns public URL in format: `https://{bucket}.fly.storage.tigris.dev/{filePath}`
+- **Upload**: Stores files in Tigris with path structure: `logos/{randomUUID}/{timestamp}-{filename}`
+- **Metadata**: Stores user ID and organization ID in S3 object metadata (not in URL)
+- **Public URL**: Returns public URL in format: `https://storage.mocah.ai/{filePath}`
 
 ### File Organization
 
-Files are organized by user ID to:
-- Enable easy user-specific file management
+Files are organized by random UUID to:
+- Protect user privacy (no sensitive IDs in public URLs)
+- Prevent enumeration attacks
 - Prevent filename conflicts
-- Support future user data deletion requirements
+- Support future user data deletion requirements via S3 metadata
 
 ```
 bucket/
   └── logos/
-      └── {userId}/
+      └── {randomUUID}/
           └── {timestamp}-{sanitizedFilename}
 ```
 
@@ -78,7 +82,8 @@ bucket/
 2. **Size Limits**: Maximum file size is 5MB
 3. **Filename Sanitization**: Special characters are removed from filenames
 4. **User Authentication**: All uploads require authenticated session
-5. **Metadata**: User ID is stored in object metadata for tracking
+5. **Privacy**: Random UUIDs used in paths to prevent ID exposure
+6. **Metadata**: User ID and organization ID stored securely in S3 object metadata for tracking
 
 ## Dependencies
 

@@ -3,7 +3,7 @@
 import { createContext, useContext, useEffect, useState } from "react";
 import type { ReactNode } from "react";
 import { authClient } from "@/lib/auth-client";
-import { trpc } from "@/utils/trpc";
+import { trpcClient } from "@/utils/trpc";
 import { toast } from "sonner";
 import { logger } from "@mocah/shared";
 import type {
@@ -59,7 +59,7 @@ export function OrganizationProvider({ children }: { children: ReactNode }) {
     setIsLoading(true);
     try {
       // Use tRPC to load organizations
-      const orgs = await trpc.organization.list.query();
+      const orgs = await trpcClient.organization.list.query();
 
       setOrganizations(orgs as Organization[]);
 
@@ -84,10 +84,14 @@ export function OrganizationProvider({ children }: { children: ReactNode }) {
           setActiveOrgState(orgs[0] as Organization);
           // Refresh session in background to sync activeOrganizationId
           authClient.getSession().catch((err) => {
-            logger.error("Failed to refresh session after auto-setting org", {
-              component: "OrganizationContext",
-              action: "loadOrganizations",
-            }, err);
+            logger.error(
+              "Failed to refresh session after auto-setting org",
+              {
+                component: "OrganizationContext",
+                action: "loadOrganizations",
+              },
+              err
+            );
           });
         } catch (error) {
           logger.error(
@@ -131,10 +135,10 @@ export function OrganizationProvider({ children }: { children: ReactNode }) {
 
       const org = organizations.find((o: Organization) => o.id === orgId);
       setActiveOrgState(org || null);
-      
+
       // Refresh session to get updated activeOrganizationId, but skip org reload
       await authClient.getSession();
-      
+
       if (!silent) {
         toast.success(`Switched to ${org?.name}`);
       }
@@ -177,9 +181,11 @@ export function OrganizationProvider({ children }: { children: ReactNode }) {
       }
 
       // Automatically set the newly created organization as active
-      const { error: setActiveError } = await authClient.organization.setActive({
-        organizationId: newOrg.id,
-      });
+      const { error: setActiveError } = await authClient.organization.setActive(
+        {
+          organizationId: newOrg.id,
+        }
+      );
 
       if (setActiveError) {
         logger.error(
@@ -189,7 +195,9 @@ export function OrganizationProvider({ children }: { children: ReactNode }) {
             action: "createOrganization",
             organizationId: newOrg.id,
           },
-          new Error(setActiveError.message || "Failed to set active organization")
+          new Error(
+            setActiveError.message || "Failed to set active organization"
+          )
         );
         // Don't throw - organization was created successfully
       }

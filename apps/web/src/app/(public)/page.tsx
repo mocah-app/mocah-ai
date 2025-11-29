@@ -21,7 +21,7 @@ export default function Home() {
             AI-powered email template builder for modern brands
           </p>
           <Button asChild>
-            <Link href="/dashboard">Go to Dashboard</Link>
+            <Link href="/app">Go to Dashboard</Link>
           </Button>
         </section>
       </div>
