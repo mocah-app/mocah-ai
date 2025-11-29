@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useCallback, useMemo } from 'react';
+import React, { useState, useCallback, useMemo, useEffect } from 'react';
 import {
   Select,
   SelectContent,
@@ -179,6 +179,11 @@ export function SpacingControl({
   const parsedValues = useMemo(() => parseSpacing(value), [value]);
   const detectedMode = useMemo(() => detectMode(parsedValues), [parsedValues]);
   const [mode, setMode] = useState<SpacingMode>(detectedMode);
+
+  // Sync mode with detectedMode when value changes externally
+  useEffect(() => {
+    setMode(detectedMode);
+  }, [detectedMode]);
 
   // Update value helper
   const updateValue = useCallback(

@@ -240,7 +240,10 @@ export function ColorControl({
                 <div
                   className="w-full aspect-square max-h-40 rounded-lg border border-border overflow-hidden cursor-crosshair relative select-none"
                   style={{
-                    background: `linear-gradient(to bottom, transparent, black), linear-gradient(to right, white, hsl(${hsl.h}, 100%, 50%))`,
+                    background: `
+                      linear-gradient(to top, hsl(${hsl.h}, 100%, 0%) 0%, transparent 50%, hsl(${hsl.h}, 100%, 100%) 100%),
+                      linear-gradient(to right, hsl(${hsl.h}, 0%, 50%), hsl(${hsl.h}, 100%, 50%))
+                    `,
                   }}
                   onMouseDown={(e) => {
                     e.preventDefault();

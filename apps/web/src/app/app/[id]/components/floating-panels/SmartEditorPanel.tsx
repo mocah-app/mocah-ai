@@ -68,19 +68,13 @@ export const SmartEditorPanel = ({
       // For buttons/links (typically <a> tags styled as buttons), update textContent directly
       if (tagName === 'a' || tagName === 'button') {
         element.textContent = updates.content;
-      } 
-      // For elements that have direct text content as first child
-      else {
+      } else {
+        // For elements that have direct text content as first child, update only the text node
+        // to preserve other child elements; otherwise update textContent directly
         const textNode = element.childNodes[0];
         if (textNode && textNode.nodeType === Node.TEXT_NODE) {
           textNode.textContent = updates.content;
-        } 
-        // For elements with no children, update textContent directly
-        else if (element.children.length === 0) {
-          element.textContent = updates.content;
-        }
-        // Fallback: update textContent for any element that can contain text
-        else {
+        } else {
           element.textContent = updates.content;
         }
       }

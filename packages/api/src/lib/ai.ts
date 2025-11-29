@@ -3,6 +3,7 @@ import { generateObject, generateText, streamObject, streamText } from "ai";
 import { z } from "zod";
 import { logger } from "@mocah/shared/logger";
 import { serverEnv } from "@mocah/config/env";
+import { repairJsonOutput } from "./json-repair";
 
 // Initialize OpenRouter provider
 const openrouter = createOpenRouter({
@@ -33,52 +34,6 @@ export interface StructuredGenerationOptions {
   onError?: (error: unknown) => void;
 }
 
-/**
- * Repair function for malformed JSON output
- * Called automatically when JSON parsing fails
- */
-async function repairJsonOutput({
-  text,
-  error,
-}: {
-  text: string;
-  error: Error;
-}): Promise<string> {
-  logger.warn("Attempting to repair malformed JSON", {
-    component: "ai",
-    error: error.message,
-    textLength: text.length,
-  });
-
-  let repaired = text;
-
-  // Fix trailing commas before } or ]
-  repaired = repaired.replace(/,(\s*[}\]])/g, "$1");
-
-  // Fix unescaped newlines in strings
-  repaired = repaired.replace(/(?<!\\)\n(?=[^"]*"[^"]*$)/gm, "\\n");
-
-  // Try to close unclosed strings
-  const quoteCount = (repaired.match(/(?<!\\)"/g) || []).length;
-  if (quoteCount % 2 !== 0) {
-    repaired += '"';
-  }
-
-  // Try to close unclosed objects/arrays
-  const openBraces = (repaired.match(/{/g) || []).length;
-  const closeBraces = (repaired.match(/}/g) || []).length;
-  for (let i = 0; i < openBraces - closeBraces; i++) {
-    repaired += "}";
-  }
-
-  const openBrackets = (repaired.match(/\[/g) || []).length;
-  const closeBrackets = (repaired.match(/]/g) || []).length;
-  for (let i = 0; i < openBrackets - closeBrackets; i++) {
-    repaired += "]";
-  }
-
-  return repaired;
-}
 
 /**
  * AI Client wrapper for OpenRouter integration

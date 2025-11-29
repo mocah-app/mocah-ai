@@ -83,21 +83,7 @@ const TemplateListSkeleton = () => (
   </div>
 );
 
-const StatsSkeleton = () => (
-  <div className="grid gap-4 md:grid-cols-3 relative z-10">
-    {[1, 2, 3].map((i) => (
-      <Card key={i} className="gap-2 py-4">
-        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-          <Skeleton className="h-4 w-20" />
-          <Skeleton className="h-8 w-12" />
-        </CardHeader>
-        <CardContent>
-          <Skeleton className="h-3 w-32 mt-1" />
-        </CardContent>
-      </Card>
-    ))}
-  </div>
-);
+
 const TEMPLATES_PER_PAGE = 6;
 
 export default function Dashboard() {
@@ -266,7 +252,7 @@ export default function Dashboard() {
               {templates.length} of {templateCount}
             </span>
           )}
-          <Button onClick={handleCreateTemplate} className="self-end ml-auto">
+          <Button onClick={handleCreateTemplate} className="self-end ml-auto" disabled={isDataLoading}>
             <Plus className="h-4 w-4" />
             Create
           </Button>
@@ -276,9 +262,6 @@ export default function Dashboard() {
       {/* Recent Templates */}
       {isDataLoading ? (
         <Card className="relative z-10">
-          <CardHeader className="flex flex-row items-center justify-between">
-            <CardTitle>Recent Templates</CardTitle>
-          </CardHeader>
           <CardContent>
             <TemplateListSkeleton />
           </CardContent>
@@ -333,30 +316,3 @@ export default function Dashboard() {
     </div>
   );
 }
-
-const PromptInput = () => {
-  const handleGenerate = () => {
-    console.log("Generate");
-  };
-  return (
-    <div className="mx-auto max-w-2xl flex flex-col items-center justify-center gap-4 py-8">
-      <h2 className="text-2xl font-bold">What do you want to create?</h2>
-      <div className="w-full relative">
-        <Textarea
-          placeholder="Describe the email template you want to generate..."
-          rows={4}
-          maxLength={1000}
-          className="w-full bg-card focus:ring-0 focus-visible:ring-0 focus-visible:ring-offset-2 focus-visible:ring-offset-ring/5 focus:outline-none focus-visible:border-ring outline-none resize-none max-h-[180px] disabled:opacity-50 shadow-2xl"
-        />
-        <Button
-          size="icon"
-          onClick={handleGenerate}
-          className="absolute bottom-0.5 right-0.5 rounded-md w-10 h-8"
-          aria-label="Generate template"
-        >
-          <Send className="size-4" />
-        </Button>
-      </div>
-    </div>
-  );
-};

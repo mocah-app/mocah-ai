@@ -37,15 +37,15 @@ export function CustomCanvasControl({
   // Use external zoom level if provided, otherwise use internal state
   const zoomLevel = externalZoomLevel ?? internalZoomLevel;
 
-  // Initialize zoom level on mount
+  // Initialize zoom level on mount only
   useEffect(() => {
     const currentZoom = getZoom();
     const initialZoom = Math.round(currentZoom * 100);
     if (externalZoomLevel === undefined) {
       setInternalZoomLevel(initialZoom);
+      onZoomLevelChange?.(initialZoom);
     }
-    onZoomLevelChange?.(initialZoom);
-  }, [getZoom, externalZoomLevel, onZoomLevelChange]);
+  }, []);
 
   // Keyboard shortcuts
   React.useEffect(() => {

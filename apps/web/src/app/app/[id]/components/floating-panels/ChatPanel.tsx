@@ -17,6 +17,7 @@ import { Prism as SyntaxHighlighter } from "react-syntax-highlighter";
 import { vscDarkPlus } from "react-syntax-highlighter/dist/esm/styles/prism";
 import { trpc } from "@/utils/trpc";
 import Loader from "@/components/loader";
+import { toast } from "sonner";
 
 interface GenerationResult {
   subject?: string;
@@ -30,6 +31,7 @@ interface Message {
   content: string;
   isStreaming?: boolean;
   isPersisted?: boolean;
+  persistenceError?: boolean; // Indicates message failed to save to DB
   generationResult?: GenerationResult; // Store the generated content with this message
 }
 
@@ -183,24 +185,23 @@ export const ChatPanel = ({
       const isNewTemplate = !templateState.currentTemplate?.reactEmailCode;
 
       try {
-        // 3. Start generation immediately (don't wait for DB)
+        // 3. Start generation immediately (UX: user sees streaming right away)
         const generationPromise = isNewTemplate
           ? templateActions.generateTemplateStream(trimmedPrompt)
           : templateActions.regenerateTemplate(trimmedPrompt);
 
-        // 4. Persist messages to DB in background (fire-and-forget)
-        const persistPromise = (async () => {
+        // 4. Define message persistence function
+        const persistMessages = async () => {
           try {
-            // Wait a moment for template to be fully ready
-            await new Promise((resolve) => setTimeout(resolve, 100));
-            
-            await createMessageMutation.mutateAsync({
+            // Persist user message
+            const dbUser = await createMessageMutation.mutateAsync({
               templateId,
               role: "user",
               content: trimmedPrompt,
               isStreaming: false,
             });
 
+            // Persist assistant message
             const dbAssistant = await createMessageMutation.mutateAsync({
               templateId,
               role: "assistant",
@@ -208,34 +209,58 @@ export const ChatPanel = ({
               isStreaming: true,
             });
 
-            // Update local message with DB id for future updates
+            // Atomically update both message IDs in a single operation
             setMessages((prev) =>
-              prev.map((msg) =>
-                msg.id === assistantMsgId
-                  ? { ...msg, id: dbAssistant.id, isPersisted: true }
-                  : msg.id === userMsgId
-                  ? { ...msg, isPersisted: true }
-                  : msg
-              )
+              prev.map((msg) => {
+                if (msg.id === userMsgId) {
+                  return { ...msg, id: dbUser.id, isPersisted: true, persistenceError: false };
+                }
+                if (msg.id === assistantMsgId) {
+                  return { ...msg, id: dbAssistant.id, isPersisted: true, persistenceError: false };
+                }
+                return msg;
+              })
             );
+            
             currentStreamingIdRef.current = dbAssistant.id;
-
             return dbAssistant.id;
+            
           } catch (error) {
-            console.error("Background persist failed:", error);
+            console.error("Message persistence failed:", error);
+            
+            // Mark messages as failed in UI
+            setMessages((prev) =>
+              prev.map((msg) => {
+                if (msg.id === userMsgId || msg.id === assistantMsgId) {
+                  return { ...msg, isPersisted: false, persistenceError: true };
+                }
+                return msg;
+              })
+            );
+            
+            // Surface error to user with actionable information
+            toast.error("Failed to save chat messages", {
+              description: "Your messages are shown locally but weren't saved. The template was still created successfully.",
+              duration: 5000,
+            });
+            
             return null;
           }
-        })();
+        };
 
-        // 5. Wait for generation to complete
+        // 5. Wait for generation to complete first
         await generationPromise;
+        
+        // 6. Now persist messages (template is guaranteed to exist)
+        // This ensures no race condition with template creation
+        const dbAssistantId = await persistMessages();
 
-        // 6. Capture the generation result from ref (not state - avoids stale closure)
+        // 7. Capture the generation result from ref (not state - avoids stale closure)
         const generationResult: GenerationResult = latestStreamingProgressRef.current ?? {};
         // Clear the ref for next generation
         latestStreamingProgressRef.current = null;
 
-        // 7. Update local message to completion with generation result
+        // 8. Update local message to completion with generation result
         const finalContent = isNewTemplate
           ? "I've created a new template based on your request. You can now edit it in the canvas!"
           : "I've updated the template based on your request.";
@@ -248,15 +273,22 @@ export const ChatPanel = ({
           )
         );
 
-        // 8. Update DB in background with metadata
-        const dbId = await persistPromise;
-        if (dbId) {
-          updateMessageMutation.mutate({
-            id: dbId,
-            content: finalContent,
-            isStreaming: false,
-            metadata: generationResult,
-          });
+        // 9. Update DB with final content and metadata
+        if (dbAssistantId) {
+          try {
+            await updateMessageMutation.mutateAsync({
+              id: dbAssistantId,
+              content: finalContent,
+              isStreaming: false,
+              metadata: generationResult,
+            });
+          } catch (error) {
+            console.error("Failed to update message with final content:", error);
+            toast.error("Failed to save final message", {
+              description: "The message is visible but the final state wasn't saved.",
+              duration: 4000,
+            });
+          }
         }
 
         currentStreamingIdRef.current = null;
@@ -288,6 +320,7 @@ export const ChatPanel = ({
       messages,
       templateId,
       templateState.currentTemplate,
+      templateState.generationPhase,
       templateActions,
       createMessageMutation,
       updateMessageMutation,
@@ -324,27 +357,33 @@ export const ChatPanel = ({
   ]);
 
   // ==================== CANCEL GENERATION ====================
-  const handleCancel = useCallback(() => {
+  const handleCancel = useCallback(async () => {
     templateActions.cancelGeneration();
     setIsLoading(false);
 
     // Update local message
     if (currentStreamingIdRef.current) {
+      const msgId = currentStreamingIdRef.current;
+      
       setMessages((prev) =>
         prev.map((msg) =>
-          msg.id === currentStreamingIdRef.current
+          msg.id === msgId
             ? { ...msg, content: "Generation cancelled.", isStreaming: false }
             : msg
         )
       );
 
-      // Update DB in background
-      const msgId = currentStreamingIdRef.current;
-      updateMessageMutation.mutate({
-        id: msgId,
-        content: "Generation cancelled.",
-        isStreaming: false,
-      });
+      // Update DB with cancellation
+      try {
+        await updateMessageMutation.mutateAsync({
+          id: msgId,
+          content: "Generation cancelled.",
+          isStreaming: false,
+        });
+      } catch (error) {
+        console.error("Failed to update cancelled message:", error);
+        // Non-critical error, don't show toast for cancellation updates
+      }
 
       currentStreamingIdRef.current = null;
     }
@@ -393,10 +432,11 @@ export const ChatPanel = ({
               >
                 <div
                   className={cn(
-                    "p-3 rounded-lg text-sm max-w-[80%]",
+                    "p-3 rounded-lg text-sm max-w-[80%] relative",
                     msg.role === "assistant"
                       ? "text-muted-foreground"
-                      : "bg-secondary text-secondary-foreground"
+                      : "bg-secondary text-secondary-foreground",
+                    msg.persistenceError && "border-2 border-amber-500/50"
                   )}
                 >
                   {msg.isStreaming ? (
@@ -405,7 +445,15 @@ export const ChatPanel = ({
                       <span>{msg.content}</span>
                     </div>
                   ) : (
-                    msg.content
+                    <>
+                      {msg.content}
+                      {msg.persistenceError && (
+                        <div className="mt-2 text-xs text-amber-600 dark:text-amber-500 flex items-center gap-1">
+                          <span>⚠️</span>
+                          <span>Not saved to database</span>
+                        </div>
+                      )}
+                    </>
                   )}
                 </div>
               </div>

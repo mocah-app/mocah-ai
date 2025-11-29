@@ -52,5 +52,5 @@ export const serverEnv = createEnv({
     NODE_ENV: z.enum(["development", "test", "production"]).optional(),
   },
   runtimeEnv: process.env,
-  skipValidation: !!process.env.SKIP_ENV_VALIDATION,
+  skipValidation: !!process.env.SKIP_ENV_VALIDATION && process.env.NODE_ENV !== "production",
 });

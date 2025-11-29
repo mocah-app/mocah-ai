@@ -150,6 +150,14 @@ function hashCode(str: string): string {
 }
 
 /**
+ * Generate cache key that includes code and render options
+ */
+function generateCacheKey(code: string, pretty: boolean): string {
+  const codeHash = hashCode(code);
+  return `${codeHash}:${pretty ? '1' : '0'}`;
+}
+
+/**
  * Validate input code before processing
  */
 function validateInput(code: string): void {
@@ -254,7 +262,7 @@ export async function renderReactEmailClientSide(
   }
 
   // Check cache
-  const cacheKey = hashCode(code);
+  const cacheKey = generateCacheKey(code, pretty);
   if (!skipCache) {
     const cached = renderCache.get(cacheKey);
     if (cached) {
@@ -264,8 +272,10 @@ export async function renderReactEmailClientSide(
 
   // Wrap render in timeout promise
   const renderPromise = executeRender(code, pretty);
+  
+  let timer: ReturnType<typeof setTimeout> | undefined;
   const timeoutPromise = new Promise<never>((_, reject) => {
-    setTimeout(() => {
+    timer = setTimeout(() => {
       reject(
         new RenderError(
           RenderErrorCode.TIMEOUT,
@@ -305,6 +315,11 @@ export async function renderReactEmailClientSide(
       error instanceof Error ? error.message : "Unknown render error",
       error
     );
+  } finally {
+    // Clear timeout to prevent timer leak
+    if (timer !== undefined) {
+      clearTimeout(timer);
+    }
   }
 }
 
@@ -393,7 +408,8 @@ export async function renderReactEmailWithMetadata(
   options: RenderOptions = {}
 ): Promise<RenderResult> {
   const startTime = performance.now();
-  const cacheKey = hashCode(code);
+  const pretty = options.pretty ?? true;
+  const cacheKey = generateCacheKey(code, pretty);
   const wasInCache = !options.skipCache && renderCache.get(cacheKey) !== null;
 
   const html = await renderReactEmailClientSide(code, options);

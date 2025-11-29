@@ -158,8 +158,6 @@ export function TemplateProvider({
           previewText: updatePayload.previewText,
           styleType: updatePayload.styleType,
           reactEmailCodeLength: updatePayload.reactEmailCode?.length || 0,
-          reactEmailCodePreview: updatePayload.reactEmailCode?.substring(0, 500) || "",
-          reactEmailCodeFull: updatePayload.reactEmailCode, // Full code for debugging
           styleDefinitionsKeys: Object.keys(styleDefinitions),
         });
 
@@ -187,15 +185,14 @@ export function TemplateProvider({
         // Refetch to get the latest data
         await refetch();
       } catch (error) {
-        console.error("❌ [TemplateProvider] Failed to save streamed template:", error);
-        console.error("📋 [TemplateProvider] Error details:", {
+        logger.error("❌ [TemplateProvider] Failed to save streamed template:", error as Error);
+        logger.error("📋 [TemplateProvider] Error details:", {
           errorMessage: error instanceof Error ? error.message : String(error),
           errorStack: error instanceof Error ? error.stack : undefined,
           templateId,
           templateData: {
             subject: template.subject,
             reactEmailCodeLength: template.reactEmailCode?.length || 0,
-            reactEmailCodePreview: template.reactEmailCode?.substring(0, 1000) || "",
           },
         });
         setState((prev) => ({

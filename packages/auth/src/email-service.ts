@@ -20,12 +20,6 @@ const FROM_EMAIL: string | undefined = serverEnv.RESEND_FROM_EMAIL
   : undefined;
 const APP_NAME = serverEnv.APP_NAME || "Mocah AI";
 
-if (!FROM_EMAIL) {
-  throw new Error(
-    "RESEND_FROM_EMAIL environment variable is required for sending emails"
-  );
-}
-
 /**
  * Get the logo URL for email templates
  * Uses the dark logo by default, can be overridden via environment variable
@@ -52,10 +46,16 @@ export class EmailService {
    * Send a generic email
    */
   static async sendEmail({ to, subject, html, text }: SendEmailOptions) {
+    if (!FROM_EMAIL) {
+      throw new Error(
+        "RESEND_FROM_EMAIL environment variable is required for sending emails"
+      );
+    }
+
     try {
       const resendClient = getResendClient();
       const result = await resendClient.emails.send({
-        from: FROM_EMAIL!, // Non-null assertion: validated at module load time
+        from: FROM_EMAIL,
         to,
         subject,
         html,
