@@ -4,7 +4,7 @@
  */
 
 import { Redis } from "@upstash/redis";
-import { logger } from "@mocah/shared";
+import { logger } from "./logger";
 import { serverEnv } from "@mocah/config/env";
 
 // Initialize Redis client (will be null if env vars not set)

@@ -99,7 +99,7 @@ export function TemplateProvider({
     styleDefinitions: {},
   });
 
-  // Streaming hook
+  // Streaming hook for initial generation
   const {
     partialTemplate,
     generate: generateStream,
@@ -108,6 +108,7 @@ export function TemplateProvider({
     error: streamError,
   } = useStreamTemplate({
     organizationId: activeOrganization?.id || "",
+    apiEndpoint: "/api/template/generate",
     onComplete: async (template) => {
       // When streaming completes, update the existing template in database
       try {
@@ -215,19 +216,127 @@ export function TemplateProvider({
     },
   });
 
+  // Streaming hook for regeneration
+  const {
+    partialTemplate: regenerationPartialTemplate,
+    generate: regenerateStream,
+    cancel: cancelRegenerationStream,
+    isGenerating: isRegenerating,
+    error: regenerationError,
+  } = useStreamTemplate({
+    templateId: templateId,
+    apiEndpoint: "/api/template/regenerate",
+    onComplete: async (template) => {
+      // When regeneration streaming completes, update the template in database
+      try {
+        if (!templateId) {
+          throw new Error("No template ID available to update");
+        }
+
+        // Convert styleType to uppercase to match Prisma enum
+        const styleTypeMap: Record<string, 'INLINE' | 'PREDEFINED_CLASSES' | 'STYLE_OBJECTS'> = {
+          'inline': 'INLINE',
+          'predefined-classes': 'PREDEFINED_CLASSES',
+          'style-objects': 'STYLE_OBJECTS',
+        };
+        const mappedStyleType = template.styleType ? styleTypeMap[template.styleType] : 'STYLE_OBJECTS';
+
+        // Parse styleDefinitions
+        let styleDefinitions: Record<string, React.CSSProperties> = {};
+        const templateAny = template as any;
+        const styleDefsJson = templateAny.styleDefinitionsJson;
+        const styleDefs = templateAny.styleDefinitions;
+        
+        if (styleDefsJson && typeof styleDefsJson === 'string') {
+          try {
+            styleDefinitions = JSON.parse(styleDefsJson);
+          } catch {
+            // Ignore parse errors
+          }
+        } else if (styleDefs && typeof styleDefs === 'object') {
+          styleDefinitions = styleDefs;
+        }
+
+        const updatePayload = {
+          id: templateId,
+          name: template.subject || state.currentTemplate?.name || "AI Generated Template",
+          subject: template.subject,
+          reactEmailCode: template.reactEmailCode,
+          styleType: mappedStyleType,
+          styleDefinitions,
+          previewText: template.previewText,
+        };
+        
+        logger.info("🔄 [TemplateProvider] Saving regenerated template data:", {
+          id: updatePayload.id,
+          name: updatePayload.name,
+          subject: updatePayload.subject,
+          previewText: updatePayload.previewText,
+          styleType: updatePayload.styleType,
+          reactEmailCodeLength: updatePayload.reactEmailCode?.length || 0,
+        });
+
+        // Set finalizing phase while saving
+        setState((prev) => ({
+          ...prev,
+          generationPhase: 'finalizing',
+        }));
+
+        const result = await updateMutation.mutateAsync(updatePayload);
+        const processedResult = convertDates(result);
+
+        setState((prev) => ({
+          ...prev,
+          currentTemplate: processedResult,
+          reactEmailCode: template.reactEmailCode || null,
+          styleDefinitions,
+          isStreaming: false,
+          streamingProgress: null,
+          isLoading: false,
+          generationPhase: 'complete',
+        }));
+
+        // Refetch to get the latest data
+        await refetch();
+      } catch (error) {
+        logger.error("❌ [TemplateProvider] Failed to save regenerated template:", error as Error);
+        setState((prev) => ({
+          ...prev,
+          isStreaming: false,
+          isLoading: false,
+          generationPhase: 'idle',
+        }));
+      }
+    },
+    onError: (error) => {
+      console.error("Regeneration streaming error:", error);
+      setState((prev) => ({
+        ...prev,
+        isStreaming: false,
+        streamingProgress: null,
+        isLoading: false,
+        generationPhase: 'idle',
+      }));
+    },
+  });
+
+  // Combine streaming progress from both hooks
+  const currentStreamingProgress = partialTemplate || regenerationPartialTemplate;
+  const isCurrentlyStreaming = isGenerating || isRegenerating;
+
   // Update streaming progress and generation phase in state
   useEffect(() => {
-    if (!isGenerating && !partialTemplate) return;
+    if (!isCurrentlyStreaming && !currentStreamingProgress) return;
 
-    const progress = partialTemplate as StreamingProgress | null;
+    const progress = currentStreamingProgress as StreamingProgress | null;
 
     setState((prev) => ({
       ...prev,
       streamingProgress: progress || prev.streamingProgress,
-      isStreaming: isGenerating,
-      generationPhase: getNextPhase(prev.generationPhase, isGenerating, progress),
+      isStreaming: isCurrentlyStreaming,
+      generationPhase: getNextPhase(prev.generationPhase, isCurrentlyStreaming, progress),
     }));
-  }, [partialTemplate, isGenerating]);
+  }, [currentStreamingProgress, isCurrentlyStreaming]);
 
   // Auto-transition from 'starting' to 'analyzing' after brief delay
   // This gives users visual feedback during server-side processing
@@ -262,7 +371,14 @@ export function TemplateProvider({
       utils.template.list.invalidate();
     },
   });
-  const updateMutation = trpc.template.update.useMutation();
+  const updateMutation = trpc.template.update.useMutation({
+    onSuccess: () => {
+      // Invalidate the specific template query to ensure fresh data on refetch
+      if (templateId) {
+        utils.template.get.invalidate({ id: templateId });
+      }
+    },
+  });
 
   // tRPC queries - fetch template data with retry for optimistic creation
   const {
@@ -396,30 +512,37 @@ export function TemplateProvider({
 
   const regenerateTemplate = useCallback(
     async (prompt: string) => {
-      if (!state.currentTemplate) return;
-      setState((prev) => ({ ...prev, isLoading: true }));
+      if (!state.currentTemplate) {
+        throw new Error("No template loaded");
+      }
+
+      setState((prev) => ({
+        ...prev,
+        isStreaming: true,
+        isLoading: true,
+        streamingProgress: null,
+        generationPhase: 'starting',
+      }));
+
       try {
-        const result = await regenerateMutation.mutateAsync({
+        logger.info("🔄 [TemplateProvider] Starting template regeneration with streaming", {
           templateId: state.currentTemplate.id,
-          prompt,
+          promptPreview: prompt.substring(0, 100),
         });
 
-        console.log("Template regenerated:", result);
-
-        // TODO: Update the canvas with the new template version
-        // This should trigger a refresh of the template node
-
-        // We might need to refetch the template to get the new version in the list
-        await refetch();
-
-        setState((prev) => ({ ...prev, isLoading: false }));
+        await regenerateStream(prompt);
       } catch (error) {
         console.error("Failed to regenerate template:", error);
-        setState((prev) => ({ ...prev, isLoading: false }));
+        setState((prev) => ({
+          ...prev,
+          isStreaming: false,
+          isLoading: false,
+          generationPhase: 'idle',
+        }));
         throw error;
       }
     },
-    [state.currentTemplate, regenerateMutation]
+    [state.currentTemplate, regenerateStream]
   );
 
   const generateTemplate = useCallback(
@@ -546,7 +669,9 @@ export function TemplateProvider({
   );
 
   const cancelGeneration = useCallback(() => {
+    // Cancel both generation and regeneration streams
     cancelStream();
+    cancelRegenerationStream();
     setState((prev) => ({
       ...prev,
       isStreaming: false,
@@ -554,7 +679,7 @@ export function TemplateProvider({
       streamingProgress: null,
       generationPhase: 'idle',
     }));
-  }, [cancelStream]);
+  }, [cancelStream, cancelRegenerationStream]);
 
   const actions: TemplateActions = {
     loadTemplate,

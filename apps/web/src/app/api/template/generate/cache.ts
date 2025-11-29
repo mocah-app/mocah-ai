@@ -4,8 +4,7 @@
  * Redis handles TTL expiration automatically
  */
 
-import { getRedis, isRedisAvailable, CACHE_KEYS } from "@/lib/redis";
-import { logger } from "@mocah/shared";
+import { getRedis, isRedisAvailable, CACHE_KEYS, logger } from "@mocah/shared";
 
 // TTL settings (in seconds for Redis)
 const MEMBERSHIP_TTL_SECONDS = 2 * 60; // 2 minutes (shorter for security)

@@ -1,7 +1,7 @@
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
-import { MessageCircle, Send, StopCircleIcon, X } from "lucide-react";
+import { MessageCircle, Send, Square, X } from "lucide-react";
 import { useParams } from "next/navigation";
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import { useTemplate, GENERATION_PHASE_MESSAGES } from "../providers/TemplateProvider";
@@ -423,11 +423,12 @@ export const ChatPanel = ({
             <Button
               onClick={handleCancel}
               size="icon"
-              variant="destructive"
+              // variant="destructive"
               className="absolute right-3 bottom-3 w-8 h-8"
               title="Cancel generation"
             >
-              <StopCircleIcon size={14} />
+              <Square size={14} />
+
             </Button>
           ) : (
             <Button

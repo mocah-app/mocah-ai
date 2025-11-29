@@ -400,6 +400,124 @@ If any check fails, DO NOT output the code. Fix the issues first.`;
 }
 
 /**
+ * Build a prompt for React Email template regeneration/modification
+ * Includes the current template code for context-aware updates
+ */
+export function buildReactEmailRegenerationPrompt(
+  userPrompt: string,
+  currentTemplateCode: string,
+  brandKit?: BrandKit
+): string {
+  const brandGuidelines = brandKit
+    ? `
+Brand Guidelines:
+- Primary Color: ${brandKit.primaryColor || "Not specified"}
+- Secondary Color: ${brandKit.secondaryColor || "Not specified"}
+- Font Family: ${brandKit.fontFamily || "Not specified"}
+- Brand Voice: ${brandKit.brandVoice || "Professional"}
+${brandKit.logoUrl ? `- Logo URL: ${brandKit.logoUrl}` : ""}
+`
+    : "";
+
+  return `You are modifying an EXISTING React Email template based on a user's request.
+
+CURRENT TEMPLATE CODE:
+\`\`\`tsx
+${currentTemplateCode}
+\`\`\`
+
+USER REQUEST: "${userPrompt}"
+
+${brandGuidelines}
+
+TASK: Modify the EXISTING template above to fulfill the user's request while preserving everything not mentioned.
+
+MODIFICATION RULES:
+1. **Preserve Structure**: Keep the same overall structure, layout, and sections UNLESS explicitly asked to change them
+2. **Targeted Changes**: Only modify what the user specifically requested
+3. **Keep Content**: Maintain all existing text, images, and elements that weren't mentioned in the request
+4. **Selective Updates**: 
+   - "make it more colorful" → Add colors to backgrounds, buttons, text while keeping all structure and content
+   - "add more spacing" → Increase padding/margins while keeping all sections and content
+   - "change button text to X" → ONLY change the button text, keep everything else identical
+   - "make header bigger" → Increase header font size, keep content and rest of template
+   - "add a footer" → Add new footer section, keep all existing sections untouched
+5. **Cumulative Changes**: This template may have been modified before - respect ALL existing customizations
+
+EXAMPLES OF CORRECT BEHAVIOR:
+
+Example 1 - Color Request:
+User: "Make it more colorful"
+Current: Plain template with black text, white background, gray button
+Correct: Same template with brand colors on backgrounds, buttons, headings - all content preserved
+Wrong: Generate completely new colorful template with different layout
+
+Example 2 - Text Change:
+User: "Change the CTA button to say 'Get Started Now'"
+Current: Template with "Buy Now" button
+Correct: Exact same template, only button text changed to "Get Started Now"
+Wrong: Generate new template with "Get Started Now" button
+
+Example 3 - Adding Element:
+User: "Add a hero image at the top"
+Current: Template with text header
+Correct: Insert <Img> component before header, keep everything else identical
+Wrong: Redesign the entire header section
+
+DO NOT:
+- Generate a completely new template from scratch
+- Remove or reorganize sections unless explicitly asked
+- Change content, text, or copy unless explicitly asked
+- Alter the design style unless explicitly asked
+- Ignore existing customizations from previous modifications
+
+CRITICAL RULES (MUST FOLLOW - VALIDATION WILL FAIL OTHERWISE):
+
+1. ABSOLUTELY NO HTML TAGS - ONLY React Email components:
+   ❌ FORBIDDEN: <div>, <span>, <p>, <h1-h6>, <a>, <button>, <img>, <br>, <hr>, <strong>, <em>, <b>, <i>
+   ✅ REQUIRED: Only use @react-email/components
+
+2. REQUIRED components (import from '@react-email/components'):
+   - <Html>, <Head>, <Body>, <Container>, <Section>, <Row>, <Column>
+   - <Heading>, <Text>, <Button>, <Img>, <Link>, <Hr>
+
+3. <Text> component - CRITICAL (MOST COMMON ERROR):
+   ❌ ABSOLUTELY FORBIDDEN: Nested <Text> components
+   ❌ WRONG: <Text>Hello <Text style={{color: 'red'}}>World</Text></Text>
+   ✅ CORRECT: Use separate <Text> components or unified styling
+
+4. <Heading> component:
+   ❌ NEVER use: <Heading as="h2">
+   ✅ ALWAYS use: <Heading style={...}>
+
+5. Email-safe CSS ONLY:
+   ❌ FORBIDDEN: display, position, transform, flexbox, grid, float, box-shadow
+   ✅ ALLOWED: padding, margin, backgroundColor, color, fontSize, fontWeight, textAlign, lineHeight, borderRadius, border, width, height
+
+6. Export format:
+   ✅ REQUIRED: export default function ComponentName() { return (...); }
+   ❌ FORBIDDEN: export const ComponentName = () => ...
+
+7. TypeScript type safety:
+   ✅ Use 'as const' for string literals: textAlign: 'center' as const
+
+PRE-OUTPUT VALIDATION CHECKLIST:
+1. Search for "<div", "<span", "<p>", "<h1" → Should find ZERO
+2. Search for "display:" → Should find ZERO
+3. Search for pattern "Text>.*<Text" → Should find ZERO (nested Text)
+4. Search for "Heading as=" → Should find ZERO
+5. Search for "export const" at component level → Should find ZERO
+6. Verify "export default function" exists → Should find EXACTLY ONE
+7. Count <Text> vs </Text> tags → Should be EQUAL
+8. Verify all textAlign/verticalAlign have "as const" → Should be 100%
+
+${brandGuidelines}
+
+Return the COMPLETE modified React Email component code with all imports, types, and structure.
+The output must be production-ready and pass all validation rules.`;
+}
+
+/**
  * Zod schema for React Email JSX generation output
  * Optimized for streaming with early fields first
  * Enhanced descriptions improve AI reliability

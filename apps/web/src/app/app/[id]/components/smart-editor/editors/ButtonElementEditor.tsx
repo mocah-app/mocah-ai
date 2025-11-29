@@ -52,16 +52,16 @@ export function ButtonElementEditor({
 
       {/* Link URL */}
       <LinkSection
-        href={elementData.attributes?.href as string}
+        href={(elementData.attributes?.href as string) ?? ''}
         onChange={(href) => handleAttributeChange('href', href)}
       />
 
       {/* Typography (simplified for buttons) */}
       <TypographySection
-        fontFamily={currentStyles.fontFamily as string}
-        fontSize={currentStyles.fontSize as string}
-        fontWeight={currentStyles.fontWeight as string}
-        textAlign={currentStyles.textAlign as string}
+        fontFamily={(currentStyles.fontFamily as string) ?? ''}
+        fontSize={(currentStyles.fontSize as string) ?? ''}
+        fontWeight={(currentStyles.fontWeight as string) ?? ''}
+        textAlign={(currentStyles.textAlign as string) ?? ''}
         onChange={handleStyleChange}
         showFontFamily={false}
         showDecoration={false}
@@ -81,8 +81,8 @@ export function ButtonElementEditor({
 
       {/* Layout (padding, border-radius) */}
       <LayoutSection
-        padding={currentStyles.padding as string}
-        borderRadius={currentStyles.borderRadius as string}
+        padding={(currentStyles.padding as string) ?? ''}
+        borderRadius={(currentStyles.borderRadius as string) ?? ''}
         onChange={handleStyleChange}
         showBorderRadius={true}
       />

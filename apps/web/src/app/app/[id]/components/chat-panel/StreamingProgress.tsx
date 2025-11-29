@@ -45,7 +45,7 @@ export const StreamingProgress = ({
 
   return (
     <div className="p-4 space-y-4">
-      <div className="space-y-3 max-h-[400px] overflow-y-auto">
+      <div className="space-y-3">
         {sections.map((section) => {
           const isCompleted = !!section.value;
           const isCurrent = currentSection?.key === section.key;

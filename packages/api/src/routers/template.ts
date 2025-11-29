@@ -5,6 +5,7 @@ import { organizationProcedure } from "../middleware";
 import { aiClient, TEMPLATE_GENERATION_MODEL } from "../lib/ai";
 import {
   buildReactEmailPrompt,
+  buildReactEmailRegenerationPrompt,
   reactEmailGenerationSchema,
 } from "../lib/prompts";
 import { validateReactEmailCode, logger } from "@mocah/shared";
@@ -351,11 +352,19 @@ export const templateRouter = router({
 
       const newVersionNumber = (latestVersion?.version || 0) + 1;
 
-      // Generate React Email template
-      const prompt = buildReactEmailPrompt(
+      // Generate React Email template with context from current template
+      const prompt = buildReactEmailRegenerationPrompt(
         input.prompt,
+        template.reactEmailCode || "",  // Current template code for context
         template.organization.brandKit as any
       );
+
+      logger.info("🔄 [Regeneration] Building prompt with current template", {
+        templateId: input.templateId,
+        userPrompt: input.prompt,
+        hasCurrentCode: !!template.reactEmailCode,
+        codeLength: template.reactEmailCode?.length || 0,
+      });
 
       const result = await aiClient.generateStructured(
         reactEmailGenerationSchema,

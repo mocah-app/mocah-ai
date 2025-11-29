@@ -8,11 +8,14 @@ import type { z } from "zod";
 type TemplateGenerationOutput = z.infer<typeof reactEmailGenerationSchema>;
 
 interface UseStreamTemplateOptions {
-  organizationId: string;
+  organizationId?: string;
+  templateId?: string;
   onComplete?: (template: TemplateGenerationOutput) => void;
   onError?: (error: Error) => void;
   /** Maximum client-side retries (default: 2) */
   maxRetries?: number;
+  /** API endpoint (default: /api/template/generate) */
+  apiEndpoint?: string;
 }
 
 /**
@@ -21,16 +24,19 @@ interface UseStreamTemplateOptions {
  */
 export function useStreamTemplate({
   organizationId,
+  templateId,
   onComplete,
   onError,
   maxRetries = 2,
+  apiEndpoint = "/api/template/generate",
 }: UseStreamTemplateOptions) {
   const [isGenerating, setIsGenerating] = useState(false);
   const [retryCount, setRetryCount] = useState(0);
   const lastPromptRef = useRef<string>("");
+  const lastBodyRef = useRef<Record<string, string>>({});
 
   const { object, submit, error, isLoading, stop } = useObject({
-    api: "/api/template/generate",
+    api: apiEndpoint,
     schema: reactEmailGenerationSchema,
     onFinish: ({ object: finalObject, error: finishError }) => {
       // Handle generation errors with retry logic
@@ -44,10 +50,7 @@ export function useStreamTemplate({
 
           // Retry after delay (exponential backoff)
           setTimeout(() => {
-            submit({
-              prompt: lastPromptRef.current,
-              organizationId,
-            });
+            submit(lastBodyRef.current);
           }, 1000 * (retryCount + 1));
           return;
         }
@@ -89,12 +92,22 @@ export function useStreamTemplate({
       setRetryCount(0);
       lastPromptRef.current = prompt;
 
-      await submit({
-        prompt,
-        organizationId,
-      });
+      // Build request body based on whether it's generation or regeneration
+      const body: Record<string, string> = { prompt };
+      
+      if (templateId) {
+        // Regeneration: needs templateId
+        body.templateId = templateId;
+      } else if (organizationId) {
+        // Generation: needs organizationId
+        body.organizationId = organizationId;
+      }
+      
+      lastBodyRef.current = body;
+
+      await submit(body);
     },
-    [submit, organizationId]
+    [submit, organizationId, templateId]
   );
 
   const cancel = useCallback(() => {

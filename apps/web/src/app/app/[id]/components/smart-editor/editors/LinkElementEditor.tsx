@@ -50,7 +50,7 @@ export function LinkElementEditor({
 
       {/* Link URL */}
       <LinkSection
-        href={elementData.attributes?.href as string}
+        href={(elementData.attributes?.href as string) ?? ''}
         onChange={(href) => handleAttributeChange('href', href)}
       />
 

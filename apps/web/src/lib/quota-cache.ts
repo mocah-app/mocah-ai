@@ -4,8 +4,7 @@
  *
  */
 
-import { getRedis, isRedisAvailable, CACHE_KEYS } from "./redis";
-import { logger } from "@mocah/shared";
+import { CACHE_KEYS, getRedis, isRedisAvailable, logger } from "@mocah/shared";
 
 // TTL for quota cache (5 minutes - balances freshness with performance)
 const QUOTA_TTL_SECONDS = 5 * 60;

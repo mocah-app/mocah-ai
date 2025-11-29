@@ -8,7 +8,7 @@ export interface StreamingProgress {
   subject?: string;
   previewText?: string;
   reactEmailCode?: string;
-  styleType?: 'inline' | 'predefined-classes' | 'style-objects';
+  styleType?: "inline" | "predefined-classes" | "style-objects";
   styleDefinitionsJson?: string;
   metadata?: {
     emailType?: string;
@@ -20,25 +20,25 @@ export interface StreamingProgress {
 
 // Generation phases for engaging UX
 export type GenerationPhase =
-  | 'idle'
-  | 'starting'
-  | 'analyzing'
-  | 'generating-subject'
-  | 'generating-preview'
-  | 'generating-code'
-  | 'finalizing'
-  | 'complete';
+  | "idle"
+  | "starting"
+  | "analyzing"
+  | "generating-subject"
+  | "generating-preview"
+  | "generating-code"
+  | "finalizing"
+  | "complete";
 
 // Phase messages for dynamic UI - fun and engaging
 export const GENERATION_PHASE_MESSAGES: Record<GenerationPhase, string> = {
-  idle: '',
-  starting: 'Brewing some email magic...',
-  analyzing: 'Understanding your vision...',
-  'generating-subject': 'Crafting the perfect subject line...',
-  'generating-preview': 'Writing your preview text...',
-  'generating-code': 'Building your template piece by piece...',
-  finalizing: 'Adding the finishing touches...',
-  complete: 'Your template is ready!',
+  idle: "",
+  starting: "Brewing...",
+  analyzing: "Analyzing...",
+  "generating-subject": "Crafting subject line...",
+  "generating-preview": "Writing preview text...",
+  "generating-code": "Building template...",
+  finalizing: "Adding finishing touches...",
+  complete: "Template ready!",
 };
 
 /**
@@ -55,29 +55,28 @@ export function getNextPhase(
   }
 
   // isGenerating is true from here on
-  
+
   // Check progress content to determine specific phase
   if (progress) {
     if (progress.reactEmailCode && progress.reactEmailCode.length > 100) {
-      return 'generating-code';
+      return "generating-code";
     }
     if (progress.previewText) {
-      return 'generating-preview';
+      return "generating-preview";
     }
     if (progress.subject) {
-      return 'generating-subject';
+      return "generating-subject";
     }
     // Progress object exists but empty/partial = analyzing
-    return 'analyzing';
+    return "analyzing";
   }
 
   // isGenerating=true but no progress yet
   // Quickly transition from starting -> analyzing after a tick
   // If already past starting, keep current phase
-  if (currentPhase === 'idle' || currentPhase === 'starting') {
-    return 'starting';
+  if (currentPhase === "idle" || currentPhase === "starting") {
+    return "starting";
   }
-  
+
   return currentPhase;
 }
-
