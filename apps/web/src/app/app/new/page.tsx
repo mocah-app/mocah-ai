@@ -113,10 +113,10 @@ export default function NewTemplatePage() {
       </div>
       {/* gradient shape background */}
       <div className="absolute w-2xl h-1/2 bg-linear-to-b z-0 from-primary-transparent dark:from-primary-foreground/40 to-blue-500/30 dark:to-blue-950 rounded-full blur-3xl left-1/2 -translate-x-1/2 top-0"></div>
-      <div className="w-full max-w-4xl space-y-8 z-10 flex flex-col items-center justify-center">
+      <div className="w-full max-w-4xl space-y-8 z-10 flex flex-col items-center justify-center px-4">
         {/* Header */}
-        <div className="text-center space-y-4">
-          <h1 className="text-2xl md:text-4xl font-bold text-foreground tracking-tight">
+        <div className="text-center space-y-4 pt-8">
+          <h1 className="text-2xl md:text-4xl text-balance font-bold text-foreground tracking-tight">
             What template will you create?
           </h1>
 
@@ -126,7 +126,7 @@ export default function NewTemplatePage() {
         </div>
 
         {/* Main Input Area */}
-        <div className="bg-card border border-border rounded-2xl shadow-2xl max-w-3xl w-full mx-auto has-focus-visible:border-blue-500/30 transition-colors">
+        <div className="bg-card border border-border rounded-2xl shadow-2xl md:max-w-2xl lg:max-w-3xl w-full mx-auto has-focus-visible:border-blue-500/30 transition-colors">
           <div className="relative">
             <Textarea
               value={prompt}
@@ -159,11 +159,11 @@ export default function NewTemplatePage() {
         </div>
 
         {/* Suggested Prompts */}
-        <div className="space-y-3 mx-auto max-w-2xl">
+        <div className="space-y-3 mx-auto max-w-2xl w-full">
           <h3 className="text-sm font-medium text-muted-foreground">
             Suggested prompts
           </h3>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3 w-full">
             {suggestedPrompts.map((suggestion, index) => (
               <Button
                 variant="outline"

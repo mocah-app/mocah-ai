@@ -1,39 +1,14 @@
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
-import {
-  Code2,
-  FileText,
-  MessageCircle,
-  Send,
-  StopCircleIcon,
-  Type,
-  X,
-} from "lucide-react";
+import { MessageCircle, Send, StopCircleIcon, X } from "lucide-react";
 import { useParams } from "next/navigation";
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import { useTemplate, GENERATION_PHASE_MESSAGES } from "../providers/TemplateProvider";
-import { Prism as SyntaxHighlighter } from "react-syntax-highlighter";
-import { vscDarkPlus } from "react-syntax-highlighter/dist/esm/styles/prism";
 import { trpc } from "@/utils/trpc";
-import Loader from "@/components/loader";
 import { toast } from "sonner";
-
-interface GenerationResult {
-  subject?: string;
-  previewText?: string;
-  codePreview?: string; // First ~500 chars
-}
-
-interface Message {
-  id: string;
-  role: "user" | "assistant";
-  content: string;
-  isStreaming?: boolean;
-  isPersisted?: boolean;
-  persistenceError?: boolean; // Indicates message failed to save to DB
-  generationResult?: GenerationResult; // Store the generated content with this message
-}
+import type { Message, GenerationResult } from "../chat-panel/MessageItem";
+import { MessageList } from "../chat-panel/MessageList";
 
 export const ChatPanel = ({
   isOpen,
@@ -414,81 +389,11 @@ export const ChatPanel = ({
       </div>
 
       {/* Messages */}
-      <div className="flex-1 overflow-y-auto p-4 space-y-4">
-        {showLoading ? (
-          <div className="flex items-center justify-center h-full">
-            <Loader />
-          </div>
-        ) : (
-          messages.map((msg, index) => (
-            <div key={msg.id}>
-              <div
-                className={cn(
-                  "flex gap-3 transition-all duration-300 ease-in-out",
-                  msg.role === "user" ? "flex-row-reverse" : "",
-                  isOpen ? "translate-y-0 opacity-100" : "translate-y-4 opacity-0"
-                )}
-                style={{ transitionDelay: isOpen ? `${index * 50}ms` : "0ms" }}
-              >
-                <div
-                  className={cn(
-                    "p-3 rounded-lg text-sm max-w-[80%] relative",
-                    msg.role === "assistant"
-                      ? "text-muted-foreground"
-                      : "bg-secondary text-secondary-foreground",
-                    msg.persistenceError && "border-2 border-amber-500/50"
-                  )}
-                >
-                  {msg.isStreaming ? (
-                    <div className="flex items-center gap-2">
-                      <Loader />
-                      <span>{msg.content}</span>
-                    </div>
-                  ) : (
-                    <>
-                      {msg.content}
-                      {msg.persistenceError && (
-                        <div className="mt-2 text-xs text-amber-600 dark:text-amber-500 flex items-center gap-1">
-                          <span>⚠️</span>
-                          <span>Not saved to database</span>
-                        </div>
-                      )}
-                    </>
-                  )}
-                </div>
-              </div>
-
-              {/* Generation result - show live progress while streaming, or saved result after completion */}
-              {msg.role === "assistant" && (
-                <>
-                  {/* While streaming: show live progress with full code */}
-                  {msg.isStreaming && templateState.streamingProgress?.reactEmailCode && (
-                    <div className="mt-3 space-y-2 animate-in fade-in slide-in-from-bottom-4">
-                      <StreamingProgress
-                        progress={templateState.streamingProgress}
-                        isComplete={false}
-                      />
-                    </div>
-                  )}
-                  {/* After completion: show saved generation result with code preview */}
-                  {!msg.isStreaming && msg.generationResult?.codePreview && (
-                    <div className="mt-3 space-y-2">
-                      <StreamingProgress
-                        progress={{
-                          subject: msg.generationResult.subject,
-                          previewText: msg.generationResult.previewText,
-                          reactEmailCode: msg.generationResult.codePreview, // Use preview for display
-                        }}
-                        isComplete={true}
-                      />
-                    </div>
-                  )}
-                </>
-              )}
-            </div>
-          ))
-        )}
-      </div>
+      <MessageList 
+        messages={messages} 
+        isLoading={showLoading}
+        isOpen={isOpen}
+      />
 
       {/* Input */}
       <div
@@ -539,150 +444,3 @@ export const ChatPanel = ({
     </div>
   );
 };
-
-// ==================== STREAMING PROGRESS COMPONENT ====================
-function StreamingProgress({
-  progress,
-  isComplete = false,
-}: {
-  progress: {
-    subject?: string;
-    previewText?: string;
-    reactEmailCode?: string;
-    styleType?: string;
-  };
-  isComplete?: boolean;
-}) {
-  const sections = [
-    {
-      key: "subject",
-      label: "Subject Line",
-      icon: Type,
-      value: progress.subject,
-      color: "text-blue-400",
-    },
-    {
-      key: "previewText",
-      label: "Preview Text",
-      icon: FileText,
-      value: progress.previewText,
-      color: "text-purple-400",
-    },
-    {
-      key: "reactEmailCode",
-      label: "React Email Code",
-      icon: Code2,
-      value: progress.reactEmailCode,
-      color: "text-green-400",
-      isCode: true,
-    },
-  ];
-
-  const completedSections = sections.filter((s) => s.value);
-  const currentSection = completedSections[completedSections.length - 1];
-
-  return (
-    <div className="p-4 space-y-4">
-      <div className="space-y-3 max-h-[400px] overflow-y-auto">
-        {sections.map((section) => {
-          const isCompleted = !!section.value;
-          const isCurrent = currentSection?.key === section.key;
-          const Icon = section.icon;
-
-          if (!isCompleted) return null;
-
-          return (
-            <div
-              key={section.key}
-              className={`space-y-2 transition-all duration-300 ${
-                isCurrent && !isComplete ? "animate-in slide-in-from-bottom-2" : ""
-              }`}
-            >
-              <div className="flex items-center gap-2">
-                <Icon className={`h-3.5 w-3.5 ${section.color}`} />
-                <span className="text-xs font-medium text-muted-foreground">
-                  {section.label}
-                </span>
-                {/* Show bouncing dots only while streaming, checkmark when complete */}
-                {isCurrent && !isComplete && (
-                  <div className="flex gap-1 ml-auto">
-                    {[0, 150, 300].map((delay) => (
-                      <div
-                        key={delay}
-                        className="w-1 h-1 bg-primary rounded-full animate-bounce"
-                        style={{ animationDelay: `${delay}ms` }}
-                      />
-                    ))}
-                  </div>
-                )}
-                {isComplete && (
-                  <span className="text-xs text-green-500 ml-auto">✓</span>
-                )}
-              </div>
-
-              {section.isCode && section.value ? (
-                <CodePreview code={section.value} />
-              ) : (
-                <div className="bg-card/50 rounded-lg p-3 border border-border/50">
-                  <p className="text-sm leading-relaxed">{section.value}</p>
-                </div>
-              )}
-
-              {section.key === "reactEmailCode" && section.value && (
-                <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                  <div className="flex items-center gap-1">
-                    <div className="w-2 h-2 rounded-full bg-green-500" />
-                    <span>{section.value.split("\n").length} lines</span>
-                  </div>
-                  <div className="w-1 h-1 rounded-full bg-muted-foreground/30" />
-                  <span>{(section.value.length / 1024).toFixed(1)} KB</span>
-                </div>
-              )}
-            </div>
-          );
-        })}
-      </div>
-    </div>
-  );
-}
-
-// ==================== CODE PREVIEW COMPONENT ====================
-function CodePreview({ code }: { code: string }) {
-  const lines = code.split("\n");
-  const previewLines = lines.slice(0, 12);
-  const hasMore = lines.length > 12;
-
-  return (
-    <div className="relative">
-      <div className="bg-[#1e1e1e] rounded-md overflow-hidden border border-gray-800">
-        <SyntaxHighlighter
-          language="tsx"
-          style={vscDarkPlus}
-          customStyle={{
-            margin: 0,
-            padding: "12px",
-            background: "#1e1e1e",
-            fontSize: "12px",
-            lineHeight: "1.5",
-          }}
-          showLineNumbers={true}
-          lineNumberStyle={{
-            minWidth: "2.5em",
-            paddingRight: "1em",
-            color: "#858585",
-            textAlign: "right",
-            userSelect: "none",
-          }}
-          wrapLines={true}
-        >
-          {previewLines.join("\n")}
-        </SyntaxHighlighter>
-        {hasMore && (
-          <div className="px-3 py-2 text-xs text-gray-500 font-mono border-t border-gray-800">
-            ... {lines.length - 12} more lines
-          </div>
-        )}
-      </div>
-    </div>
-  );
-}
