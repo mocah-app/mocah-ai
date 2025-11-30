@@ -2,6 +2,7 @@
 
 import React from 'react';
 import type { ElementData, ElementUpdates } from '@/lib/react-email';
+import type { BrandColors } from '../EditorShell';
 import {
   ContentSection,
   TypographySection,
@@ -13,6 +14,8 @@ interface LinkElementEditorProps {
   elementData: ElementData;
   currentStyles: React.CSSProperties;
   onUpdate: (updates: ElementUpdates) => void;
+  brandFont?: string | null;
+  brandColors?: BrandColors;
 }
 
 /**
@@ -22,6 +25,7 @@ export function LinkElementEditor({
   elementData,
   currentStyles,
   onUpdate,
+  brandColors,
 }: LinkElementEditorProps) {
   const handleStyleChange = (property: string, value: string) => {
     onUpdate({
@@ -67,6 +71,7 @@ export function LinkElementEditor({
       <ColorSection
         value={currentStyles.color as string}
         onChange={(v) => handleStyleChange('color', v)}
+        brandColors={brandColors}
       />
     </div>
   );

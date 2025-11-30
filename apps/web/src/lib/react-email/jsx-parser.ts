@@ -118,7 +118,39 @@ export function extractTextContent(node: any): string {
 }
 
 /**
+ * CSS-like properties that indicate a style object
+ */
+const CSS_PROPERTY_NAMES = [
+  'color', 'backgroundColor', 'background',
+  'fontSize', 'fontFamily', 'fontWeight', 'fontStyle',
+  'lineHeight', 'letterSpacing', 'textAlign', 'textDecoration',
+  'padding', 'paddingTop', 'paddingRight', 'paddingBottom', 'paddingLeft',
+  'margin', 'marginTop', 'marginRight', 'marginBottom', 'marginLeft',
+  'width', 'height', 'maxWidth', 'minWidth',
+  'border', 'borderRadius', 'borderWidth', 'borderColor',
+  'display', 'position', 'top', 'right', 'bottom', 'left',
+  'flex', 'flexDirection', 'justifyContent', 'alignItems',
+];
+
+/**
+ * Check if an object expression looks like a style object
+ */
+function looksLikeStyleObject(node: any): boolean {
+  if (!node || node.type !== 'ObjectExpression') return false;
+  
+  const properties = node.properties || [];
+  if (properties.length === 0) return false;
+  
+  // Check if any property matches CSS property names
+  return properties.some((prop: any) => {
+    const key = prop.key?.name || prop.key?.value;
+    return CSS_PROPERTY_NAMES.includes(key);
+  });
+}
+
+/**
  * Extract style object definitions from code
+ * Enhanced: Extracts any object that looks like a style object, not just those ending in "Style"
  */
 export function extractStyleDefinitions(code: string): Record<string, any> {
   const ast = parseJSX(code);
@@ -126,14 +158,24 @@ export function extractStyleDefinitions(code: string): Record<string, any> {
   
   traverse(ast, {
     VariableDeclarator(path: any) {
-      // Find const styleObject = { ... }
-      if (
-        path.node.id.type === 'Identifier' &&
-        path.node.id.name.endsWith('Style')
-      ) {
-        const styleName = path.node.id.name;
-        if (path.node.init?.type === 'ObjectExpression') {
-          styles[styleName] = evaluateObjectExpression(path.node.init);
+      if (path.node.id.type !== 'Identifier') return;
+      
+      const varName = path.node.id.name;
+      const init = path.node.init;
+      
+      // Check if it's an object expression
+      if (init?.type === 'ObjectExpression') {
+        // Method 1: Name ends with common style suffixes
+        const isNamedStyle = 
+          varName.endsWith('Style') ||
+          varName.endsWith('Styles') ||
+          varName.toLowerCase().includes('style');
+        
+        // Method 2: Object has CSS-like properties
+        const hasCssProps = looksLikeStyleObject(init);
+        
+        if (isNamedStyle || hasCssProps) {
+          styles[varName] = evaluateObjectExpression(init);
         }
       }
     }

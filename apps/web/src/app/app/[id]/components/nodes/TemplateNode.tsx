@@ -39,6 +39,7 @@ interface TemplateNodeProps {
 export function TemplateNode({ data, id }: TemplateNodeProps) {
   const nodeId = id;
   const { actions, state } = useEditorMode();
+  const { state: templateState } = useTemplate();
   const { onSaveSmartEditorChanges, onResetSmartEditorChanges, isSaving } = useDesignChanges();
   const mode = actions.getNodeMode(nodeId);
   
@@ -72,10 +73,21 @@ export function TemplateNode({ data, id }: TemplateNodeProps) {
       />
 
       {/* Node Body */}
-      {data.isLoading ? (
+      {data.isLoading && templateState.generationPhase !== 'complete' ? (
         <LoadingState />
       ) : (
-        <div className="h-[600px] overflow-hidden">
+        <div className="h-[600px] overflow-hidden relative">
+          {/* Show loading overlay if still loading but in complete phase (waiting for render) */}
+          {data.isLoading && templateState.generationPhase === 'complete' && (
+            <div className="absolute inset-0 bg-background/80 backdrop-blur-sm z-10 flex flex-col items-center justify-center">
+              <div className="relative mb-4">
+                <MocahLoadingIcon isLoading={true} size="sm" />
+              </div>
+              <p className="text-muted-foreground text-sm animate-pulse">
+                {GENERATION_PHASE_MESSAGES[templateState.generationPhase]}
+              </p>
+            </div>
+          )}
           {mode === "view" ? (
             <ViewModeContent template={data.template} />
           ) : (

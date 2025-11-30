@@ -28,6 +28,14 @@ export {
 } from './element-extractor';
 export type { ElementData } from './element-extractor';
 
+// Computed Styles
+export {
+  extractComputedStyles,
+  normalizeStyles,
+  mergeStyles,
+  isScaleValue,
+} from './computed-styles';
+
 // Code Updater
 export {
   updateReactEmailCode,

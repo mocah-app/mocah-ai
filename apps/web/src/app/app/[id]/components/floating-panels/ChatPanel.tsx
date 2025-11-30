@@ -15,11 +15,15 @@ export const ChatPanel = ({
   onClose,
   initialPrompt,
   onPromptConsumed,
+  errorFixPrompt,
+  onErrorFixConsumed,
 }: {
   isOpen: boolean;
   onClose: () => void;
   initialPrompt?: string;
   onPromptConsumed?: () => void;
+  errorFixPrompt?: string;
+  onErrorFixConsumed?: () => void;
 }) => {
   const { state: templateState, actions: templateActions } = useTemplate();
   const params = useParams();
@@ -329,6 +333,33 @@ export const ChatPanel = ({
     isInitialized,
     handleSend,
     onPromptConsumed,
+  ]);
+
+  // ==================== AUTO-SEND ERROR FIX PROMPT ====================
+  useEffect(() => {
+    if (
+      !isOpen ||
+      !errorFixPrompt ||
+      !templateId ||
+      !templateState.currentTemplate ||
+      !isInitialized ||
+      isLoading
+    ) {
+      return;
+    }
+
+    // Send the error fix prompt
+    handleSend(errorFixPrompt);
+    onErrorFixConsumed?.();
+  }, [
+    isOpen,
+    errorFixPrompt,
+    templateId,
+    templateState.currentTemplate,
+    isInitialized,
+    isLoading,
+    handleSend,
+    onErrorFixConsumed,
   ]);
 
   // ==================== CANCEL GENERATION ====================

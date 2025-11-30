@@ -3,13 +3,20 @@
  * Centralized constants for consistent design scales
  */
 
-// Font Family Options
-export const FONT_FAMILIES = [
+// Font Family Option interface (allows dynamic brand fonts)
+export interface FontFamilyOption {
+  value: string;
+  label: string;
+  stack: string;
+}
+
+// Font Family Options (base options, can be extended with brand fonts)
+export const FONT_FAMILIES: FontFamilyOption[] = [
   { value: 'inherit', label: 'Default', stack: 'inherit' },
   { value: 'system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif', label: 'Sans Serif', stack: 'system-ui' },
   { value: 'Georgia, "Times New Roman", Times, serif', label: 'Serif', stack: 'serif' },
   { value: 'ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace', label: 'Monospace', stack: 'mono' },
-] as const;
+];
 
 // Font Size Scale (Tailwind-inspired)
 export const FONT_SIZES = [
@@ -114,11 +121,8 @@ export const WIDTH_PRESETS = [
 export const COLOR_PRESETS = [
   '#ffffff',
   '#000000',
-  '#6b7280', // gray-500
   '#ef4444', // red-500
   '#f97316', // orange-500
-  '#eab308', // yellow-500
-  '#22c55e', // green-500
   '#3b82f6', // blue-500
   '#8b5cf6', // violet-500
 ] as const;
@@ -128,16 +132,13 @@ export const BACKGROUND_COLOR_PRESETS = [
   'transparent',
   '#ffffff',
   '#000000',
-  '#6b7280', // gray-500
   '#ef4444', // red-500
-  '#8b5cf6', // violet-500
   '#3b82f6', // blue-500
-  '#22c55e', // green-500
-  '#eab308', // yellow-500
+  '#8b5cf6', // violet-500
 ] as const;
 
 // Type helpers
-export type FontFamily = typeof FONT_FAMILIES[number]['value'];
+export type FontFamily = string; // Dynamic to allow brand fonts
 export type FontSize = typeof FONT_SIZES[number]['value'];
 export type FontWeight = typeof FONT_WEIGHTS[number]['value'];
 export type LineHeight = typeof LINE_HEIGHTS[number]['value'];

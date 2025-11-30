@@ -131,7 +131,7 @@ export const aiClient = {
   ): ReturnType<typeof streamObject<T>> {
     const modelName = model || DEFAULT_MODEL;
 
-    logger.info("AI streaming started", {
+    logger.info("AI stream request initiated", {
       component: "ai",
       action: "streamStructured",
       model: modelName,
@@ -186,7 +186,7 @@ export const aiClient = {
   streamText(prompt: string, model?: string): ReturnType<typeof streamText> {
     const modelName = model || DEFAULT_MODEL;
     try {
-      logger.info("AI text streaming started", {
+      logger.info("AI text stream request initiated", {
         component: "ai",
         action: "streamText",
         model: modelName,

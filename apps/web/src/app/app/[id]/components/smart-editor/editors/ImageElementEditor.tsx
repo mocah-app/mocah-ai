@@ -2,12 +2,15 @@
 
 import React from 'react';
 import type { ElementData, ElementUpdates } from '@/lib/react-email';
+import type { BrandColors } from '../EditorShell';
 import { ImageSection, LayoutSection } from '../sections';
 
 interface ImageElementEditorProps {
   elementData: ElementData;
   currentStyles: React.CSSProperties;
   onUpdate: (updates: ElementUpdates) => void;
+  brandFont?: string | null;
+  brandColors?: BrandColors;
 }
 
 /**

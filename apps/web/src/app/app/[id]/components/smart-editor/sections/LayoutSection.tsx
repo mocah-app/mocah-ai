@@ -19,10 +19,7 @@ export function LayoutSection({
   onChange,
   showBorderRadius = false,
 }: LayoutSectionProps) {
-  const currentBorderRadius = BORDER_RADIUS.find(r => r.value === borderRadius)
-    ? borderRadius
-    : undefined;
-
+  // Pass through actual values - controls will handle custom values
   return (
     <PropertySection label="Layout">
       <SpacingControl
@@ -40,7 +37,7 @@ export function LayoutSection({
       {showBorderRadius && (
         <SelectControl
           label="Border Radius"
-          value={currentBorderRadius}
+          value={borderRadius}
           options={BORDER_RADIUS}
           onChange={(v) => onChange('borderRadius', v)}
           placeholder="Default"

@@ -12,6 +12,12 @@ import {
   getElementClassName,
 } from "./jsx-parser";
 
+import {
+  extractComputedStyles,
+  mergeStyles,
+  normalizeStyles,
+} from "./computed-styles";
+
 export interface ElementData {
   id: string;
   type:
@@ -23,12 +29,18 @@ export interface ElementData {
     | "Section"
     | "Container"
     | "Row"
-    | "Column";
+    | "Column"
+    | "Html"
+    | "Head"
+    | "Body"
+    | "Hr"
+    | "Preview";
   line: number;
   content: string;
   styleType: "inline" | "predefined-class" | "style-object";
   styleName?: string;
   inlineStyles?: React.CSSProperties;
+  computedStyles?: React.CSSProperties; // NEW: Styles from DOM
   className?: string;
   attributes: Record<string, any>;
 }
@@ -120,6 +132,9 @@ export function extractElementData(
     });
   }
 
+  // NEW: Extract computed styles from DOM element
+  const computedStyles = extractComputedStyles(element);
+
   return {
     id: elementId,
     type: type as ElementData["type"],
@@ -128,6 +143,7 @@ export function extractElementData(
     styleType,
     styleName,
     inlineStyles,
+    computedStyles, // NEW
     className,
     attributes,
   };
@@ -135,16 +151,31 @@ export function extractElementData(
 
 /**
  * Get current styles for an element
+ * Merges source styles (from code) with computed styles (from DOM)
+ * Source styles take precedence for explicit values
  */
 export function getCurrentStyles(
   elementData: ElementData,
   styleDefinitions: Record<string, React.CSSProperties>
 ): React.CSSProperties {
+  // Get source styles (from JSX code)
+  let sourceStyles: React.CSSProperties = {};
+  
   if (elementData.styleType === "style-object" && elementData.styleName) {
-    return styleDefinitions[elementData.styleName] || {};
+    sourceStyles = styleDefinitions[elementData.styleName] || {};
+  } else if (elementData.inlineStyles) {
+    sourceStyles = elementData.inlineStyles;
   }
 
-  return elementData.inlineStyles || {};
+  // Get computed styles (from DOM)
+  const computedStyles = elementData.computedStyles || {};
+
+  // Merge: computed styles as base, source styles override
+  // This ensures we show actual rendered values but preserve explicit code values
+  return mergeStyles(
+    normalizeStyles(sourceStyles),
+    computedStyles
+  );
 }
 
 /**

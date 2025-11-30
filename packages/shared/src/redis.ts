@@ -1,11 +1,18 @@
 /**
  * Upstash Redis client for serverless caching
  * Works across all Vercel serverless function instances
+ * 
+ * Note: In dev mode, this module may be loaded multiple times across
+ * different Next.js contexts (SSR, API routes, middleware, etc.)
+ * 
+ * IMPORTANT: This is SERVER-SIDE ONLY. Not exported from @mocah/shared main index.
+ * Import directly from '@mocah/shared/redis' in server-side code only.
  */
 
 import { Redis } from "@upstash/redis";
-import { logger } from "./logger";
 import { serverEnv } from "@mocah/config/env";
+import { logger } from "./logger";
+
 
 // Initialize Redis client (will be null if env vars not set)
 let redis: Redis | null = null;
@@ -16,11 +23,6 @@ try {
       url: serverEnv.UPSTASH_REDIS_REST_URL,
       token: serverEnv.UPSTASH_REDIS_REST_TOKEN,
     });
-    logger.info("Redis client initialized successfully");
-  } else {
-    logger.warn(
-      "Redis environment variables not set. Caching will be disabled."
-    );
   }
 } catch (error) {
   logger.error("Failed to initialize Redis client", error as Error);

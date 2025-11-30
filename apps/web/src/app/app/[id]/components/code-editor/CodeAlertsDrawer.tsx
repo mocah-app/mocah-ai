@@ -25,8 +25,7 @@ import {
   Code2,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { useTemplate } from "../providers/TemplateProvider";
-import Loader from "@/components/loader";
+import { useErrorFix } from "../providers/ErrorFixProvider";
 
 interface AlertItem {
   id: string;
@@ -242,8 +241,7 @@ export function CodeAlertsDrawer({
   reactEmailCode,
   onGoToLine,
 }: CodeAlertsDrawerProps) {
-  const { actions: templateActions, state: templateState } = useTemplate();
-  const [fixingIssueId, setFixingIssueId] = useState<string | null>(null);
+  const { onRequestErrorFix } = useErrorFix();
   const [activeTab, setActiveTab] = useState("compatibility");
 
   // Convert errors and warnings to AlertItems
@@ -257,14 +255,12 @@ export function CodeAlertsDrawer({
 
   const totalIssues = allAlerts.length;
 
-  const handleFixIssue = async (alert: AlertItem) => {
+  const handleFixIssue = (alert: AlertItem) => {
     if (!reactEmailCode) return;
 
-    setFixingIssueId(alert.id);
-
-    try {
-      // Create a specific prompt for the AI to fix the issue
-      const fixPrompt = `Fix the following email compatibility issue in the React Email code:
+    // Create a specific prompt for the AI to fix the issue
+    // Note: Template code is automatically fetched by the regeneration API
+    const fixPrompt = `Fix the following email compatibility issue:
 
 **Issue:** ${alert.title}
 **Description:** ${alert.description}
@@ -275,30 +271,22 @@ Please fix this issue while:
 2. Using only email-safe CSS properties and React Email components
 3. Replacing any unsupported properties with email-compatible alternatives
 4. Do NOT use any display, flex, grid, or positioning properties
-5. Use <Section>, <Row>, <Column> for layouts instead of flexbox
+5. Use <Section>, <Row>, <Column> for layouts instead of flexbox`;
 
-Current code has this issue. Fix it.`;
-
-      await templateActions.regenerateTemplate(fixPrompt);
-      onClose();
-    } catch (error) {
-      console.error("Failed to fix issue:", error);
-    } finally {
-      setFixingIssueId(null);
-    }
+    // Send to chat panel for AI to fix
+    onRequestErrorFix(fixPrompt, reactEmailCode);
+    onClose();
   };
 
-  const handleFixAllIssues = async () => {
+  const handleFixAllIssues = () => {
     if (!reactEmailCode || allAlerts.length === 0) return;
 
-    setFixingIssueId("all");
+    const issuesList = allAlerts
+      .map((alert, idx) => `${idx + 1}. ${alert.title}: ${alert.description}`)
+      .join("\n");
 
-    try {
-      const issuesList = allAlerts
-        .map((alert, idx) => `${idx + 1}. ${alert.title}: ${alert.description}`)
-        .join("\n");
-
-      const fixPrompt = `Fix ALL the following email compatibility issues in the React Email code:
+    // Note: Template code is automatically fetched by the regeneration API
+    const fixPrompt = `Fix ALL the following email compatibility issues:
 
 **Issues Found (${allAlerts.length}):**
 ${issuesList}
@@ -314,13 +302,9 @@ Please fix ALL these issues while:
 
 Fix all issues in a single pass.`;
 
-      await templateActions.regenerateTemplate(fixPrompt);
-      onClose();
-    } catch (error) {
-      console.error("Failed to fix all issues:", error);
-    } finally {
-      setFixingIssueId(null);
-    }
+    // Send to chat panel for AI to fix
+    onRequestErrorFix(fixPrompt, reactEmailCode);
+    onClose();
   };
 
   return (
@@ -374,22 +358,12 @@ Fix all issues in a single pass.`;
               <div className="w-full lg:w-auto p-4 bg-muted/30">
                 <Button
                   onClick={handleFixAllIssues}
-                  disabled={fixingIssueId !== null || templateState.isLoading}
                   className="w-full"
                   variant="default"
                   size="sm"
                 >
-                  {fixingIssueId === "all" ? (
-                    <>
-                      <Loader />
-                      Fixing all issues...
-                    </>
-                  ) : (
-                    <>
-                      <Wand2 className="h-4 w-4 mr-2" />
-                      Fix All ({allAlerts.length}) Issues
-                    </>
-                  )}
+                  <Wand2 className="h-4 w-4 mr-2" />
+                  Fix All ({allAlerts.length}) Issues
                 </Button>
               </div>
             )}
@@ -412,9 +386,6 @@ Fix all issues in a single pass.`;
                         key={alert.id}
                         alert={alert}
                         onFix={() => handleFixIssue(alert)}
-                        isFixing={
-                          fixingIssueId === alert.id || fixingIssueId === "all"
-                        }
                         onGoToLine={onGoToLine}
                       />
                     ))}
@@ -448,9 +419,6 @@ Fix all issues in a single pass.`;
                         key={alert.id}
                         alert={alert}
                         onFix={() => handleFixIssue(alert)}
-                        isFixing={
-                          fixingIssueId === alert.id || fixingIssueId === "all"
-                        }
                         onGoToLine={onGoToLine}
                       />
                     ))}
@@ -505,7 +473,6 @@ function AlertCard({
 }: {
   alert: AlertItem;
   onFix: () => void;
-  isFixing: boolean;
   onGoToLine?: (line: number) => void;
 }) {
   const IconComponent = alert.type === "error" ? AlertCircle : AlertTriangle;
