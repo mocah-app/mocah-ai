@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useCallback, useRef } from "react";
+import React, { useCallback } from "react";
 import { useEditorMode } from "../providers/EditorModeProvider";
 import { useTemplate } from "../providers/TemplateProvider";
 import { useCanvas } from "../providers/CanvasProvider";
@@ -19,6 +19,7 @@ export const SmartEditorPanel = ({
 }: SmartEditorPanelProps) => {
   const { state: editorState } = useEditorMode();
   const { state: canvasState } = useCanvas();
+  const { state: templateState } = useTemplate();
   const { selectedElement } = editorState;
 
   // Get current active node
@@ -40,6 +41,14 @@ export const SmartEditorPanel = ({
   // Get style definitions from active node
   const styleDefinitions =
     (activeNode?.data as TemplateNodeData)?.template?.styleDefinitions || {};
+
+  // Get brand assets from brand kit
+  const brandFont = templateState.brandKit?.fontFamily || null;
+  const brandColors = {
+    primary: templateState.brandKit?.primaryColor || null,
+    secondary: templateState.brandKit?.secondaryColor || null,
+    accent: templateState.brandKit?.accentColor || null,
+  };
 
   // Handle live preview updates (DOM manipulation, no save)
   const handlePreviewUpdate = useCallback((elementId: string, updates: ElementUpdates) => {
@@ -103,6 +112,8 @@ export const SmartEditorPanel = ({
       elementData={elementData}
       styleDefinitions={styleDefinitions}
       onPreviewUpdate={handlePreviewUpdate}
+      brandFont={brandFont}
+      brandColors={brandColors}
     />
   );
 };

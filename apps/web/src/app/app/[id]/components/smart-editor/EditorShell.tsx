@@ -15,12 +15,20 @@ import {
   LayoutElementEditor,
 } from "./editors";
 
+export interface BrandColors {
+  primary: string | null;
+  secondary: string | null;
+  accent: string | null;
+}
+
 interface EditorShellProps {
   isOpen: boolean;
   onClose: () => void;
   elementData: ElementData | null;
   styleDefinitions: Record<string, React.CSSProperties>;
   onPreviewUpdate: (elementId: string, updates: ElementUpdates) => void;
+  brandFont?: string | null;
+  brandColors?: BrandColors;
 }
 
 /**
@@ -35,6 +43,8 @@ export function EditorShell({
   elementData,
   styleDefinitions,
   onPreviewUpdate,
+  brandFont,
+  brandColors,
 }: EditorShellProps) {
   const { actions: editorActions, state: editorState } = useEditorMode();
   
@@ -160,6 +170,8 @@ export function EditorShell({
             elementData={enhancedElementData}
             currentStyles={currentStyles}
             onUpdate={handleUpdate}
+            brandFont={brandFont}
+            brandColors={brandColors}
           />
         ) : (
           <EmptyState />
@@ -176,12 +188,16 @@ function ElementEditor({
   elementData,
   currentStyles,
   onUpdate,
+  brandFont,
+  brandColors,
 }: {
   elementData: ElementData;
   currentStyles: React.CSSProperties;
   onUpdate: (updates: ElementUpdates) => void;
+  brandFont?: string | null;
+  brandColors?: BrandColors;
 }) {
-  const props = { elementData, currentStyles, onUpdate };
+  const props = { elementData, currentStyles, onUpdate, brandFont, brandColors };
 
   switch (elementData.type) {
     case "Heading":

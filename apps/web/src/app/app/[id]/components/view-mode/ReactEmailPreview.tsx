@@ -13,6 +13,8 @@ import Loader from "@/components/loader";
 import { Button } from "@/components/ui/button";
 import { Sparkles } from "lucide-react";
 import { useErrorFix } from "../providers/ErrorFixProvider";
+import { logger } from "@mocah/shared";
+import MocahLoadingIcon from "@/components/mocah-brand/MocahLoadingIcon";
 
 /** Map error codes to user-friendly messages */
 function getErrorMessage(error: unknown): string {
@@ -47,7 +49,14 @@ interface ReactEmailPreviewProps {
 }
 
 // Selection indicator styles to inject into iframe
-const SELECTION_STYLES = `
+const getSelectionStyles = (isSafari: boolean) => `
+  ${isSafari ? `
+  [data-element-id] {
+    cursor: pointer !important;
+    -webkit-tap-highlight-color: transparent;
+  }
+  ` : ''}
+  
   .mocah-selection-label {
     position: absolute;
     top: -20px;
@@ -91,6 +100,7 @@ export const ReactEmailPreview = ({
   const [selectedElementId, setSelectedElementId] = useState<string | null>(
     null
   );
+  const [isSelectableReady, setIsSelectableReady] = useState(false);
   const iframeRef = useRef<HTMLIFrameElement>(null);
   const selectedElementIdRef = useRef<string | null>(null);
   const { onRequestErrorFix } = useErrorFix();
@@ -100,12 +110,21 @@ export const ReactEmailPreview = ({
     selectedElementIdRef.current = selectedElementId;
   }, [selectedElementId]);
 
+  // Reset selectable ready state when enableSelection changes
+  useEffect(() => {
+    if (enableSelection) {
+      setIsSelectableReady(false);
+    } else {
+      setIsSelectableReady(true);
+    }
+  }, [enableSelection]);
+
   // Inject selection styles into iframe
-  const injectStyles = useCallback((doc: Document) => {
+  const injectStyles = useCallback((doc: Document, isSafari: boolean) => {
     if (doc.getElementById("mocah-selection-styles")) return;
     const style = doc.createElement("style");
     style.id = "mocah-selection-styles";
-    style.textContent = SELECTION_STYLES;
+    style.textContent = getSelectionStyles(isSafari);
     doc.head.appendChild(style);
   }, []);
 
@@ -170,7 +189,6 @@ export const ReactEmailPreview = ({
         
         // Notify parent that rendering completed successfully
         if (onRenderComplete) {
-          console.log("🎨 [ReactEmailPreview] Rendering complete, notifying parent");
           onRenderComplete();
         }
       } catch (err) {
@@ -194,16 +212,44 @@ export const ReactEmailPreview = ({
 
     const doc = iframe.contentDocument;
 
-    // Inject selection styles
-    injectStyles(doc);
+    // Detect Safari
+    const isSafari = /^((?!chrome|android).)*safari/i.test(navigator.userAgent);
 
+    // Inject selection styles
+    injectStyles(doc, isSafari);
+    
+    // Find all selectable elements
+    const selectableElements = doc.querySelectorAll("[data-element-id]");
+    
     // Attach click handlers to elements with data-element-id
-    doc.querySelectorAll("[data-element-id]").forEach((element) => {
-      element.addEventListener("click", async (e) => {
+    selectableElements.forEach((element) => {
+      const htmlElement = element as HTMLElement;
+      const elementId = element.getAttribute("data-element-id");
+      
+      // Safari-specific: Ensure element is interactive 
+      if (isSafari) {
+        htmlElement.style.cursor = 'pointer';
+        htmlElement.style.pointerEvents = 'auto';
+        (htmlElement.style as any).webkitTouchCallout = 'none';
+        (htmlElement.style as any).webkitUserSelect = 'none';
+      }
+      
+      const clickHandler = async (e: Event) => {
+        const clickEvent = e as MouseEvent;
+        const clickTarget = clickEvent.target as Element;
+        
+        // Find the closest element with data-element-id from the click target
+        const targetElement = clickTarget.closest('[data-element-id]');
+        
+        // Only handle if this click is meant for THIS specific element
+        // In Safari with capture phase, parent elements catch child clicks
+        if (targetElement !== element) {
+          return;
+        }
+        
         e.stopPropagation();
         e.preventDefault();
 
-        const elementId = element.getAttribute("data-element-id");
         if (!elementId) return;
 
         try {
@@ -222,22 +268,40 @@ export const ReactEmailPreview = ({
           // Update visual indicator with element type label
           updateSelectionIndicator(doc, element, elementData?.type || null);
         } catch (error) {
-          console.error("Failed to extract element data:", error);
+          logger.error("Failed to extract element data:", {
+            error,
+          });
         }
-      });
+      };
 
-      // Hover effect
-      element.addEventListener("mouseenter", () => {
+      const mouseEnterHandler = () => {
         const currentSelectedId = selectedElementIdRef.current;
         if (element.getAttribute("data-element-id") !== currentSelectedId) {
           element.classList.add("mocah-hover-element");
         }
-      });
+      };
 
-      element.addEventListener("mouseleave", () => {
+      const mouseLeaveHandler = () => {
         element.classList.remove("mocah-hover-element");
-      });
+      };
+      
+      // For Safari, try both normal and capture phase
+      if (isSafari) {
+        element.addEventListener("click", clickHandler, { capture: true });
+        element.addEventListener("click", clickHandler, { capture: false });
+      } else {
+        element.addEventListener("click", clickHandler);
+      }
+
+      // Hover effects
+      element.addEventListener("mouseenter", mouseEnterHandler);
+      element.addEventListener("mouseleave", mouseLeaveHandler);
     });
+
+    // Mark as ready after a short delay to ensure all handlers are attached
+    setTimeout(() => {
+      setIsSelectableReady(true);
+    }, 100);
   }, [
     enableSelection,
     onElementSelect,
@@ -297,16 +361,24 @@ export const ReactEmailPreview = ({
     );
   }
 
+  // Detect Safari
+  const isSafari = /^((?!chrome|android).)*safari/i.test(navigator.userAgent);
+
   return (
-    <div className="w-full h-full overflow-auto max-w-[600px] mx-auto p-2">
+    <div className="w-full h-full overflow-auto max-w-[600px] mx-auto p-2 relative">
       <iframe
         ref={iframeRef}
         srcDoc={html}
         className="w-full h-full border-0"
-        sandbox="allow-same-origin"
+        sandbox={isSafari ? "allow-same-origin allow-scripts" : "allow-same-origin"}
         title="Email Preview"
         onLoad={enableSelection ? handleIframeLoad : undefined}
       />
+      
+      {/* Loading overlay while making elements selectable */}
+      {enableSelection && !isSelectableReady && (
+        <MocahLoadingIcon isLoading={true} size="sm" />
+      )}
     </div>
   );
 };

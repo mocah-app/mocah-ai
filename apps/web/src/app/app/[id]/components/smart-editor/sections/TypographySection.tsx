@@ -1,6 +1,6 @@
 'use client';
 
-import React from 'react';
+import React, { useMemo } from 'react';
 import { PropertySection, SelectControl, ToggleGroupControl } from '../controls';
 import {
   FONT_FAMILIES,
@@ -24,6 +24,8 @@ interface TypographySectionProps {
   // Optional: hide certain controls
   showFontFamily?: boolean;
   showDecoration?: boolean;
+  // Brand font from organization's brand kit
+  brandFont?: string | null;
 }
 
 export function TypographySection({
@@ -37,27 +39,38 @@ export function TypographySection({
   onChange,
   showFontFamily = true,
   showDecoration = true,
+  brandFont,
 }: TypographySectionProps) {
-  // Find current values in options to display correctly
-  const currentFontFamily = FONT_FAMILIES.find(f => f.value === fontFamily) 
-    ? fontFamily 
-    : FONT_FAMILIES[0].value;
+  // Build font family options with brand font at the top
+  const fontFamilyOptions = useMemo(() => {
+    const options = [...FONT_FAMILIES];
+    
+    // If brand font exists, make it the first "Brand Font" option
+    if (brandFont) {
+      // Replace "Default" with "Brand Font" and use the actual brand font value
+      options[0] = {
+        value: brandFont,
+        label: 'Brand Font',
+        stack: brandFont,
+      };
+    }
+    
+    return options;
+  }, [brandFont]);
+
+  // Determine the default font value (brand font or first option)
+  const defaultFontValue = brandFont || FONT_FAMILIES[0].value;
   
-  const currentFontSize = FONT_SIZES.find(f => f.value === fontSize)
-    ? fontSize
-    : undefined;
-    
-  const currentFontWeight = FONT_WEIGHTS.find(f => f.value === fontWeight)
-    ? fontWeight
-    : undefined;
-    
-  const currentLineHeight = LINE_HEIGHTS.find(l => l.value === lineHeight)
-    ? lineHeight
-    : undefined;
-    
-  const currentLetterSpacing = LETTER_SPACINGS.find(l => l.value === letterSpacing)
-    ? letterSpacing
-    : undefined;
+  // Use brand font as default if fontFamily is undefined or 'inherit'
+  const currentFontFamily = fontFamily && fontFamily !== 'inherit' 
+    ? fontFamily 
+    : defaultFontValue;
+  
+  // Pass actual values to let SelectControl show custom values if needed
+  const currentFontSize = fontSize;
+  const currentFontWeight = fontWeight;
+  const currentLineHeight = lineHeight;
+  const currentLetterSpacing = letterSpacing;
 
   return (
     <PropertySection label="Typography">
@@ -65,7 +78,7 @@ export function TypographySection({
       {showFontFamily && (
         <SelectControl
           value={currentFontFamily}
-          options={FONT_FAMILIES}
+          options={fontFamilyOptions}
           onChange={(v) => onChange('fontFamily', v)}
           placeholder="Select font..."
         />

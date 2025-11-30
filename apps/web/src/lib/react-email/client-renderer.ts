@@ -17,6 +17,7 @@ import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server.browser";
 import * as ReactEmail from "@react-email/components";
 import * as Babel from "@babel/standalone";
+import { logger } from "@mocah/shared";
 
 
 // ============================================================================
@@ -299,7 +300,7 @@ export async function renderReactEmailClientSide(
 
     // Log performance in development
     if (process.env.NODE_ENV === "development") {
-      console.debug(
+      logger.debug(
         `[ReactEmail] Rendered in ${renderTimeMs}ms (cached: ${!skipCache && renderCache.get(cacheKey) !== null})`
       );
     }

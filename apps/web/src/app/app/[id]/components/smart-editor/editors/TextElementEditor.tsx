@@ -2,6 +2,7 @@
 
 import React from 'react';
 import type { ElementData, ElementUpdates } from '@/lib/react-email';
+import type { BrandColors } from '../EditorShell';
 import {
   ContentSection,
   TypographySection,
@@ -14,6 +15,8 @@ interface TextElementEditorProps {
   elementData: ElementData;
   currentStyles: React.CSSProperties;
   onUpdate: (updates: ElementUpdates) => void;
+  brandFont?: string | null;
+  brandColors?: BrandColors;
 }
 
 /**
@@ -23,6 +26,8 @@ export function TextElementEditor({
   elementData,
   currentStyles,
   onUpdate,
+  brandFont,
+  brandColors,
 }: TextElementEditorProps) {
   const handleStyleChange = (property: string, value: string) => {
     onUpdate({
@@ -53,18 +58,21 @@ export function TextElementEditor({
         textDecoration={currentStyles.textDecoration as string}
         onChange={handleStyleChange}
         showDecoration={true}
+        brandFont={brandFont}
       />
 
       {/* Color Section */}
       <ColorSection
         value={currentStyles.color as string}
         onChange={(v) => handleStyleChange('color', v)}
+        brandColors={brandColors}
       />
 
       {/* Background Section */}
       <BackgroundSection
         value={currentStyles.backgroundColor as string}
         onChange={(v) => handleStyleChange('backgroundColor', v)}
+        brandColors={brandColors}
       />
 
       {/* Layout Section */}

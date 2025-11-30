@@ -1,7 +1,9 @@
 'use client';
 
-import React from 'react';
+import React, { useMemo } from 'react';
 import { PropertySection, ColorControl } from '../controls';
+import { COLOR_PRESETS } from '../constants/editor-constants';
+import type { BrandColors } from '../EditorShell';
 
 interface ColorSectionProps {
   value: string | undefined;
@@ -10,6 +12,7 @@ interface ColorSectionProps {
   defaultValue?: string;
   showPresets?: boolean;
   showAlpha?: boolean;
+  brandColors?: BrandColors;
 }
 
 export function ColorSection({
@@ -19,7 +22,25 @@ export function ColorSection({
   defaultValue,
   showPresets = true,
   showAlpha = false,
+  brandColors,
 }: ColorSectionProps) {
+  // Build presets with brand colors at the front
+  const colorPresets = useMemo(() => {
+    const brandColorList = [
+      brandColors?.primary,
+      brandColors?.secondary,
+      brandColors?.accent,
+    ].filter((c): c is string => !!c);
+    
+    // If we have brand colors, prepend them (avoiding duplicates)
+    if (brandColorList.length > 0) {
+      const basePresets = COLOR_PRESETS.filter(c => !brandColorList.includes(c));
+      return [...brandColorList, ...basePresets];
+    }
+    
+    return [...COLOR_PRESETS];
+  }, [brandColors]);
+
   return (
     <PropertySection label={label}>
       <ColorControl
@@ -28,6 +49,7 @@ export function ColorSection({
         defaultValue={defaultValue}
         showPresets={showPresets}
         showAlpha={showAlpha}
+        presets={colorPresets}
       />
     </PropertySection>
   );

@@ -2,6 +2,7 @@
 
 import React from 'react';
 import type { ElementData, ElementUpdates } from '@/lib/react-email';
+import type { BrandColors } from '../EditorShell';
 import { PropertySection, ToggleGroupControl, SelectControl } from '../controls';
 import { BackgroundSection, LayoutSection } from '../sections';
 import { TEXT_ALIGNMENTS, WIDTH_PRESETS } from '../constants/editor-constants';
@@ -10,6 +11,8 @@ interface LayoutElementEditorProps {
   elementData: ElementData;
   currentStyles: React.CSSProperties;
   onUpdate: (updates: ElementUpdates) => void;
+  brandFont?: string | null;
+  brandColors?: BrandColors;
 }
 
 /**
@@ -19,6 +22,7 @@ export function LayoutElementEditor({
   elementData,
   currentStyles,
   onUpdate,
+  brandColors,
 }: LayoutElementEditorProps) {
   const handleStyleChange = (property: string, value: string) => {
     onUpdate({
@@ -70,6 +74,7 @@ export function LayoutElementEditor({
       <BackgroundSection
         value={currentStyles.backgroundColor as string}
         onChange={(v) => handleStyleChange('backgroundColor', v)}
+        brandColors={brandColors}
       />
 
       {/* Layout (padding, margin) */}
