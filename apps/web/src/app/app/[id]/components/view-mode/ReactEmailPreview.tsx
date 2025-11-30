@@ -10,6 +10,9 @@ import {
 } from "@/lib/react-email";
 import type { ElementData } from "@/lib/react-email";
 import Loader from "@/components/loader";
+import { Button } from "@/components/ui/button";
+import { Sparkles } from "lucide-react";
+import { useErrorFix } from "../providers/ErrorFixProvider";
 
 /** Map error codes to user-friendly messages */
 function getErrorMessage(error: unknown): string {
@@ -39,6 +42,8 @@ interface ReactEmailPreviewProps {
   enableSelection?: boolean;
   /** Force re-render key - change this to force a fresh render */
   renderKey?: number;
+  /** Callback when rendering completes successfully */
+  onRenderComplete?: () => void;
 }
 
 // Selection indicator styles to inject into iframe
@@ -77,15 +82,18 @@ export const ReactEmailPreview = ({
   onElementSelect,
   enableSelection = false,
   renderKey = 0,
+  onRenderComplete,
 }: ReactEmailPreviewProps) => {
   const [html, setHtml] = useState<string>("");
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [rawError, setRawError] = useState<unknown>(null);
   const [selectedElementId, setSelectedElementId] = useState<string | null>(
     null
   );
   const iframeRef = useRef<HTMLIFrameElement>(null);
   const selectedElementIdRef = useRef<string | null>(null);
+  const { onRequestErrorFix } = useErrorFix();
 
   // Keep ref in sync with state for event handlers
   useEffect(() => {
@@ -143,6 +151,7 @@ export const ReactEmailPreview = ({
 
       setIsLoading(true);
       setError(null);
+      setRawError(null);
 
       try {
         // If renderKey changed, clear cache to force fresh render
@@ -158,16 +167,23 @@ export const ReactEmailPreview = ({
         // Client-side rendering - runs in browser sandbox
         const renderedHtml = await renderReactEmailClientSide(codeToRender);
         setHtml(renderedHtml);
+        
+        // Notify parent that rendering completed successfully
+        if (onRenderComplete) {
+          console.log("🎨 [ReactEmailPreview] Rendering complete, notifying parent");
+          onRenderComplete();
+        }
       } catch (err) {
         console.error("Failed to render React Email:", err);
         setError(getErrorMessage(err));
+        setRawError(err);
       } finally {
         setIsLoading(false);
       }
     }
 
     renderEmail();
-  }, [reactEmailCode, enableSelection, renderKey]); // Added renderKey to force re-render
+  }, [reactEmailCode, enableSelection, renderKey]);
 
   // Handle iframe load for element selection - must be before conditional returns
   const handleIframeLoad = useCallback(() => {
@@ -245,13 +261,29 @@ export const ReactEmailPreview = ({
   }
 
   if (error) {
+    const handleFixWithAI = () => {
+      const errorDetails = rawError instanceof RenderError 
+        ? rawError.message 
+        : String(rawError);
+      onRequestErrorFix(errorDetails, reactEmailCode);
+    };
+
     return (
       <div className="flex h-full w-full items-center justify-center bg-muted/20">
         <div className="max-w-md rounded-lg border border-destructive/50 bg-destructive/10 p-6 text-center">
           <p className="mb-2 font-semibold text-destructive">
             Failed to render preview
           </p>
-          <p className="text-sm text-destructive/80">{error}</p>
+          <p className="text-sm text-destructive/80 mb-4">{error}</p>
+          <Button
+            onClick={handleFixWithAI}
+            variant="default"
+            size="sm"
+            className="gap-2"
+          >
+            <Sparkles className="size-4" />
+            Fix with AI
+          </Button>
         </div>
       </div>
     );

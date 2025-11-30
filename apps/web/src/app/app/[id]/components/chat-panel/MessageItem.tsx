@@ -43,7 +43,7 @@ export const MessageItem = ({ message, index, isOpen }: MessageItemProps) => {
             "p-3 rounded-lg text-sm max-w-[80%] whitespace-pre-wrap wrap-break-word relative",
             message.role === "assistant"
               ? "text-muted-foreground"
-              : "bg-secondary text-secondary-foreground",
+              : "bg-secondary text-secondary-foreground max-h-80 overflow-y-auto",
             message.persistenceError && "border-2 border-amber-500/50"
           )}
         >

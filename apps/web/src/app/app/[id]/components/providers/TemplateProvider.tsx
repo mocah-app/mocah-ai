@@ -32,6 +32,7 @@ interface TemplateState {
   isStreaming: boolean;
   streamingProgress: StreamingProgress | null;
   generationPhase: GenerationPhase;
+  waitingForRender: boolean; // True when waiting for preview to render after generation
   
   // React Email specific state
   reactEmailCode: string | null;
@@ -51,6 +52,7 @@ interface TemplateActions {
   generateTemplateStream: (prompt: string) => Promise<void>;
   cancelGeneration: () => void;
   setIsDirty: (dirty: boolean) => void;
+  onPreviewRenderComplete: () => void; // Called when preview finishes rendering
   
   // React Email specific actions
   updateReactEmailCode: (code: string, styleDefinitions?: Record<string, React.CSSProperties>) => void;
@@ -95,6 +97,7 @@ export function TemplateProvider({
     isStreaming: false,
     streamingProgress: null,
     generationPhase: 'idle',
+    waitingForRender: false,
     reactEmailCode: null,
     styleDefinitions: {},
   });
@@ -200,6 +203,7 @@ export function TemplateProvider({
           ...prev,
           isStreaming: false,
           isLoading: false,
+          waitingForRender: false,
           generationPhase: 'idle',
         }));
       }
@@ -211,6 +215,7 @@ export function TemplateProvider({
         isStreaming: false,
         streamingProgress: null,
         isLoading: false,
+        waitingForRender: false,
         generationPhase: 'idle',
       }));
     },
@@ -285,6 +290,10 @@ export function TemplateProvider({
         const result = await updateMutation.mutateAsync(updatePayload);
         const processedResult = convertDates(result);
 
+        logger.info("⏳ [TemplateProvider] Regenerated template saved, waiting for preview render", {
+          reactEmailCodeLength: template.reactEmailCode?.length || 0,
+        });
+
         setState((prev) => ({
           ...prev,
           currentTemplate: processedResult,
@@ -292,7 +301,8 @@ export function TemplateProvider({
           styleDefinitions,
           isStreaming: false,
           streamingProgress: null,
-          isLoading: false,
+          isLoading: true, // Keep loading true
+          waitingForRender: true, // Wait for preview to render
           generationPhase: 'complete',
         }));
 
@@ -304,6 +314,7 @@ export function TemplateProvider({
           ...prev,
           isStreaming: false,
           isLoading: false,
+          waitingForRender: false,
           generationPhase: 'idle',
         }));
       }
@@ -315,6 +326,7 @@ export function TemplateProvider({
         isStreaming: false,
         streamingProgress: null,
         isLoading: false,
+        waitingForRender: false,
         generationPhase: 'idle',
       }));
     },
@@ -330,12 +342,21 @@ export function TemplateProvider({
 
     const progress = currentStreamingProgress as StreamingProgress | null;
 
-    setState((prev) => ({
-      ...prev,
-      streamingProgress: progress || prev.streamingProgress,
-      isStreaming: isCurrentlyStreaming,
-      generationPhase: getNextPhase(prev.generationPhase, isCurrentlyStreaming, progress),
-    }));
+    setState((prev) => {
+      // If streaming just started (starting/analyzing phase) and no new progress yet,
+      // clear old streamingProgress to avoid showing stale data
+      const shouldClearOldProgress = 
+        isCurrentlyStreaming && 
+        !progress && 
+        (prev.generationPhase === 'starting' || prev.generationPhase === 'analyzing');
+
+      return {
+        ...prev,
+        streamingProgress: shouldClearOldProgress ? null : (progress || prev.streamingProgress),
+        isStreaming: isCurrentlyStreaming,
+        generationPhase: getNextPhase(prev.generationPhase, isCurrentlyStreaming, progress),
+      };
+    });
   }, [currentStreamingProgress, isCurrentlyStreaming]);
 
   // Auto-transition from 'starting' to 'analyzing' after brief delay
@@ -401,12 +422,18 @@ export function TemplateProvider({
     }
   );
 
-  // Sync query loading state
+  // Sync query loading state (but don't override if waiting for render)
   useEffect(() => {
-    setState((prev) => ({
-      ...prev,
-      isLoading: isQueryLoading,
-    }));
+    setState((prev) => {
+      // If we're waiting for render, keep isLoading true
+      if (prev.waitingForRender) {
+        return prev;
+      }
+      return {
+        ...prev,
+        isLoading: isQueryLoading,
+      };
+    });
   }, [isQueryLoading]);
 
   // Sync query data to state
@@ -422,7 +449,8 @@ export function TemplateProvider({
         brandKit: processedData.organization.brandKit as BrandKit,
         reactEmailCode: processedData.reactEmailCode || null,
         styleDefinitions: (processedData.styleDefinitions as Record<string, React.CSSProperties>) || {},
-        isLoading: false,
+        // Only set isLoading to false if we're not waiting for render
+        isLoading: prev.waitingForRender ? true : false,
       }));
     }
   }, [templateData]);
@@ -537,6 +565,7 @@ export function TemplateProvider({
           ...prev,
           isStreaming: false,
           isLoading: false,
+          waitingForRender: false,
           generationPhase: 'idle',
         }));
         throw error;
@@ -660,6 +689,7 @@ export function TemplateProvider({
           ...prev,
           isStreaming: false,
           isLoading: false,
+          waitingForRender: false,
           generationPhase: 'idle',
         }));
         throw error;
@@ -677,9 +707,25 @@ export function TemplateProvider({
       isStreaming: false,
       isLoading: false,
       streamingProgress: null,
+      waitingForRender: false,
       generationPhase: 'idle',
     }));
   }, [cancelStream, cancelRegenerationStream]);
+
+  const onPreviewRenderComplete = useCallback(() => {
+    setState((prev) => {
+      // Only update if we were waiting for render
+      if (prev.waitingForRender) {
+        logger.info("✅ [TemplateProvider] Preview render complete, clearing loading state");
+        return {
+          ...prev,
+          isLoading: false,
+          waitingForRender: false,
+        };
+      }
+      return prev;
+    });
+  }, []);
 
   const actions: TemplateActions = {
     loadTemplate,
@@ -694,6 +740,7 @@ export function TemplateProvider({
     generateTemplateStream,
     cancelGeneration,
     setIsDirty,
+    onPreviewRenderComplete,
     updateReactEmailCode,
     saveReactEmailCode,
     resetReactEmailCode,

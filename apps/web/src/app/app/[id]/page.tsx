@@ -8,6 +8,7 @@ import {
 } from "./components/providers/TemplateProvider";
 import { EditorModeProvider } from "./components/providers/EditorModeProvider";
 import { DesignChangesProvider } from "./components/providers/DesignChangesProvider";
+import { ErrorFixProvider } from "./components/providers/ErrorFixProvider";
 import { InfiniteCanvas } from "./components/canvas/InfiniteCanvas";
 import { SmartEditorPanel } from "./components/floating-panels/SmartEditorPanel";
 import { ChatPanel } from "./components/floating-panels/ChatPanel";
@@ -29,11 +30,14 @@ function EditorContent() {
   const { getPrompt, clearPrompt } = useTemplateCreation();
   const params = useParams();
   const templateId = params.id as string;
-  
+
   // Read prompt immediately on first render for ChatPanel prop
   const promptFromStorage = React.useMemo(() => getPrompt(), []);
   const [activePanel, setActivePanel] = React.useState<string | null>(null);
   const [initialPrompt] = React.useState<string | null>(promptFromStorage);
+  const [errorFixPrompt, setErrorFixPrompt] = React.useState<
+    string | undefined
+  >(undefined);
   const [isSaving, setIsSaving] = useState(false);
 
   // Check if there are ANY pending changes across all elements (smart editor)
@@ -41,11 +45,12 @@ function EditorContent() {
   // Check if code editor has unsaved changes
   const hasCodeEditorChanges = templateState.isDirty && !hasSmartEditorChanges;
   // Check if code editor overlay is handling the save (code mode + smart editor changes)
-  const isCodeModeWithSmartEditorChanges = editorState.globalMode === "code" && hasSmartEditorChanges;
+  const isCodeModeWithSmartEditorChanges =
+    editorState.globalMode === "code" && hasSmartEditorChanges;
   // Show SaveDesignEdit bar only when overlay is NOT handling the save
-  const hasPendingChanges = isCodeModeWithSmartEditorChanges 
-    ? false  // Overlay handles save in code mode
-    : (hasSmartEditorChanges || hasCodeEditorChanges);
+  const hasPendingChanges = isCodeModeWithSmartEditorChanges
+    ? false // Overlay handles save in code mode
+    : hasSmartEditorChanges || hasCodeEditorChanges;
 
   // Get active node for save operations
   const activeNode =
@@ -58,7 +63,7 @@ function EditorContent() {
 
     try {
       const allChanges = editorActions.getAllPendingChanges();
-      
+
       // Handle smart editor changes
       if (allChanges.size > 0 && activeNode) {
         const { updateReactEmailCode } = await import("@/lib/react-email");
@@ -89,14 +94,11 @@ function EditorContent() {
         }
 
         // Save the final accumulated result to database
-        await templateActions.saveReactEmailCode(
-          currentCode,
-          currentStyleDefs
-        );
+        await templateActions.saveReactEmailCode(currentCode, currentStyleDefs);
 
         // Clear ALL pending changes after successful save
         editorActions.clearAllPendingChanges();
-      } 
+      }
       // Handle code editor changes (when no smart editor changes)
       else if (templateState.isDirty) {
         await templateActions.saveTemplate();
@@ -106,12 +108,7 @@ function EditorContent() {
     } finally {
       setIsSaving(false);
     }
-  }, [
-    editorActions,
-    activeNode,
-    templateActions,
-    templateState.isDirty,
-  ]);
+  }, [editorActions, activeNode, templateActions, templateState.isDirty]);
 
   // Handle reset changes - clears ALL pending changes (no API calls)
   const handleResetChanges = useCallback(() => {
@@ -122,12 +119,17 @@ function EditorContent() {
       // Force the preview to re-render with original content
       editorActions.refreshPreview();
     }
-    
+
     // Handle code editor changes - reset to last saved version (no API call)
     if (templateState.isDirty) {
       templateActions.resetReactEmailCode();
     }
-  }, [editorActions, editorState.allPendingChanges.size, templateState.isDirty, templateActions]);
+  }, [
+    editorActions,
+    editorState.allPendingChanges.size,
+    templateState.isDirty,
+    templateActions,
+  ]);
 
   // Handle save for smart editor changes only (used by code editor overlay)
   const handleSaveSmartEditorChanges = useCallback(async () => {
@@ -208,12 +210,12 @@ function EditorContent() {
     } else {
       // Open the new panel and close any other
       setActivePanel(panel);
-      
+
       // If opening editor, enable design mode for element selection
       if (panel === "editor") {
         editorActions.setDesignMode(true);
       }
-      
+
       // If opening chat, close editor and deselect element
       if (panel === "chat") {
         if (editorState.selectedElement) {
@@ -223,6 +225,19 @@ function EditorContent() {
       }
     }
   };
+
+  // Handle error fix request from preview component
+  const handleRequestErrorFix = useCallback((error: string, _code: string) => {
+    // Note: We don't need to include the template code in the prompt
+    // The regeneration API automatically fetches it from the database
+    const errorFixMessage = `I'm getting a rendering error in my template. Please fix it while keeping the rest of the design intact.
+
+**Error:**
+${error}`;
+
+    setErrorFixPrompt(errorFixMessage);
+    setActivePanel("chat");
+  }, []);
 
   // Initialize template node - either loading or with data
   useEffect(() => {
@@ -261,7 +276,8 @@ function EditorContent() {
       const templateContent = {
         subject: template.subject ?? undefined,
         previewText: template.previewText ?? undefined,
-        reactEmailCode: templateState.reactEmailCode || template.reactEmailCode || undefined,
+        reactEmailCode:
+          templateState.reactEmailCode || template.reactEmailCode || undefined,
         styleDefinitions: templateState.styleDefinitions,
       };
 
@@ -274,7 +290,7 @@ function EditorContent() {
           version: 1,
           name: template.name,
           isCurrent: true,
-          isLoading: false,
+          isLoading: templateState.isLoading, // Use actual loading state
           template: templateContent,
           metadata: {
             createdAt: template.createdAt,
@@ -305,14 +321,16 @@ function EditorContent() {
     const templateContent = {
       subject: template.subject ?? undefined,
       previewText: template.previewText ?? undefined,
-      reactEmailCode: templateState.reactEmailCode || template.reactEmailCode || undefined,
+      reactEmailCode:
+        templateState.reactEmailCode || template.reactEmailCode || undefined,
       styleDefinitions: templateState.styleDefinitions,
     };
 
     // Check if content actually changed (avoid infinite updates)
     const currentContent = JSON.stringify(existingNode.data.template);
     const newContent = JSON.stringify(templateContent);
-    const loadingChanged = existingNode.data.isLoading !== templateState.isStreaming;
+    const loadingChanged =
+      existingNode.data.isLoading !== templateState.isLoading;
 
     if (
       currentContent === newContent &&
@@ -329,7 +347,7 @@ function EditorContent() {
         version: 1,
         name: template.name,
         isCurrent: true,
-        isLoading: templateState.isStreaming,
+        isLoading: templateState.isLoading, // Use actual loading state
         template: templateContent,
         metadata: {
           createdAt: template.createdAt,
@@ -339,6 +357,7 @@ function EditorContent() {
     });
   }, [
     templateState.isStreaming,
+    templateState.isLoading,
     templateState.currentTemplate,
     templateState.reactEmailCode,
     templateState.styleDefinitions,
@@ -347,7 +366,10 @@ function EditorContent() {
   ]);
 
   // Show loading overlay when template is loading and no node exists yet
-  const isLoadingTemplate = templateState.isLoading && !templateState.currentTemplate && !templateState.isStreaming;
+  const isLoadingTemplate =
+    templateState.isLoading &&
+    !templateState.currentTemplate &&
+    !templateState.isStreaming;
   const hasTemplateNode = canvasState.nodes.some(
     (n) => n.id === "template-node" || n.id.startsWith("template-")
   );
@@ -358,53 +380,60 @@ function EditorContent() {
       onResetSmartEditorChanges={handleResetSmartEditorChanges}
       isSaving={isSaving}
     >
-      <div className="h-screen w-full relative overflow-hidden flex">
-        <div className="flex h-dvh">
-          <FloatingNav activePanel={activePanel} onTogglePanel={handlePanelToggle} />
-          <ChatPanel
-            isOpen={activePanel === "chat"}
-            onClose={() => {
-              setActivePanel(null);
-            }}
-            initialPrompt={initialPrompt || undefined}
-            onPromptConsumed={clearPrompt}
-          />
-          <SmartEditorPanel
-            isOpen={activePanel === "editor"}
-            onClose={() => {
-              setActivePanel(null);
-              editorActions.selectElement(null);
-              editorActions.setDesignMode(false);
-            }}
-          />
-        </div>
-        <InfiniteCanvas />
-        
-        {/* Loading overlay when opening template from dashboard */}
-        {isLoadingTemplate && !hasTemplateNode && (
-          <div className="absolute inset-0 z-50 bg-background/80 backdrop-blur-sm flex items-center justify-center">
-            <div className="relative w-full h-full">
-              <EdgeRayLoader />
-              <div className="absolute inset-0 flex flex-col items-center justify-center p-12">
-                <div className="relative mb-4">
-                  <MocahLoadingIcon isLoading={true} size="sm" />
+      <ErrorFixProvider onRequestErrorFix={handleRequestErrorFix}>
+        <div className="h-screen w-full relative overflow-hidden flex">
+          <div className="flex h-dvh">
+            <FloatingNav
+              activePanel={activePanel}
+              onTogglePanel={handlePanelToggle}
+            />
+            <ChatPanel
+              isOpen={activePanel === "chat"}
+              onClose={() => {
+                setActivePanel(null);
+              }}
+              initialPrompt={initialPrompt || undefined}
+              onPromptConsumed={clearPrompt}
+              errorFixPrompt={errorFixPrompt}
+              onErrorFixConsumed={() => setErrorFixPrompt(undefined)}
+            />
+            <SmartEditorPanel
+              isOpen={activePanel === "editor"}
+              onClose={() => {
+                setActivePanel(null);
+                editorActions.selectElement(null);
+                editorActions.setDesignMode(false);
+              }}
+            />
+          </div>
+          <InfiniteCanvas />
+
+          {/* Loading overlay when opening template from dashboard */}
+          {isLoadingTemplate && !hasTemplateNode && (
+            <div className="absolute inset-0 z-50 bg-background/80 backdrop-blur-sm flex items-center justify-center">
+              <div className="relative w-full h-full">
+                <EdgeRayLoader />
+                <div className="absolute inset-0 flex flex-col items-center justify-center p-12">
+                  <div className="relative mb-4">
+                    <MocahLoadingIcon isLoading={true} size="sm" />
+                  </div>
+                  <p className="text-muted-foreground text-sm">
+                    Loading template...
+                  </p>
                 </div>
-                <p className="text-muted-foreground text-sm">
-                  Loading template...
-                </p>
               </div>
             </div>
-          </div>
-        )}
-        
-        {/* Floating save bar for unsaved design changes */}
-        <SaveDesignEdit
-          isVisible={hasPendingChanges}
-          onSave={handleSaveChanges}
-          onReset={handleResetChanges}
-          isSaving={isSaving}
-        />
-      </div>
+          )}
+
+          {/* Floating save bar for unsaved design changes */}
+          <SaveDesignEdit
+            isVisible={hasPendingChanges}
+            onSave={handleSaveChanges}
+            onReset={handleResetChanges}
+            isSaving={isSaving}
+          />
+        </div>
+      </ErrorFixProvider>
     </DesignChangesProvider>
   );
 }

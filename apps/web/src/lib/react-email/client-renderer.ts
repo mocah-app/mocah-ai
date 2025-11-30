@@ -10,12 +10,14 @@
  * - Structured error handling with error codes
  * - Performance metrics
  * - Timeout protection
+ * - Safari compatible (uses browser-compatible server rendering)
  */
 
-import { render } from "@react-email/render";
 import { createElement } from "react";
+import { renderToStaticMarkup } from "react-dom/server.browser";
 import * as ReactEmail from "@react-email/components";
 import * as Babel from "@babel/standalone";
+
 
 // ============================================================================
 // Types
@@ -384,12 +386,53 @@ async function executeRender(code: string, pretty: boolean): Promise<string> {
     );
   }
 
-  // Step 6: Render to HTML
-  const html = await render(createElement(Component), {
-    pretty,
-  });
+  // Step 6: Render to HTML using react-dom/server.browser (Safari compatible)
+  // Uses browser-compatible server rendering which doesn't rely on Web Streams
+  let html = renderToStaticMarkup(createElement(Component));
+
+  // Add DOCTYPE and proper HTML structure for email
+  html = `<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">${html}`;
+
+  // Apply pretty formatting if requested
+  if (pretty) {
+    return formatHtml(html);
+  }
 
   return html;
+}
+
+/**
+ * Basic HTML pretty printer
+ * Adds indentation to HTML for readability
+ */
+function formatHtml(html: string): string {
+  let formatted = "";
+  let indent = 0;
+  const indentSize = 2;
+
+  html.split(/(<[^>]+>)/g).forEach((part) => {
+    if (!part.trim()) return;
+
+    // Closing tag
+    if (part.startsWith("</")) {
+      indent = Math.max(0, indent - indentSize);
+      formatted += " ".repeat(indent) + part + "\n";
+    }
+    // Self-closing or opening tag
+    else if (part.startsWith("<")) {
+      formatted += " ".repeat(indent) + part + "\n";
+      // Don't indent for self-closing tags or DOCTYPE/comments
+      if (!part.endsWith("/>") && !part.startsWith("<!")) {
+        indent += indentSize;
+      }
+    }
+    // Text content
+    else {
+      formatted += " ".repeat(indent) + part.trim() + "\n";
+    }
+  });
+
+  return formatted.trim();
 }
 
 // ============================================================================
