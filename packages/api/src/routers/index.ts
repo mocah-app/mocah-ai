@@ -2,6 +2,7 @@ import { protectedProcedure, publicProcedure, router } from "../index";
 import { storageRouter } from "./storage";
 import { organizationRouter } from "./organization";
 import { brandKitRouter } from "./brand-kit";
+import { brandBuilderRouter } from "./brandkit-builder";
 import { templateRouter } from "./template";
 import { chatRouter } from "./chat";
 
@@ -20,6 +21,7 @@ export const appRouter = router({
   storage: storageRouter,
   organization: organizationRouter,
   brandKit: brandKitRouter,
+  brandBuilder: brandBuilderRouter,
   template: templateRouter,
   chat: chatRouter,
 });

@@ -1,15 +1,133 @@
 import { z } from "zod";
 
 /**
- * Prompt templates for AI React Email generation
+ * Optimized prompt templates for AI React Email generation
+ * Token-efficient design with modular architecture
  */
 
 interface BrandKit {
   primaryColor?: string;
-  secondaryColor?: string;
+  accentColor?: string;
   fontFamily?: string;
   logoUrl?: string;
   brandVoice?: string;
+}
+
+interface PromptConfig {
+  includeExamples?: boolean;
+  includeValidation?: boolean;
+  verbosity?: "minimal" | "standard" | "detailed";
+}
+
+// ============================================================================
+// TIER 1: CRITICAL RULES (Validation Failures) - ~300 tokens
+// ============================================================================
+
+const CRITICAL_RULES = `CRITICAL RULES (validation fails if violated):
+
+1. NO HTML TAGS → React Email components only
+   FORBIDDEN: div, span, p, h1-h6, a, button, img, br, hr, strong, em, b, i
+   USE: Html, Head, Body, Container, Section, Row, Column, Heading, Text, Button, Img, Link, Hr
+
+2. NO nested <Text> components
+   BAD:  <Text>Hello <Text>World</Text></Text>
+   FIX:  <Text>Hello</Text><Text>World</Text>
+
+3. NO 'display' CSS property (use Row/Column for layouts)
+
+4. Export format: export default function ComponentName() { return (...); }
+   BAD: export const X = () => ...
+
+5. NO 'as' prop on Heading: <Heading style={...}> only`;
+
+// ============================================================================
+// TIER 2: COMPONENT REFERENCE - ~200 tokens
+// ============================================================================
+
+const COMPONENT_REFERENCE = `COMPONENTS (import from '@react-email/components'):
+Html, Head, Body, Container, Section, Row, Column, Heading, Text, Button, Img, Link, Hr
+
+REQUIRED IMPORTS:
+import { Html, Head, Body, Container, Section, Text, Heading, Button, Img, Link, Hr, Row, Column } from '@react-email/components';
+import * as React from 'react';`;
+
+// ============================================================================
+// TIER 3: STYLE GUIDELINES - ~250 tokens
+// ============================================================================
+
+const STYLE_GUIDELINES = `STYLE RULES:
+- Use 'as const' for literals: textAlign: 'center' as const
+- Width/height: pixels ('600px') or percentages ('50%') only. NO fit-content/max-content
+- Container max-width: 600px
+- Vertical centering: lineHeight = height (e.g., height: '32px', lineHeight: '32px')
+
+EMAIL-SAFE CSS:
+✅ padding, margin, backgroundColor, color, fontSize, fontWeight, textAlign, lineHeight, borderRadius, border, width, height, letterSpacing, verticalAlign
+❌ display, position, transform, flex*, grid*, float, box-shadow, overflow, filter`;
+
+// ============================================================================
+// TIER 4: EXAMPLES (Condensed) - ~300 tokens when included
+// ============================================================================
+
+const CONDENSED_EXAMPLES = `PATTERN EXAMPLES:
+
+// Style objects at top
+const headingStyle = { fontSize: '32px', fontWeight: '700', color: '#1a1a1a', textAlign: 'center' as const, margin: '0 0 16px 0' };
+const buttonStyle = { backgroundColor: '#007bff', color: '#fff', padding: '12px 24px', borderRadius: '6px', textDecoration: 'none' };
+
+// Basic section
+<Section style={{ padding: '40px', textAlign: 'center' as const }}>
+  <Heading style={headingStyle}>Welcome!</Heading>
+  <Text style={{ fontSize: '16px', color: '#666' }}>Your content here</Text>
+  <Button href="https://example.com" style={buttonStyle}>Click Me</Button>
+</Section>
+
+// Multi-column
+<Row>
+  <Column style={{ width: '50%' }}><Text>Left</Text></Column>
+  <Column style={{ width: '50%' }}><Text>Right</Text></Column>
+</Row>`;
+
+// ============================================================================
+// VALIDATION CHECKLIST (Modular) - ~100 tokens
+// ============================================================================
+
+const VALIDATION_CHECKLIST = `PRE-OUTPUT CHECKS:
+□ No HTML tags (div, span, p, h1-h6, a, button, img)
+□ No nested Text: pattern "Text>.*<Text" = 0 matches
+□ No display: property
+□ No Heading as= prop
+□ export default function exists
+□ All textAlign/verticalAlign have 'as const'
+□ <Text> count = </Text> count`;
+
+// ============================================================================
+// DESIGN PHILOSOPHY (Brief) - ~150 tokens
+// ============================================================================
+
+const DESIGN_PHILOSOPHY = `DESIGN APPROACH:
+- Match design to content purpose (urgent sale = bold, newsletter = clean, invitation = elegant)
+- Use white space strategically
+- Typography: vary sizes, use color accents on key words
+- Brand colors enhance, not dominate - use neutrals as base`;
+
+// ============================================================================
+// PROMPT BUILDERS
+// ============================================================================
+
+/**
+ * Build brand guidelines section
+ */
+function buildBrandSection(brandKit?: BrandKit): string {
+  if (!brandKit) return "";
+  const parts = [
+    `Primary: ${brandKit.primaryColor || "Not specified"}`,
+    `Accent: ${brandKit.accentColor || "Not specified"}`,
+    `Font: ${brandKit.fontFamily || "Not specified"}`,
+    `Voice: ${brandKit.brandVoice || "Professional"}`,
+  ];
+  if (brandKit.logoUrl) parts.push(`Logo: ${brandKit.logoUrl}`);
+  return `\nBRAND: ${parts.join(" | ")}`;
 }
 
 /**
@@ -25,579 +143,182 @@ export function buildElementRegenerationPrompt(
     ? `\nBrand Voice: ${brandKit.brandVoice || "Professional"}`
     : "";
 
-  return `Regenerate this ${elementType} element based on the following request:
+  return `Regenerate this ${elementType} element:
 
-Current Content:
-${currentContent}
-
-User Request: "${userPrompt}"
+Current: ${currentContent}
+Request: "${userPrompt}"
 ${brandContext}
 
-Generate an improved version that:
-1. Addresses the user's request
-2. Maintains professional quality
-3. Stays consistent with brand voice
-4. Keeps the same element type and structure
-
-Return only the regenerated content, nothing else.`;
+Requirements: Address request, maintain quality, stay on-brand, keep element type.
+Return only regenerated content.`;
 }
 
 /**
- * Build a prompt for React Email JSX generation
+ * Build optimized prompt for React Email JSX generation
+ * Supports configurable verbosity and modular sections
  */
 export function buildReactEmailPrompt(
   userPrompt: string,
-  brandKit?: BrandKit
+  brandKit?: BrandKit,
+  config: PromptConfig = {}
 ): string {
-  const brandGuidelines = brandKit
-    ? `
-Brand Guidelines:
-- Primary Color: ${brandKit.primaryColor || "Not specified"}
-- Secondary Color: ${brandKit.secondaryColor || "Not specified"}
-- Font Family: ${brandKit.fontFamily || "Not specified"}
-- Brand Voice: ${brandKit.brandVoice || "Professional"}
-${brandKit.logoUrl ? `- Logo URL: ${brandKit.logoUrl}` : ""}
-`
-    : "";
+  const {
+    includeExamples = true,
+    includeValidation = true,
+    verbosity = "standard",
+  } = config;
 
-  return `Create a unique, visually distinctive email template as a React Email component.
+  const sections: string[] = [
+    `Create a React Email template.
 
-User Request: "${userPrompt}"
+Request: "${userPrompt}"
+${buildBrandSection(brandKit)}`,
+    CRITICAL_RULES,
+    COMPONENT_REFERENCE,
+    STYLE_GUIDELINES,
+  ];
 
-${brandGuidelines}
+  if (verbosity !== "minimal") {
+    sections.push(DESIGN_PHILOSOPHY);
+  }
 
-Design Philosophy:
-- AVOID generic templates - be creative with layout, spacing, and composition
-- Design should match the content's purpose and tone (urgent sale = bold/dynamic, newsletter = clean/spacious, invitation = elegant)
-- Vary section arrangements: side-by-side columns, asymmetric layouts, alternating image positions
-- Use white space strategically - not every email needs to be packed
-- Consider unconventional hero sections: split backgrounds, overlapping elements, edge-to-edge images
-- Make typography interesting: vary sizes dramatically, use color accents on key words
-- Brand colors should enhance, not dominate - use neutrals and let brand colors highlight important elements
+  if (includeExamples && verbosity !== "minimal") {
+    sections.push(CONDENSED_EXAMPLES);
+  }
 
-CRITICAL RULES - MUST FOLLOW (VALIDATION WILL FAIL IF NOT FOLLOWED):
+  if (includeValidation) {
+    sections.push(VALIDATION_CHECKLIST);
+  }
 
-1. ABSOLUTELY NO HTML TAGS - ONLY React Email components:
-   ❌ FORBIDDEN: <div>, <span>, <p>, <h1-h6>, <a>, <button>, <img>, <br>, <hr>, <strong>, <em>, <b>, <i>
-   ✅ REQUIRED: Only use @react-email/components
-   
-   ANY HTML tag will cause validation failure. Use ONLY React Email components.
+  sections.push(`OUTPUT: Complete React Email component with imports, style objects, and export default function.`);
 
-2. REQUIRED components (import from '@react-email/components'):
-   - <Html> - Root wrapper
-   - <Head> - For meta tags
-   - <Body> - Main body
-   - <Container> - Max-width content wrapper
-   - <Section> - Content sections (replaces <div>)
-   - <Row> & <Column> - Multi-column layouts
-   - <Heading> - Headings (replaces <h1>, <h2>, etc.) - DO NOT use 'as' prop
-   - <Text> - All text content (replaces <p>, <span>, <strong>, <em>)
-   - <Button> - Call-to-action buttons
-   - <Img> - Images
-   - <Link> - Hyperlinks (replaces <a>)
-   - <Hr> - Horizontal rules
-
-3. Style objects at top for main elements (make them easy to customize):
-
-const heroSectionStyle = {
-  padding: '40px',
-  textAlign: 'center' as const,
-};
-
-const headingStyle = {
-  fontSize: '48px',
-  fontWeight: '800',
-  color: '#1a1a1a',
-  textAlign: 'center' as const,
-  margin: '0 0 16px 0',
-};
-
-// For badge/number styles, DO NOT use display property
-const badgeStyle = {
-  width: '32px',
-  height: '32px',
-  backgroundColor: '#007bff',
-  color: '#ffffff',
-  fontSize: '16px',
-  fontWeight: '700',
-  textAlign: 'center' as const,
-  lineHeight: '32px',
-  borderRadius: '50%',
-  margin: '0 0 8px 0',
-};
-
-4. Component usage examples:
-
-// Basic section
-<Section style={heroSectionStyle}>
-  <Heading style={headingStyle}>Welcome!</Heading>
-  <Text style={bodyTextStyle}>Your content here</Text>
-  <Button href="https://example.com" style={buttonStyle}>Click Me</Button>
-</Section>
-
-// Multi-column layout
-<Section>
-  <Row>
-    <Column style={{ width: '50%' }}>
-      <Text>Left column</Text>
-    </Column>
-    <Column style={{ width: '50%' }}>
-      <Text>Right column</Text>
-    </Column>
-  </Row>
-</Section>
-
-// Numbers/badges (use Text, not div)
-<Section>
-  <Text style={badgeStyle}>1</Text>
-  <Heading style={featureTitleStyle}>Feature Title</Heading>
-  <Text style={descStyle}>Description text</Text>
-</Section>
-
-5. <Heading> component rules:
-   ❌ NEVER use: <Heading as="h2"> or <Heading as="h3">
-   ✅ ALWAYS use: <Heading style={yourStyle}>
-   The component handles semantic heading structure automatically.
-
-6. <Text> component rules - CRITICAL (MOST COMMON VALIDATION ERROR):
-
-   THE #1 MISTAKE: Nesting <Text> components inside other <Text> components
-   
-   ❌ ABSOLUTELY FORBIDDEN - These patterns will FAIL validation:
-   
-   <Text>Hello <Text style={{color: 'red'}}>World</Text></Text>
-   <Text>We offer <Text style={{fontWeight: 'bold'}}>free shipping</Text> today</Text>
-   <Text>Get <Text>20%</Text> off!</Text>
-   <Text style={paragraph}>Visit <Text style={emphasizeText}>our store</Text> today</Text>
-   
-   ✅ CORRECT APPROACHES - Choose ONE of these patterns:
-   
-   Pattern 1: Separate Text components (RECOMMENDED - most reliable):
-   <Text style={{marginBottom: '20px'}}>We offer</Text>
-   <Text style={{fontWeight: 'bold', color: 'red', marginBottom: '20px'}}>free shipping</Text>
-   <Text style={{marginBottom: '20px'}}>today!</Text>
-   
-   Pattern 2: Single Text with unified styling (when inline emphasis isn't critical):
-   <Text style={{fontSize: '16px', marginBottom: '20px'}}>
-     We offer free shipping today!
-   </Text>
-   
-   Pattern 3: Use formatting in single string (NO nested tags):
-   <Text style={{fontSize: '16px'}}>
-     Get your 20% OFF discount today!
-   </Text>
-   
-   Pattern 4: Multiple adjacent Text components for distinct styles:
-   <Section>
-     <Text style={{fontSize: '18px', color: '#333', marginBottom: '10px'}}>
-       Welcome to our special offer!
-     </Text>
-     <Text style={{fontSize: '24px', color: '#d0069a', fontWeight: 'bold', marginBottom: '10px'}}>
-       20% OFF Everything
-     </Text>
-     <Text style={{fontSize: '16px', color: '#666'}}>
-       Use code SAVE20 at checkout
-     </Text>
-   </Section>
-
-   WHY THIS MATTERS:
-   - Email clients don't support nested Text components reliably
-   - React Email's Text component is designed to be self-contained
-   - Nested Text causes rendering issues in Outlook, Gmail, etc.
-   
-   VALIDATION CHECK:
-   Before completing generation, scan your code for "</Text>" 
-   - Count occurrences
-   - Ensure each <Text> has exactly ONE closing tag
-   - If you find patterns like "Text>.*?<Text", you have nested components - FIX IT
-
-   EXAMPLES OF COMMON MISTAKES AND FIXES:
-   
-   ❌ WRONG:
-   <Text style={paragraph}>
-     Once upon a time, <Text style={emphasizeText}>[Your Brand]</Text> was born
-   </Text>
-   
-   ✅ FIXED - Option A (Separate components):
-   <Text style={paragraph}>Once upon a time,</Text>
-   <Text style={{...paragraph, ...emphasizeText}}>[Your Brand]</Text>
-   <Text style={paragraph}>was born</Text>
-   
-   ✅ FIXED - Option B (Unified styling):
-   <Text style={paragraph}>
-     Once upon a time, [Your Brand] was born
-   </Text>
-   
-   ---
-   
-   ❌ WRONG:
-   <Text style={paragraph}>
-     We believe in <Text style={emphasizeText}>love, laughter, and magic</Text>!
-   </Text>
-   
-   ✅ FIXED:
-   <Text style={paragraph}>We believe in</Text>
-   <Text style={{...paragraph, ...emphasizeText, margin: '0 0 20px 0'}}>
-     love, laughter, and magic
-   </Text>
-   <Text style={paragraph}>!</Text>
-   
-   ---
-   
-   ❌ WRONG:
-   <Text>Enjoy a <Text style={{fontWeight: 'bold'}}>15% DISCOUNT</Text> today!</Text>
-   
-   ✅ FIXED:
-   <Text style={{marginBottom: '10px'}}>Enjoy a</Text>
-   <Text style={{fontWeight: 'bold', fontSize: '20px', color: '#d0069a', marginBottom: '10px'}}>
-     15% DISCOUNT
-   </Text>
-   <Text>today!</Text>
-
-   SELF-CHECK BEFORE OUTPUTTING:
-   1. Search your generated code for "<Text>" - count them
-   2. Search for "</Text>" - count them
-   3. Counts should be EQUAL
-   4. Search for pattern "Text>.*<Text" - should find ZERO matches
-   5. If you find nested Text, STOP and rewrite those sections
-
-7. Email-safe CSS ONLY (CRITICAL - display property will trigger warnings):
-   ✅ ALLOWED: padding, margin, backgroundColor, color, fontSize, fontWeight, textAlign, lineHeight, borderRadius, border, width, height, letterSpacing, verticalAlign
-   ✅ WIDTH/HEIGHT: Use pixels ('600px'), percentages ('50%'), or omit entirely - NEVER use 'fit-content', 'max-content', 'min-content'
-   
-   ❌ ABSOLUTELY FORBIDDEN (will break in email clients):
-      - display: ANY VALUE (flex, grid, inline-block, block, inline, table, table-cell, etc.)
-        → Use <Row>/<Column> for layouts instead
-        → Use padding/margin for spacing instead
-        → Use lineHeight equal to height for vertical centering
-      - position: ANY VALUE (absolute, fixed, sticky, relative)
-      - transform, flexbox properties (justify-content, align-items, flex-direction, etc.)
-      - grid properties (grid-template, grid-column, etc.)
-      - box-shadow (limited support, avoid if possible)
-      - overflow, clip-path, filter, backdrop-filter
-      - float, clear
-      - Modern CSS: fit-content, max-content, min-content, clamp(), calc() with complex expressions
-   
-   NEVER write "display:" in any style object. Use layout components and spacing properties instead.
-
-8. For spacing and layout:
-   - Vertical spacing: Use margin-top/bottom, padding-top/bottom
-   - Horizontal spacing: Use margin-left/right, padding-left/right
-   - Centering text: Use textAlign: 'center' as const
-   - Centering blocks: Use margin: '0 auto'
-   - Multi-column: Use <Row> and <Column> with percentage widths
-
-9. Max-width 600px on Container
-
-10. Use TypeScript 'as const' for string literals:
-    ✅ REQUIRED: textAlign: 'center' as const
-    This provides type safety and proper literal types for style properties
-
-11. Line-height for vertical centering:
-    For fixed-height elements like badges, use lineHeight equal to height:
-    { height: '32px', lineHeight: '32px' } // Centers text vertically
-
-PRE-GENERATION VALIDATION CHECKLIST (Review before generating):
-
-Run through this checklist mentally BEFORE generating code:
-
-1. ❌ NO HTML tags anywhere (div, span, p, h1-h6, a, button, img, etc.)
-   ✅ Only React Email components from @react-email/components
-
-2. ❌ NO nested <Text> components - SCAN FOR: Text>.*<Text
-   ✅ Each <Text> is independent and self-contained
-
-3. ❌ NO display property in any style object
-   ✅ Use Row/Column for layouts, padding/margin for spacing
-
-4. ❌ NO "as" prop on <Heading> components - SCAN FOR: Heading as=
-   ✅ <Heading style={...}> only
-
-5. ❌ NO export const ComponentName =
-   ✅ export default function ComponentName()
-
-6. ❌ NO width: 'fit-content' or 'max-content'
-   ✅ Use pixels ('600px') or percentages ('50%') only
-
-7. ✅ All string literal styles use 'as const': textAlign: 'center' as const
-
-8. ✅ All imports from @react-email/components at top
-
-9. ✅ React imported: import * as React from 'react';
-
-10. ✅ Style objects defined before component function
-
-If ANY ❌ item is found in your generated code, STOP and fix it before outputting.
-
-OUTPUT FORMAT (CRITICAL - VALIDATION WILL FAIL IF NOT FOLLOWED):
-
-1. EXPORT FORMAT - REQUIRED (validation checks this):
-   ❌ WRONG: export const ComponentName = () => ( ... );
-   ❌ WRONG: export const ComponentName = () => { return ( ... ); };
-   ❌ WRONG: const ComponentName = () => ( ... ); export default ComponentName;
-   ✅ CORRECT: export default function ComponentName() { return ( ... ); }
-   
-   You MUST use 'export default function' or validation will fail.
-
-2. Complete structure:
-   - Proper imports at the top: import { Html, Head, Body, Container, Section, Text, Heading, Button, Img, Link, Hr, Row, Column } from '@react-email/components';
-   - Import React: import * as React from 'react';
-   - TypeScript interface for props (if any)
-   - Style object definitions (const styleName = { ... };)
-   - export default function ComponentName(props) { return ( ... ); }
-   - Use 'as const' for string literal types in style objects
-
-3. Example correct format:
-
-import { Html, Head, Body, Container, Section, Text, Heading, Button } from '@react-email/components';
-import * as React from 'react';
-
-interface WelcomeEmailProps {
-  userName?: string;
-}
-
-const mainStyle = {
-  backgroundColor: '#f6f6f6',
-  fontFamily: 'Arial, sans-serif',
-};
-
-const containerStyle = {
-  backgroundColor: '#ffffff',
-  margin: '0 auto',
-  padding: '20px',
-  maxWidth: '600px',
-};
-
-export default function WelcomeEmail({ userName = 'there' }: WelcomeEmailProps) {
-  return (
-    <Html>
-      <Head />
-      <Body style={mainStyle}>
-        <Container style={containerStyle}>
-          <Section>
-            <Heading>Welcome!</Heading>
-            <Text>Hello {userName}</Text>
-          </Section>
-        </Container>
-      </Body>
-    </Html>
-  );
-}
-
-Think: "What would make THIS specific email stand out in an inbox while staying professional and on-brand?"
-
-FINAL SELF-CHECK (Do this before outputting your generated code):
-1. Run a text search for "<div", "<span", "<p>", "<h1", "<h2", "<a " in your code → Should find ZERO
-2. Run a text search for "display:" in your code → Should find ZERO
-3. Run a text search for "Text>.*<Text" pattern → Should find ZERO
-4. Run a text search for "Heading as=" → Should find ZERO
-5. Run a text search for "export const" at component level → Should find ZERO
-6. Verify "export default function" exists → Should find EXACTLY ONE
-7. Count <Text> tags vs </Text> tags → Should be EQUAL
-8. Verify all textAlign/verticalAlign have "as const" → Should be 100%
-
-If any check fails, DO NOT output the code. Fix the issues first.`;
+  return sections.filter(Boolean).join("\n\n");
 }
 
 /**
- * Build a prompt for React Email template regeneration/modification
- * Includes the current template code for context-aware updates
+ * Build prompt for React Email template regeneration/modification
  */
 export function buildReactEmailRegenerationPrompt(
   userPrompt: string,
   currentTemplateCode: string,
   brandKit?: BrandKit
 ): string {
-  const brandGuidelines = brandKit
-    ? `
-Brand Guidelines:
-- Primary Color: ${brandKit.primaryColor || "Not specified"}
-- Secondary Color: ${brandKit.secondaryColor || "Not specified"}
-- Font Family: ${brandKit.fontFamily || "Not specified"}
-- Brand Voice: ${brandKit.brandVoice || "Professional"}
-${brandKit.logoUrl ? `- Logo URL: ${brandKit.logoUrl}` : ""}
-`
-    : "";
+  return `Modify existing React Email template.
 
-  return `You are modifying an EXISTING React Email template based on a user's request.
-
-CURRENT TEMPLATE CODE:
+CURRENT CODE:
 \`\`\`tsx
 ${currentTemplateCode}
 \`\`\`
 
-USER REQUEST: "${userPrompt}"
-
-${brandGuidelines}
-
-TASK: Modify the EXISTING template above to fulfill the user's request while preserving everything not mentioned.
+REQUEST: "${userPrompt}"
+${buildBrandSection(brandKit)}
 
 MODIFICATION RULES:
-1. **Preserve Structure**: Keep the same overall structure, layout, and sections UNLESS explicitly asked to change them
-2. **Targeted Changes**: Only modify what the user specifically requested
-3. **Keep Content**: Maintain all existing text, images, and elements that weren't mentioned in the request
-4. **Selective Updates**: 
-   - "make it more colorful" → Add colors to backgrounds, buttons, text while keeping all structure and content
-   - "add more spacing" → Increase padding/margins while keeping all sections and content
-   - "change button text to X" → ONLY change the button text, keep everything else identical
-   - "make header bigger" → Increase header font size, keep content and rest of template
-   - "add a footer" → Add new footer section, keep all existing sections untouched
-5. **Cumulative Changes**: This template may have been modified before - respect ALL existing customizations
+- Preserve structure unless explicitly asked to change
+- Only modify what user requested
+- Keep all existing content not mentioned
+- Respect previous customizations
 
-EXAMPLES OF CORRECT BEHAVIOR:
+${CRITICAL_RULES}
 
-Example 1 - Color Request:
-User: "Make it more colorful"
-Current: Plain template with black text, white background, gray button
-Correct: Same template with brand colors on backgrounds, buttons, headings - all content preserved
-Wrong: Generate completely new colorful template with different layout
+${VALIDATION_CHECKLIST}
 
-Example 2 - Text Change:
-User: "Change the CTA button to say 'Get Started Now'"
-Current: Template with "Buy Now" button
-Correct: Exact same template, only button text changed to "Get Started Now"
-Wrong: Generate new template with "Get Started Now" button
-
-Example 3 - Adding Element:
-User: "Add a hero image at the top"
-Current: Template with text header
-Correct: Insert <Img> component before header, keep everything else identical
-Wrong: Redesign the entire header section
-
-DO NOT:
-- Generate a completely new template from scratch
-- Remove or reorganize sections unless explicitly asked
-- Change content, text, or copy unless explicitly asked
-- Alter the design style unless explicitly asked
-- Ignore existing customizations from previous modifications
-
-CRITICAL RULES (MUST FOLLOW - VALIDATION WILL FAIL OTHERWISE):
-
-1. ABSOLUTELY NO HTML TAGS - ONLY React Email components:
-   ❌ FORBIDDEN: <div>, <span>, <p>, <h1-h6>, <a>, <button>, <img>, <br>, <hr>, <strong>, <em>, <b>, <i>
-   ✅ REQUIRED: Only use @react-email/components
-
-2. REQUIRED components (import from '@react-email/components'):
-   - <Html>, <Head>, <Body>, <Container>, <Section>, <Row>, <Column>
-   - <Heading>, <Text>, <Button>, <Img>, <Link>, <Hr>
-
-3. <Text> component - CRITICAL (MOST COMMON ERROR):
-   ❌ ABSOLUTELY FORBIDDEN: Nested <Text> components
-   ❌ WRONG: <Text>Hello <Text style={{color: 'red'}}>World</Text></Text>
-   ✅ CORRECT: Use separate <Text> components or unified styling
-
-4. <Heading> component:
-   ❌ NEVER use: <Heading as="h2">
-   ✅ ALWAYS use: <Heading style={...}>
-
-5. Email-safe CSS ONLY:
-   ❌ FORBIDDEN: display, position, transform, flexbox, grid, float, box-shadow
-   ✅ ALLOWED: padding, margin, backgroundColor, color, fontSize, fontWeight, textAlign, lineHeight, borderRadius, border, width, height
-
-6. Export format:
-   ✅ REQUIRED: export default function ComponentName() { return (...); }
-   ❌ FORBIDDEN: export const ComponentName = () => ...
-
-7. TypeScript type safety:
-   ✅ Use 'as const' for string literals: textAlign: 'center' as const
-
-PRE-OUTPUT VALIDATION CHECKLIST:
-1. Search for "<div", "<span", "<p>", "<h1" → Should find ZERO
-2. Search for "display:" → Should find ZERO
-3. Search for pattern "Text>.*<Text" → Should find ZERO (nested Text)
-4. Search for "Heading as=" → Should find ZERO
-5. Search for "export const" at component level → Should find ZERO
-6. Verify "export default function" exists → Should find EXACTLY ONE
-7. Count <Text> vs </Text> tags → Should be EQUAL
-8. Verify all textAlign/verticalAlign have "as const" → Should be 100%
-
-${brandGuidelines}
-
-Return the COMPLETE modified React Email component code with all imports, types, and structure.
-The output must be production-ready and pass all validation rules.`;
+Return complete modified component code.`;
 }
+
+// ============================================================================
+// EXTENDED PROMPTS (for complex scenarios)
+// ============================================================================
+
+/**
+ * Build detailed prompt with all examples (for debugging or complex requests)
+ */
+export function buildDetailedReactEmailPrompt(
+  userPrompt: string,
+  brandKit?: BrandKit
+): string {
+  return buildReactEmailPrompt(userPrompt, brandKit, {
+    includeExamples: true,
+    includeValidation: true,
+    verbosity: "detailed",
+  });
+}
+
+/**
+ * Build minimal prompt (for simple modifications)
+ */
+export function buildMinimalReactEmailPrompt(
+  userPrompt: string,
+  brandKit?: BrandKit
+): string {
+  return buildReactEmailPrompt(userPrompt, brandKit, {
+    includeExamples: false,
+    includeValidation: true,
+    verbosity: "minimal",
+  });
+}
+
+// ============================================================================
+// SCHEMA DEFINITIONS
+// ============================================================================
 
 /**
  * Zod schema for React Email JSX generation output
  * Optimized for streaming with early fields first
- * Enhanced descriptions improve AI reliability
  */
 export const reactEmailGenerationSchema = z.object({
   subject: z
     .string()
     .min(1)
     .max(100)
-    .describe(
-      "Email subject line (1-100 chars). Generate FIRST. Be concise, compelling, and relevant to the email content."
-    ),
+    .describe("Email subject line (1-100 chars). Concise, compelling."),
 
   previewText: z
     .string()
     .min(30)
     .max(200)
-    .describe(
-      "Email preview text shown in inbox (30-200 chars). MUST be under 200 characters. Summarize the email's main value proposition concisely."
-    ),
+    .describe("Email preview text (30-200 chars). Main value proposition."),
 
   reactEmailCode: z
     .string()
     .min(500)
     .describe(
-      `Complete React Email component code. MUST include:
-1. Imports: import { Html, Head, Body, Container, Section, Text, Heading, Button, Img, Link, Hr, Row, Column } from '@react-email/components';
-2. React: import * as React from 'react';
-3. Style objects with 'as const' for string literals
-4. Export: export default function ComponentName() { return (...) }
-
-FORBIDDEN: HTML tags (div, span, p, h1-h6, a), nested <Text>, display CSS, 'as' prop on Heading.`
+      "Complete React Email component. Imports from @react-email/components, style objects, export default function. NO HTML tags, NO nested Text, NO display CSS."
     ),
 
   styleType: z
     .enum(["inline", "predefined-classes", "style-objects"])
     .default("style-objects")
-    .describe(
-      "Styling approach. Use 'style-objects' (default) for best maintainability."
-    ),
+    .describe("Styling approach. Default: style-objects."),
 
   styleDefinitionsJson: z
     .string()
     .optional()
-    .describe(
-      'Optional JSON string of style objects. Format: \'{"styleName":{"property":"value"}}\'. Only if extracting styles separately.'
-    ),
+    .describe("Optional JSON of extracted style objects."),
 
   metadata: z
     .object({
-      generatedAt: z
-        .string()
-        .describe("ISO 8601 timestamp (e.g., '2024-01-15T10:30:00Z')"),
-      model: z.string().describe("Model identifier used for generation"),
-      tokensUsed: z.number().int().min(0).describe("Total tokens consumed"),
+      generatedAt: z.string().describe("ISO 8601 timestamp"),
+      model: z.string().describe("Model identifier"),
+      tokensUsed: z.number().int().min(0).describe("Tokens consumed"),
       emailType: z
         .string()
         .nullish()
-        .describe(
-          "Email category: 'welcome', 'newsletter', 'promotional', 'transactional', 'notification', etc."
-        ),
+        .describe("Category: welcome, newsletter, promotional, transactional, notification"),
     })
-    .describe("Generation metadata for tracking and debugging"),
+    .describe("Generation metadata"),
 });
 
-/**
- * Schema name and description for AI context
- * Used by streamStructured/generateStructured for better reliability
- */
 export const TEMPLATE_SCHEMA_NAME = "ReactEmailTemplate";
 export const TEMPLATE_SCHEMA_DESCRIPTION =
-  "A complete React Email template with subject line, preview text, and valid React Email component code. The code must use only @react-email/components, no HTML tags.";
+  "React Email template with subject, preview text, and valid component code using @react-email/components only.";
 
-export type ReactEmailGenerationOutput = z.infer<
-  typeof reactEmailGenerationSchema
->;
+export type ReactEmailGenerationOutput = z.infer<typeof reactEmailGenerationSchema>;
 
-/**
- * Prompt suggestions for different section types
- */
+// ============================================================================
+// PROMPT SUGGESTIONS
+// ============================================================================
+
 export const promptSuggestions = {
   text: [
     "Make this more urgent",
@@ -626,3 +347,36 @@ export const promptSuggestions = {
     "Create an abstract background",
   ],
 };
+
+// ============================================================================
+// UTILITY EXPORTS (for prompt caching strategies)
+// ============================================================================
+
+/** Static rules section - cacheable */
+export const STATIC_PROMPT_SECTIONS = {
+  criticalRules: CRITICAL_RULES,
+  componentReference: COMPONENT_REFERENCE,
+  styleGuidelines: STYLE_GUIDELINES,
+  examples: CONDENSED_EXAMPLES,
+  validation: VALIDATION_CHECKLIST,
+  designPhilosophy: DESIGN_PHILOSOPHY,
+} as const;
+
+/** Get estimated token count for a prompt config */
+export function estimateTokenCount(config: PromptConfig = {}): number {
+  const baseTokens = 400; // Request + critical rules
+  let total = baseTokens;
+  
+  if (config.verbosity !== "minimal") {
+    total += 150; // Design philosophy
+    if (config.includeExamples !== false) {
+      total += 300; // Examples
+    }
+  }
+  
+  if (config.includeValidation !== false) {
+    total += 100; // Validation
+  }
+  
+  return total;
+}

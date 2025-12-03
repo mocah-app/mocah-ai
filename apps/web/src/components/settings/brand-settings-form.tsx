@@ -23,7 +23,7 @@ export function BrandSettingsForm() {
   const [defaultValues, setDefaultValues] = useState<Partial<BrandFormValues>>({
     brandName: "",
     primaryColor: "#3B82F6",
-    secondaryColor: "#10B981",
+    accentColor: "#10B981",
     fontFamily: "Arial, sans-serif",
     brandVoice: "professional",
     logo: "",
@@ -33,7 +33,7 @@ export function BrandSettingsForm() {
   >({
     brandName: "",
     primaryColor: "#3B82F6",
-    secondaryColor: "#10B981",
+    accentColor: "#10B981",
     fontFamily: "Arial, sans-serif",
     brandVoice: "professional",
     logo: "",
@@ -48,7 +48,7 @@ export function BrandSettingsForm() {
       const values = {
         brandName: activeOrganization.name,
         primaryColor: brandKit?.primaryColor || "#3B82F6",
-        secondaryColor: brandKit?.secondaryColor || "#10B981",
+        accentColor: brandKit?.accentColor || "#10B981",
         fontFamily: brandKit?.fontFamily || "Arial, sans-serif",
         brandVoice: (brandKit?.brandVoice as any) || "professional",
         logo: brandKit?.logo || activeOrganization.logo || "",
@@ -93,7 +93,7 @@ export function BrandSettingsForm() {
       };
       brandKit: {
         primaryColor?: string;
-        secondaryColor?: string;
+        accentColor?: string;
         fontFamily?: string;
         brandVoice?: string;
         logo?: string;
@@ -177,7 +177,7 @@ export function BrandSettingsForm() {
 
       const metadata: OrganizationMetadata = {
         primaryColor: values.primaryColor,
-        secondaryColor: values.secondaryColor,
+        accentColor: values.accentColor,
         fontFamily: values.fontFamily,
         brandVoice: values.brandVoice,
         logo: logoUrl,
@@ -204,7 +204,7 @@ export function BrandSettingsForm() {
         },
         brandKit: {
           primaryColor: values.primaryColor,
-          secondaryColor: values.secondaryColor,
+          accentColor: values.accentColor,
           fontFamily: values.fontFamily,
           brandVoice: values.brandVoice,
           logo: logoUrl,
@@ -215,7 +215,7 @@ export function BrandSettingsForm() {
       setOriginalValues({
         brandName: values.brandName,
         primaryColor: values.primaryColor,
-        secondaryColor: values.secondaryColor,
+        accentColor: values.accentColor,
         fontFamily: values.fontFamily,
         brandVoice: values.brandVoice,
         logo: logoUrl,
@@ -281,8 +281,14 @@ export function BrandSettingsForm() {
               formData?.values.primaryColor ||
               defaultValues.primaryColor ||
               "#3B82F6",
-            secondaryColor:
-              formData?.values.secondaryColor || defaultValues.secondaryColor,
+            accentColor:
+              formData?.values.accentColor || defaultValues.accentColor,
+            backgroundColor:
+              activeOrganization?.brandKit?.backgroundColor || "#FFFFFF",
+            textColor:
+              activeOrganization?.brandKit?.textPrimaryColor || "#374151",
+            borderRadius:
+              activeOrganization?.brandKit?.borderRadius || "8px",
             fontFamily:
               formData?.values.fontFamily ||
               defaultValues.fontFamily ||

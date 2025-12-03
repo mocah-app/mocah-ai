@@ -54,8 +54,7 @@ export const auth = betterAuth<BetterAuthOptions>({
               data: {
                 organizationId: organization.id,
                 primaryColor: metadata.primaryColor || "#3B82F6",
-                secondaryColor: metadata.secondaryColor || "#10B981",
-                accentColor: metadata.accentColor || "#F59E0B",
+                accentColor: metadata.accentColor || "#10B981",
                 fontFamily: metadata.fontFamily || "Arial, sans-serif",
                 brandVoice: metadata.brandVoice || "professional",
                 logo: organization.logo || metadata.logo || null, // Prioritize top-level logo field

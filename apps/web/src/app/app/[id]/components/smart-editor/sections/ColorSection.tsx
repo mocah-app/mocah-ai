@@ -28,7 +28,6 @@ export function ColorSection({
   const colorPresets = useMemo(() => {
     const brandColorList = [
       brandColors?.primary,
-      brandColors?.secondary,
       brandColors?.accent,
     ].filter((c): c is string => !!c);
     

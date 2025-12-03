@@ -17,7 +17,6 @@ import {
 
 export interface BrandColors {
   primary: string | null;
-  secondary: string | null;
   accent: string | null;
 }
 

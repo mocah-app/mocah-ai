@@ -25,6 +25,10 @@ import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import { cn } from "@/lib/utils";
 import type { Organization } from "@/types/organization";
 import Loader from "../loader";
+import { EMAIL_SAFE_FONTS } from "@mocah/shared";
+
+// Re-export for backwards compatibility
+export { EMAIL_SAFE_FONTS };
 
 export const brandFormSchema = z.object({
   brandName: z
@@ -32,7 +36,7 @@ export const brandFormSchema = z.object({
     .min(2, "Brand name must be at least 2 characters")
     .max(50, "Brand name must be less than 50 characters"),
   primaryColor: z.string().regex(/^#[0-9A-F]{6}$/i, "Invalid hex color"),
-  secondaryColor: z
+  accentColor: z
     .string()
     .regex(/^#[0-9A-F]{6}$/i, "Invalid hex color")
     .optional(),
@@ -42,19 +46,6 @@ export const brandFormSchema = z.object({
 });
 
 export type BrandFormValues = z.infer<typeof brandFormSchema>;
-
-export const EMAIL_SAFE_FONTS = [
-  "Arial, sans-serif",
-  "Times New Roman, serif",
-  "Verdana, sans-serif",
-  "Georgia, serif",
-  "Tahoma, sans-serif",
-  "Helvetica, sans-serif",
-  "Courier New, monospace",
-  "Lucida Sans, Lucida Grande, sans-serif",
-  "Trebuchet MS, sans-serif",
-  "Palatino, Book Antiqua, serif",
-];
 
 export interface BrandFormData {
   values: BrandFormValues;
@@ -87,7 +78,7 @@ export function BrandForm({
   defaultValues = {
     brandName: "",
     primaryColor: "#3B82F6",
-    secondaryColor: "#10B981",
+    accentColor: "#10B981",
     fontFamily: "Arial, sans-serif",
     brandVoice: "professional",
   },
@@ -148,7 +139,7 @@ export function BrandForm({
   }, [
     watchedValues.brandName,
     watchedValues.primaryColor,
-    watchedValues.secondaryColor,
+    watchedValues.accentColor,
     watchedValues.fontFamily,
     watchedValues.brandVoice,
     logoFile,
@@ -341,18 +332,19 @@ export function BrandForm({
             )}
           />
 
-          {/* Secondary Color */}
+          {/* Accent Color */}
           <FormField
             control={form.control}
-            name="secondaryColor"
+            name="accentColor"
             render={({ field }) => (
               <FormItem className="border-b pb-4 px-4">
-                <FormLabel>Secondary Color (Optional)</FormLabel>
+                <FormLabel>Accent Color (Optional)</FormLabel>
                 <FormControl>
                   <div className="flex gap-2">
                     <Input
                       type="color"
-                      {...field}
+                      value={field.value || "#10B981"}
+                      onChange={field.onChange}
                       className="w-20 h-10 cursor-pointer"
                       disabled={isLoading}
                     />
