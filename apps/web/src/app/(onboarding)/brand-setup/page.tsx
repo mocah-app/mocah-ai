@@ -608,7 +608,7 @@ function BrandSetupContent() {
                           <FormControl>
                                 <div className="flex items-center gap-2">
                                   <Avatar className="h-10 w-40 p-2 border">
-                                  <AvatarImage src={field.value} />
+                                  <AvatarImage src={field.value} className="object-contain" />
                                     <AvatarFallback className="text-xs">
                                       {watchedValues.companyName?.charAt(0) || "?"}
                                   </AvatarFallback>

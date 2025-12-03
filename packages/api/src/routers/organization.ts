@@ -7,6 +7,7 @@ import { organizationProcedure } from "../middleware";
 export const organizationRouter = router({
   /**
    * Get all organizations the user is a member of
+   * Returns minimal brandKit data - use getById for full brandKit
    */
   list: protectedProcedure.query(async ({ ctx }) => {
     const memberships = await ctx.db.member.findMany({
@@ -16,7 +17,23 @@ export const organizationRouter = router({
       include: {
         organization: {
           include: {
-            brandKit: true,
+            brandKit: {
+              select: {
+                id: true,
+                organizationId: true,
+                primaryColor: true,
+                accentColor: true,
+                fontFamily: true,
+                brandVoice: true,
+                logo: true,
+                favicon: true,
+                backgroundColor: true,
+                textPrimaryColor: true,
+                borderRadius: true,
+                // Omit heavy fields: links, summary, productsServices, 
+                // brandValues, companyDescription, socialLinks, etc.
+              },
+            },
           },
         },
       },
@@ -67,7 +84,16 @@ export const organizationRouter = router({
       const organization = await ctx.db.organization.findUnique({
         where: { id: input.organizationId },
         include: {
-          brandKit: true,
+          brandKit: {
+            select: {
+              organizationId: true,
+              primaryColor: true,
+              accentColor: true,
+              fontFamily: true,
+              brandVoice: true,
+              logo: true,
+            },
+          },
           members: {
             include: {
               user: true,

@@ -1,6 +1,8 @@
 import { DashboardSidebar } from "@/components/dashboard/dashboard-sidebar";
 import { SidebarInset } from "@/components/ui/sidebar";
 import DashboardHeader from "@/components/dashboardHeader";
+import { BrandConfigurationModal } from "@/components/brand-kit/brand-configuration-modal";
+import { Suspense } from "react";
 
 export default function DashboardWithSidebarLayout({
   children,
@@ -16,6 +18,10 @@ export default function DashboardWithSidebarLayout({
           <div className="flex-1 overflow-auto">{children}</div>
         </div>
       </SidebarInset>
+      {/* Brand Configuration Modal - triggered by URL param */}
+      <Suspense fallback={null}>
+        <BrandConfigurationModal />
+      </Suspense>
     </div>
   );
 }

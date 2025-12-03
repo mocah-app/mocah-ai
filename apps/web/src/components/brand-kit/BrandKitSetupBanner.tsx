@@ -1,7 +1,7 @@
 "use client";
 import { Button } from "@/components/ui/button";
 import { Card, CardHeader, CardTitle } from "@/components/ui/card";
-import { Palette } from "lucide-react";
+import type { Route } from "next";
 import { useRouter } from "next/navigation";
 
 function BrandKitSetupBanner() {
@@ -20,7 +20,7 @@ function BrandKitSetupBanner() {
         </CardTitle>
 
         <Button
-          onClick={() => router.push("/app/settings")}
+          onClick={() => router.push("/app/?brand=configuration" as Route)}
           className="justify-end "
         >
           Complete

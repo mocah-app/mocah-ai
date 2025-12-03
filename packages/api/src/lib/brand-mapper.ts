@@ -7,6 +7,7 @@
 
 import type { EmailSafeFont } from "@mocah/shared";
 import type { FirecrawlScrapeResponse, SocialLinks } from "./firecrawl";
+import { filterInternalLinks } from "./firecrawl";
 
 // ============================================================================
 // Types
@@ -132,7 +133,10 @@ export function mapFirecrawlToBrandKit(
 
     // Firecrawl content
     summary: summary || null,
-    links: links || null,
+    links: (() => {
+      const filtered = filterInternalLinks(links, metadata?.sourceURL);
+      return filtered.length > 0 ? filtered : null;
+    })(),
 
     // Confidence
     scrapeConfidence: branding?.confidence?.overall || null,

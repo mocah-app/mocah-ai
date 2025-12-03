@@ -74,14 +74,14 @@ export function LiveEmailPreview({ brand }: { brand: BrandPreview }) {
       {/* Email Client Mockup */}
       <Card className="flex-1 overflow-hidden p-0 relative border border-gray-200">
         <div className="h-full overflow-auto relative">
-          <div className="flex gap-2 p-1 px-4 fixed mt-1">
+          <div className="flex gap-2 p-2 px-4 border-b border-gray-200">
             <div className="bg-red-500 h-3 w-3 rounded-full" />
             <div className="bg-green-500 h-3 w-3 rounded-full" />
             <div className="bg-blue-500 h-3 w-3 rounded-full" />
           </div>
           {/* Email Header */}
-          <div className="border-b border-gray-200 p-4 bg-white">
-            <div className="space-y-1 text-sm pt-4">
+          <div className="border-b border-gray-200 px-4 py-2 bg-white">
+            <div className="space-y-1 text-sm ">
               <div className="flex gap-2">
                 <span className="text-muted-foreground">From:</span>
                 <span className="text-gray-700">{brandName}</span>
@@ -99,7 +99,7 @@ export function LiveEmailPreview({ brand }: { brand: BrandPreview }) {
             <div className="max-w-[600px] mx-auto">
               {/* Header */}
               <div
-                className="p-2 pb-4 text-left"
+                className="p-4 text-left"
               >
                 {logo ? (
                   <img

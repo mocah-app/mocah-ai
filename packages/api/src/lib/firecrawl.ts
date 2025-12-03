@@ -260,3 +260,52 @@ export function extractDomain(url: string): string {
   }
 }
 
+/**
+ * Filters links to only include internal links (same domain) and limits to top 10
+ * 
+ * @param links - Array of URLs to filter
+ * @param baseUrl - The base website URL to compare against
+ * @returns Array of internal links, limited to top 10
+ */
+export function filterInternalLinks(links: string[] | undefined | null, baseUrl: string | null | undefined): string[] {
+  if (!links || !Array.isArray(links) || links.length === 0 || !baseUrl) {
+    return [];
+  }
+
+  try {
+    const normalizedBaseUrl = normalizeUrl(baseUrl);
+    const baseUrlObj = new URL(normalizedBaseUrl);
+    const baseDomain = baseUrlObj.hostname.replace("www.", "");
+
+    const internalLinks: string[] = [];
+
+    for (const link of links) {
+      if (!link || typeof link !== "string") continue;
+
+      try {
+        const normalizedLink = normalizeUrl(link);
+        const linkUrlObj = new URL(normalizedLink);
+        const linkDomain = linkUrlObj.hostname.replace("www.", "");
+
+        // Check if link is internal (same domain)
+        if (linkDomain === baseDomain) {
+          internalLinks.push(link);
+          
+          // Stop once we have 10 internal links
+          if (internalLinks.length >= 10) {
+            break;
+          }
+        }
+      } catch {
+        // Skip invalid URLs
+        continue;
+      }
+    }
+
+    return internalLinks;
+  } catch {
+    // If baseUrl is invalid, return empty array
+    return [];
+  }
+}
+

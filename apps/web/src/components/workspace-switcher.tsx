@@ -67,7 +67,7 @@ export function WorkspaceSwitcher() {
         <Button variant="outline" className="w-[200px] justify-between">
           <span className="truncate flex items-center gap-2">
             <Avatar className="size-4">
-              <AvatarImage src={displayOrg?.logo || undefined} />
+              <AvatarImage src={displayOrg?.logo || undefined} className="object-contain" />
               <AvatarFallback>
                 {displayOrg?.name?.charAt(0)}
               </AvatarFallback>
@@ -92,7 +92,7 @@ export function WorkspaceSwitcher() {
             <div className="flex items-center gap-2">
               {org.logo && (
                 <Avatar className="size-4">
-                  <AvatarImage src={org.logo || undefined} />
+                  <AvatarImage src={org.logo || undefined} className="object-contain" />
                   <AvatarFallback>{org.name?.charAt(0)}</AvatarFallback>
                 </Avatar>
               )}
