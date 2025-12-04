@@ -400,6 +400,16 @@ function BrandSetupContent() {
   // Watched values for live preview
   const watchedValues = brandForm.watch();
 
+  // Safely extract hostname from website URL
+  const getHostname = (url: string | null): string | null => {
+    if (!url) return null;
+    try {
+      return new URL(url).hostname;
+    } catch {
+      return null;
+    }
+  };
+
   // ============================================================================
   // Render
   // ============================================================================
@@ -562,21 +572,24 @@ function BrandSetupContent() {
                     className="space-y-0 shadow-2xl rounded-xl border p-0 relative z-20 bg-card max-h-[75vh] overflow-y-auto"
                   >
                     {/* Confidence indicator for scraped data */}
-                    {step === "review" && scrapedData?.scrapeConfidence && (
-                      <div className="px-4 pt-4">
-                        <div className="flex items-center gap-2 text-xs text-muted-foreground bg-muted/50 rounded-md px-3 py-2">
-                          <Sparkles className="w-3 h-3" />
-                          <span>
-                            {Math.round(scrapedData.scrapeConfidence * 100)}% confidence
-                          </span>
-                          {scrapedData.websiteUrl && (
-                            <span className="text-foreground/60">
-                              from {new URL(scrapedData.websiteUrl).hostname}
+                    {step === "review" && scrapedData?.scrapeConfidence && (() => {
+                      const hostname = getHostname(scrapedData.websiteUrl);
+                      return (
+                        <div className="px-4 pt-4">
+                          <div className="flex items-center gap-2 text-xs text-muted-foreground bg-muted/50 rounded-md px-3 py-2">
+                            <Sparkles className="w-3 h-3" />
+                            <span>
+                              {Math.round(scrapedData.scrapeConfidence * 100)}% confidence
                             </span>
-                          )}
+                            {hostname && (
+                              <span className="text-foreground/60">
+                                from {hostname}
+                              </span>
+                            )}
+                          </div>
                         </div>
-                      </div>
-                    )}
+                      );
+                    })()}
 
                     {/* Brand Name & Logo Row */}
                     <div className="p-4 pt-4 border-b">

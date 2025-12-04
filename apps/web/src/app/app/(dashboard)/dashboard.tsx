@@ -206,28 +206,6 @@ export default function Dashboard() {
   // Check if brand kit is set up
   const hasBrandKit = displayOrg?.metadata?.setupCompleted;
 
-  const topStats: TopStats[] = [
-    {
-      title: "Templates",
-      value: templateCount,
-      description: "Your email templates",
-    },
-    { title: "AI Credits", value: 0, description: "50 remaining this month" },
-    {
-      title: "Plan",
-      value: 0,
-      description: (
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={() => router.push("/pricing")}
-        >
-          Upgrade Plan
-        </Button>
-      ),
-    },
-  ];
-
   return (
     <div className="space-y-6 relative">
       <h1 className="sr-only">{displayOrg?.name}</h1>

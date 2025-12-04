@@ -16,7 +16,7 @@ import {
     Redo2,
     Undo2
 } from "lucide-react";
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 
 interface CustomCanvasControlProps {
   isHandMode?: boolean;
@@ -38,6 +38,7 @@ export function CustomCanvasControl({
   const zoomLevel = externalZoomLevel ?? internalZoomLevel;
 
   // Initialize zoom level on mount only
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => {
     const currentZoom = getZoom();
     const initialZoom = Math.round(currentZoom * 100);
@@ -47,8 +48,31 @@ export function CustomCanvasControl({
     }
   }, []);
 
+  const handleZoomIn = useCallback(() => {
+    zoomIn({ duration: 200 });
+    // Zoom level will be updated via onMove callback
+  }, [zoomIn]);
+
+  const handleZoomOut = useCallback(() => {
+    zoomOut({ duration: 200 });
+    // Zoom level will be updated via onMove callback
+  }, [zoomOut]);
+
+  const handleFitView = useCallback(() => {
+    fitView({ duration: 200, padding: 0.2 });
+    // Zoom level will be updated via onMove callback
+  }, [fitView]);
+
+  const handleZoomTo100 = useCallback(() => {
+    setViewport({ x: 0, y: 0, zoom: 1 }, { duration: 200 });
+    if (externalZoomLevel === undefined) {
+      setInternalZoomLevel(100);
+    }
+    onZoomLevelChange?.(100);
+  }, [setViewport, externalZoomLevel, onZoomLevelChange]);
+
   // Keyboard shortcuts
-  React.useEffect(() => {
+  useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       // Check for Cmd (Mac) or Ctrl (Windows/Linux)
       const isCmdOrCtrl = e.metaKey || e.ctrlKey;
@@ -79,30 +103,7 @@ export function CustomCanvasControl({
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, []);
-
-  const handleZoomIn = () => {
-    zoomIn({ duration: 200 });
-    // Zoom level will be updated via onMove callback
-  };
-
-  const handleZoomOut = () => {
-    zoomOut({ duration: 200 });
-    // Zoom level will be updated via onMove callback
-  };
-
-  const handleFitView = () => {
-    fitView({ duration: 200, padding: 0.2 });
-    // Zoom level will be updated via onMove callback
-  };
-
-  const handleZoomTo100 = () => {
-    setViewport({ x: 0, y: 0, zoom: 1 }, { duration: 200 });
-    if (externalZoomLevel === undefined) {
-      setInternalZoomLevel(100);
-    }
-    onZoomLevelChange?.(100);
-  };
+  }, [handleZoomIn, handleZoomOut, handleZoomTo100, handleFitView]);
 
   const toggleMode = () => {
     setIsHandMode(!isHandMode);

@@ -6,10 +6,11 @@ import { Textarea } from "@/components/ui/textarea";
 import { useOrganization } from "@/contexts/organization-context";
 import { useTemplateCreation } from "@/utils/store-prompt-in-session";
 import { trpc } from "@/utils/trpc";
-import { CircleChevronUp, Loader, Plus, Send } from "lucide-react";
+import { CircleChevronUp, Plus, Send } from "lucide-react";
 import { useRouter } from "next/navigation";
 import React, { useState } from "react";
 import { toast } from "sonner";
+import Loader from "@/components/loader";
 
 export default function NewTemplatePage() {
   const router = useRouter();
@@ -24,7 +25,9 @@ export default function NewTemplatePage() {
     },
   });
 
-  const handleGenerate = () => {
+  const [isCreating, setIsCreating] = useState(false);
+
+  const handleGenerate = async () => {
     if (!prompt.trim()) {
       toast.error("Please enter a prompt");
       return;
@@ -35,18 +38,15 @@ export default function NewTemplatePage() {
       return;
     }
 
-    // Generate UUID client-side for instant navigation
+    setIsCreating(true);
+
+    // Generate UUID client-side
     const templateId = crypto.randomUUID();
 
-    // Store prompt for the streaming process
-    setCreationPrompt(prompt.trim());
-
-    // Navigate immediately (optimistic UI)
-    router.push(`/app/${templateId}`);
-
-    // Create skeleton in background (fire-and-forget)
-    createSkeletonMutation.mutate(
-      {
+    try {
+      // Create skeleton first - ensures template exists before navigation
+      // This is fast (~50-100ms) and prevents race conditions
+      await createSkeletonMutation.mutateAsync({
         id: templateId,
         name: "New Template",
         description: prompt.trim(),
@@ -54,19 +54,22 @@ export default function NewTemplatePage() {
         reactEmailCode: "", // Empty - will be populated by AI generation
         styleType: "STYLE_OBJECTS",
         isPublic: false,
-      },
-      {
-        onError: (error) => {
-          console.error("Failed to create skeleton template:", error);
-          // User already navigated, show toast but don't block
-          toast.error("Failed to initialize template");
-        },
-      }
-    );
+      });
+
+      // Store prompt for the streaming process
+      setCreationPrompt(prompt.trim());
+
+      // Navigate after skeleton exists
+      router.push(`/app/${templateId}`);
+    } catch (error) {
+      console.error("Failed to create template:", error);
+      toast.error("Failed to create template. Please try again.");
+      setIsCreating(false);
+    }
   };
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
-    if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) {
+    if (e.key === "Enter" && (e.metaKey || e.ctrlKey) && !isCreating) {
       e.preventDefault();
       handleGenerate();
     }
@@ -147,12 +150,16 @@ export default function NewTemplatePage() {
 
               <Button
                 onClick={handleGenerate}
-                disabled={!prompt.trim()}
+                disabled={!prompt.trim() || isCreating}
                 size="icon"
                 aria-label="generate template"
                 className="h-10 w-10"
               >
-                <Send className="size-5" />
+                {isCreating ? (
+                  <Loader />
+                ) : (
+                  <Send className="size-5" />
+                )}
               </Button>
             </div>
           </div>
@@ -169,6 +176,7 @@ export default function NewTemplatePage() {
                 variant="outline"
                 key={index}
                 onClick={() => setPrompt(suggestion.prompt)}
+                disabled={isCreating}
                 className="w-full justify-between h-auto group/item overflow-clip hover:border-primary/50"
               >
                 <span className="text-wrap text-left">{suggestion.label}</span>

@@ -160,6 +160,15 @@ export const ReactEmailPreview = ({
   // Refs
   const iframeRef = useRef<HTMLIFrameElement>(null);
   const selectedElementIdRef = useRef<string | null>(null);
+  const selectableReadyTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const attachedHandlersRef = useRef<
+    Array<{
+      element: Element;
+      type: string;
+      handler: EventListener;
+      options?: boolean | AddEventListenerOptions;
+    }>
+  >([]);
 
   // Context
   const { onRequestErrorFix } = useErrorFix();
@@ -169,10 +178,41 @@ export const ReactEmailPreview = ({
     selectedElementIdRef.current = selectedElementId;
   }, [selectedElementId]);
 
+  // Cleanup function to remove all attached event listeners
+  const cleanupIframeListeners = useCallback(() => {
+    // Clear the timeout
+    if (selectableReadyTimeoutRef.current) {
+      clearTimeout(selectableReadyTimeoutRef.current);
+      selectableReadyTimeoutRef.current = null;
+    }
+
+    // Remove all attached event listeners
+    attachedHandlersRef.current.forEach(({ element, type, handler, options }) => {
+      try {
+        element.removeEventListener(type, handler, options);
+      } catch {
+        // Element may have been removed from DOM
+      }
+    });
+    attachedHandlersRef.current = [];
+  }, []);
+
   // Reset selectable ready state when enableSelection changes
   useEffect(() => {
     setIsSelectableReady(!enableSelection);
-  }, [enableSelection]);
+
+    // Cleanup listeners when enableSelection is disabled
+    if (!enableSelection) {
+      cleanupIframeListeners();
+    }
+  }, [enableSelection, cleanupIframeListeners]);
+
+  // Cleanup on unmount
+  useEffect(() => {
+    return () => {
+      cleanupIframeListeners();
+    };
+  }, [cleanupIframeListeners]);
 
   // Inject selection styles into iframe
   const injectStyles = useCallback((doc: Document, isSafari: boolean) => {
@@ -251,6 +291,9 @@ export const ReactEmailPreview = ({
 
   // Handle iframe load for element selection
   const handleIframeLoad = useCallback(() => {
+    // Cleanup previous listeners before attaching new ones
+    cleanupIframeListeners();
+
     if (!enableSelection || !onElementSelect) return;
 
     const iframe = iframeRef.current;
@@ -262,6 +305,17 @@ export const ReactEmailPreview = ({
     injectStyles(doc, isSafari);
 
     const selectableElements = doc.querySelectorAll("[data-element-id]");
+
+    // Helper to track event listener attachment
+    const addTrackedListener = (
+      element: Element,
+      type: string,
+      handler: EventListener,
+      options?: boolean | AddEventListenerOptions
+    ) => {
+      element.addEventListener(type, handler, options);
+      attachedHandlersRef.current.push({ element, type, handler, options });
+    };
 
     selectableElements.forEach((element) => {
       const htmlElement = element as HTMLElement;
@@ -315,17 +369,17 @@ export const ReactEmailPreview = ({
 
       // Safari needs both capture phases
       if (isSafari) {
-        element.addEventListener("click", clickHandler, { capture: true });
-        element.addEventListener("click", clickHandler, { capture: false });
+        addTrackedListener(element, "click", clickHandler, { capture: true });
+        addTrackedListener(element, "click", clickHandler, { capture: false });
       } else {
-        element.addEventListener("click", clickHandler);
+        addTrackedListener(element, "click", clickHandler);
       }
 
-      element.addEventListener("mouseenter", mouseEnterHandler);
-      element.addEventListener("mouseleave", mouseLeaveHandler);
+      addTrackedListener(element, "mouseenter", mouseEnterHandler);
+      addTrackedListener(element, "mouseleave", mouseLeaveHandler);
     });
 
-    setTimeout(() => setIsSelectableReady(true), 100);
+    selectableReadyTimeoutRef.current = setTimeout(() => setIsSelectableReady(true), 100);
   }, [
     enableSelection,
     onElementSelect,
@@ -333,6 +387,7 @@ export const ReactEmailPreview = ({
     styleDefinitions,
     injectStyles,
     updateSelectionIndicator,
+    cleanupIframeListeners,
   ]);
 
   // ============================================================================
@@ -353,7 +408,7 @@ export const ReactEmailPreview = ({
   if (error) {
     return (
       <PreviewErrorCard
-        title="Failed to render preview"
+        title="Failed to load preview"
         errors={[error]}
         onFixWithAI={() => {
           const errorDetails =
@@ -368,7 +423,7 @@ export const ReactEmailPreview = ({
   if (validationError && onFixValidationError && onDismissValidationError) {
     return (
       <PreviewErrorCard
-        title="Validation Issues Found"
+        title="Some issues were found"
         description={`${validationError.errors.length} issue${validationError.errors.length !== 1 ? "s" : ""} need fixing`}
         errors={validationError.errors}
         warnings={validationError.warnings}

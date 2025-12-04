@@ -12,7 +12,6 @@ import React, {
 import { convertDates, logger } from "@mocah/shared";
 import { useStreamTemplate } from "@/hooks/use-stream-template";
 import { useOrganization } from "@/contexts/organization-context";
-import { useRouter } from "next/navigation";
 import {
   type GenerationPhase,
   type StreamingProgress,
@@ -21,6 +20,9 @@ import {
 
 // Re-export for consumers
 export { GENERATION_PHASE_MESSAGES, type GenerationPhase } from "./generation-phases";
+
+// Template-level error types
+export type TemplateError = "NOT_FOUND" | "LOAD_ERROR" | null;
 
 // Validation error state when AI generates invalid code
 export interface ValidationError {
@@ -41,6 +43,7 @@ interface TemplateState {
   generationPhase: GenerationPhase;
   waitingForRender: boolean; // True when waiting for preview to render after generation
   validationError: ValidationError | null; // When AI generates code that fails validation
+  error: TemplateError; // Template-level error (not found, load failed, etc.)
   
   // React Email specific state
   reactEmailCode: string | null;
@@ -95,7 +98,6 @@ export function TemplateProvider({
   templateId?: string;
 }) {
   const { activeOrganization } = useOrganization();
-  const router = useRouter();
   const [state, setState] = useState<TemplateState>({
     currentTemplate: null,
     versions: [],
@@ -108,6 +110,7 @@ export function TemplateProvider({
     generationPhase: 'idle',
     waitingForRender: false,
     validationError: null,
+    error: null,
     reactEmailCode: null,
     styleDefinitions: {},
   });
@@ -460,7 +463,8 @@ export function TemplateProvider({
     },
   });
 
-  // tRPC queries - fetch template data with retry for optimistic creation
+  // tRPC queries - fetch template data
+  // Note: No retry needed for NOT_FOUND since skeleton is created before navigation
   const {
     data: templateData,
     isLoading: isQueryLoading,
@@ -470,14 +474,6 @@ export function TemplateProvider({
     { id: templateId! },
     {
       enabled: !!templateId,
-      retry: (failureCount, error: any) => {
-        // Retry up to 3 times if template not found (might be creating in background)
-        if (error?.data?.code === "NOT_FOUND" && failureCount < 3) {
-          return true;
-        }
-        return false;
-      },
-      retryDelay: 500, // Wait 500ms between retries
     }
   );
 
@@ -513,6 +509,28 @@ export function TemplateProvider({
       }));
     }
   }, [templateData]);
+
+  // Handle query errors - set error state for not found UI
+  useEffect(() => {
+    if (queryError) {
+      const errorData = queryError.data as { code?: string } | undefined;
+      if (errorData?.code === "NOT_FOUND") {
+        logger.warn("Template not found", { templateId });
+        setState((prev) => ({
+          ...prev,
+          isLoading: false,
+          error: "NOT_FOUND",
+        }));
+      } else {
+        logger.error("Failed to load template", queryError);
+        setState((prev) => ({
+          ...prev,
+          isLoading: false,
+          error: "LOAD_ERROR",
+        }));
+      }
+    }
+  }, [queryError, templateId]);
 
   const loadTemplate = useCallback(
     async (id: string) => {

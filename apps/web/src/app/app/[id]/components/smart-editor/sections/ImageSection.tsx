@@ -40,7 +40,7 @@ export function ImageSection({
           <div className="mt-2 rounded-md overflow-hidden border border-border bg-muted/50">
             <img
               src={src}
-              alt={alt || ''}
+              alt={alt || 'Image preview'}
               className="w-full h-auto max-h-32 object-contain"
             />
           </div>
