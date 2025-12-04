@@ -11,7 +11,7 @@ catalog:
   '@upstash/redis': ^1.35.7
   better-auth: ^1.3.28
   dotenv: ^17.2.2
-  next: 16.0.3
+  next: 16.0.7
   pg: ^8.14.1
   stripe: ^19.1.0
   tsdown: ^0.15.5

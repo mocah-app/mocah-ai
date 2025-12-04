@@ -6,11 +6,45 @@ import { z } from "zod";
  */
 
 interface BrandKit {
-  primaryColor?: string;
-  accentColor?: string;
-  fontFamily?: string;
-  logoUrl?: string;
-  brandVoice?: string;
+  // Core brand colors
+  primaryColor?: string | null;
+  accentColor?: string | null;
+  backgroundColor?: string | null;
+  textPrimaryColor?: string | null;
+
+  // Typography & Voice
+  fontFamily?: string | null;
+  brandVoice?: string | null; // "professional", "casual", "playful", "luxury"
+
+  // Brand assets
+  logo?: string | null;
+  favicon?: string | null;
+  ogImage?: string | null;
+  customCss?: string | null;
+
+  // Layout
+  borderRadius?: string | null;
+
+  // Brand personality
+  brandTone?: string | null;
+  brandEnergy?: string | null; // "low", "medium", "high"
+  targetAudience?: string | null;
+
+  // Company information
+  companyName?: string | null;
+  companyDescription?: string | null;
+  tagline?: string | null;
+  industry?: string | null;
+  productsServices?: string[] | null;
+  brandValues?: string[] | null;
+  socialLinks?: Record<string, string> | null;
+  contactEmail?: string | null;
+  foundingYear?: string | null;
+
+  // Website data
+  websiteUrl?: string | null;
+  summary?: string | null;
+  links?: string[] | null;
 }
 
 interface PromptConfig {
@@ -109,25 +143,102 @@ const DESIGN_PHILOSOPHY = `DESIGN APPROACH:
 - Match design to content purpose (urgent sale = bold, newsletter = clean, invitation = elegant)
 - Use white space strategically
 - Typography: vary sizes, use color accents on key words
-- Brand colors enhance, not dominate - use neutrals as base`;
+- Apply brand colors: primary for CTAs/headers, accent for highlights
+- Use brand font family if specified
+- Match brand voice/tone in all copy (professional, casual, playful, or luxury)
+- Speak directly to the target audience
+- Reflect brand values and personality in messaging`;
 
 // ============================================================================
 // PROMPT BUILDERS
 // ============================================================================
 
 /**
- * Build brand guidelines section
+ * Build comprehensive brand context section for AI
+ * Includes company info, personality, colors, and design guidelines
  */
 function buildBrandSection(brandKit?: BrandKit): string {
   if (!brandKit) return "";
-  const parts = [
-    `Primary: ${brandKit.primaryColor || "Not specified"}`,
-    `Accent: ${brandKit.accentColor || "Not specified"}`,
-    `Font: ${brandKit.fontFamily || "Not specified"}`,
-    `Voice: ${brandKit.brandVoice || "Professional"}`,
-  ];
-  if (brandKit.logoUrl) parts.push(`Logo: ${brandKit.logoUrl}`);
-  return `\nBRAND: ${parts.join(" | ")}`;
+
+  const sections: string[] = [];
+
+  // Company Identity
+  const companyParts: string[] = [];
+  if (brandKit.companyName) companyParts.push(`Company: ${brandKit.companyName}`);
+  if (brandKit.tagline) companyParts.push(`Tagline: "${brandKit.tagline}"`);
+  if (brandKit.industry) companyParts.push(`Industry: ${brandKit.industry}`);
+  if (brandKit.foundingYear) companyParts.push(`Founded: ${brandKit.foundingYear}`);
+  
+  if (companyParts.length > 0) {
+    sections.push(`COMPANY: ${companyParts.join(" | ")}`);
+  }
+
+  // Company Description
+  if (brandKit.companyDescription) {
+    sections.push(`ABOUT: ${brandKit.companyDescription}`);
+  }
+
+  // Products & Services
+  if (brandKit.productsServices && brandKit.productsServices.length > 0) {
+    sections.push(`PRODUCTS/SERVICES: ${brandKit.productsServices.join(", ")}`);
+  }
+
+  // Brand Values
+  if (brandKit.brandValues && brandKit.brandValues.length > 0) {
+    sections.push(`BRAND VALUES: ${brandKit.brandValues.join(", ")}`);
+  }
+
+  // Target Audience
+  if (brandKit.targetAudience) {
+    sections.push(`TARGET AUDIENCE: ${brandKit.targetAudience}`);
+  }
+
+  // Brand Personality
+  const personalityParts: string[] = [];
+  if (brandKit.brandVoice) personalityParts.push(`Voice: ${brandKit.brandVoice}`);
+  if (brandKit.brandTone) personalityParts.push(`Tone: ${brandKit.brandTone}`);
+  if (brandKit.brandEnergy) personalityParts.push(`Energy: ${brandKit.brandEnergy}`);
+  
+  if (personalityParts.length > 0) {
+    sections.push(`BRAND PERSONALITY: ${personalityParts.join(" | ")}`);
+  }
+
+  // Visual Identity
+  const visualParts: string[] = [];
+  if (brandKit.primaryColor) visualParts.push(`Primary: ${brandKit.primaryColor}`);
+  if (brandKit.accentColor) visualParts.push(`Accent: ${brandKit.accentColor}`);
+  if (brandKit.backgroundColor) visualParts.push(`Background: ${brandKit.backgroundColor}`);
+  if (brandKit.textPrimaryColor) visualParts.push(`Text: ${brandKit.textPrimaryColor}`);
+  if (brandKit.fontFamily) visualParts.push(`Font: ${brandKit.fontFamily}`);
+  if (brandKit.borderRadius) visualParts.push(`Border Radius: ${brandKit.borderRadius}`);
+  
+  if (visualParts.length > 0) {
+    sections.push(`VISUAL IDENTITY: ${visualParts.join(" | ")}`);
+  }
+
+  // Logo (include if available for image reference)
+  if (brandKit.logo && !brandKit.logo.startsWith('data:')) {
+    sections.push(`LOGO URL: ${brandKit.logo}`);
+  }
+
+  // Website Summary (if available from scraping)
+  if (brandKit.summary) {
+    // Truncate if too long
+    const summaryTruncated = brandKit.summary.length > 500 
+      ? brandKit.summary.substring(0, 500) + "..."
+      : brandKit.summary;
+    sections.push(`WEBSITE CONTEXT: ${summaryTruncated}`);
+  }
+
+  if (sections.length === 0) return "";
+
+  return `\n=== BRAND GUIDELINES ===\n${sections.join("\n")}\n========================\n
+IMPORTANT: Apply these brand guidelines throughout the email:
+- Use the brand colors (primary for CTAs, accent for highlights)
+- Match the brand voice and tone in all copy
+- Speak to the target audience appropriately
+- Reflect brand values in messaging
+- Reference products/services when relevant`;
 }
 
 /**
@@ -139,9 +250,7 @@ export function buildElementRegenerationPrompt(
   userPrompt: string,
   brandKit?: BrandKit
 ): string {
-  const brandContext = brandKit
-    ? `\nBrand Voice: ${brandKit.brandVoice || "Professional"}`
-    : "";
+  const brandContext = buildBrandContextForElement(brandKit);
 
   return `Regenerate this ${elementType} element:
 
@@ -151,6 +260,25 @@ ${brandContext}
 
 Requirements: Address request, maintain quality, stay on-brand, keep element type.
 Return only regenerated content.`;
+}
+
+/**
+ * Build a concise brand context for element-level regeneration
+ */
+function buildBrandContextForElement(brandKit?: BrandKit): string {
+  if (!brandKit) return "";
+
+  const parts: string[] = [];
+  
+  if (brandKit.companyName) parts.push(`Company: ${brandKit.companyName}`);
+  if (brandKit.brandVoice) parts.push(`Voice: ${brandKit.brandVoice}`);
+  if (brandKit.brandTone) parts.push(`Tone: ${brandKit.brandTone}`);
+  if (brandKit.targetAudience) parts.push(`Audience: ${brandKit.targetAudience}`);
+  if (brandKit.tagline) parts.push(`Tagline: "${brandKit.tagline}"`);
+  
+  if (parts.length === 0) return "";
+  
+  return `\nBrand Context: ${parts.join(" | ")}`;
 }
 
 /**

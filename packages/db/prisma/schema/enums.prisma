@@ -71,3 +71,9 @@ enum ChatMessageRole {
   assistant
 }
 
+enum TemplateStatus {
+  DRAFT     // Initial state - AI generation not complete
+  ACTIVE    // Generation complete, template ready to use
+  ARCHIVED  // Soft archived (alternative to deletion)
+}
+

@@ -87,6 +87,8 @@ export const templateRouter = router({
       z
         .object({
           category: z.string().optional(),
+          status: z.enum(["DRAFT", "ACTIVE", "ARCHIVED"]).optional(),
+          includeDrafts: z.boolean().optional(), // Explicitly include DRAFT templates
           isPublic: z.boolean().optional(),
           isFavorite: z.boolean().optional(),
           limit: z.number().min(1).max(100).default(50),
@@ -99,6 +101,14 @@ export const templateRouter = router({
         organizationId: ctx.organizationId,
         deletedAt: null,
       };
+
+      // Filter by status - default to ACTIVE only (excludes incomplete drafts)
+      if (input?.status) {
+        where.status = input.status;
+      } else if (!input?.includeDrafts) {
+        // By default, exclude DRAFT templates from dashboard
+        where.status = "ACTIVE";
+      }
 
       if (input?.category) {
         where.category = input.category;
@@ -504,6 +514,7 @@ export const templateRouter = router({
         description: z.string().optional(),
         subject: z.string().optional(),
         category: z.string().optional(),
+        status: z.enum(["DRAFT", "ACTIVE", "ARCHIVED"]).optional(),
         isPublic: z.boolean().optional(),
         isFavorite: z.boolean().optional(),
         reactEmailCode: z.string().optional(),

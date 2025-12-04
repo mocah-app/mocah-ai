@@ -2,16 +2,17 @@
 // Template Management - React Email based content creation and storage
 
 model Template {
-  id             String   @id @default(uuid())
+  id             String         @id @default(uuid())
   organizationId String
   name           String
   description    String?
-  subject        String?  // Email subject line
+  subject        String?        // Email subject line
   category       String?
-  isPublic       Boolean  @default(false)
-  isFavorite     Boolean  @default(false)
-  createdAt      DateTime @default(now())
-  updatedAt      DateTime @updatedAt
+  status         TemplateStatus @default(DRAFT)  // DRAFT until generation complete
+  isPublic       Boolean        @default(false)
+  isFavorite     Boolean        @default(false)
+  createdAt      DateTime       @default(now())
+  updatedAt      DateTime       @updatedAt
   deletedAt      DateTime?
   
   // React Email Architecture
@@ -35,6 +36,7 @@ model Template {
 
   @@index([organizationId])
   @@index([category])
+  @@index([status])
   @@index([isPublic])
   @@index([deletedAt])
   @@map("template")

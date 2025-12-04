@@ -153,6 +153,7 @@ export function TemplateProvider({
           styleType: mappedStyleType,
           styleDefinitions,
           previewText: template.previewText,
+          status: "ACTIVE" as const, // Mark as ACTIVE - generation complete
         };
         
         logger.info("📝 [TemplateProvider] Saving streamed template data:", {
