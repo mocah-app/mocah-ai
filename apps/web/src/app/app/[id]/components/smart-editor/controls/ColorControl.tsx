@@ -158,7 +158,7 @@ export function ColorControl({
       {/* Inline Presets */}
       {showPresets && (
         <div className="flex flex-wrap gap-1 pt-1">
-          {(presets || COLOR_PRESETS).map((color) => {
+          {(presets || COLOR_PRESETS).map((color, index) => {
             const isPresetTransparent = color === "transparent";
             const isSelected =
               value === color ||
@@ -166,7 +166,7 @@ export function ColorControl({
 
             return (
               <button
-                key={color}
+                key={`${index}-${color}`}
                 type="button"
                 onClick={() => onChange(isPresetTransparent ? "transparent" : color)}
                 className={cn(

@@ -8,6 +8,7 @@ import {
   buildReactEmailRegenerationPrompt,
   reactEmailGenerationSchema,
 } from "../lib/prompts";
+import { repairHtmlTags } from "../lib/html-tag-repair";
 import { validateReactEmailCode, logger } from "@mocah/shared";
 
 // Valid style type values for templates
@@ -211,6 +212,17 @@ export const templateRouter = router({
         tokensUsed: result.metadata?.tokensUsed || "unknown",
       });
       logger.info("=".repeat(80) + "\n");
+
+      // Auto-repair HTML tags before validation (safety net for non-compliant AI output)
+      const repairResult = repairHtmlTags(result.reactEmailCode);
+      if (repairResult.changed) {
+        logger.info("🔧 Auto-repaired HTML tags in AI output", {
+          originalLength: result.reactEmailCode.length,
+          repairedLength: repairResult.code.length,
+          changeCount: repairResult.changeCount,
+        });
+        result.reactEmailCode = repairResult.code;
+      }
 
       // Validate generated React Email code
       logger.info("\n" + "=".repeat(80));
@@ -582,6 +594,17 @@ export const templateRouter = router({
           }
         }
 
+        // Auto-repair HTML tags before validation (safety net for non-compliant AI output)
+        const repairResult = repairHtmlTags(updateData.reactEmailCode);
+        if (repairResult.changed) {
+          logger.info("🔧 Auto-repaired HTML tags in AI output", {
+            originalLength: updateData.reactEmailCode.length,
+            repairedLength: repairResult.code.length,
+            changeCount: repairResult.changeCount,
+          });
+          updateData.reactEmailCode = repairResult.code;
+        }
+
         const validation = validateReactEmailCode(updateData.reactEmailCode);
         
         logger.info("Validation result:", {
@@ -597,10 +620,16 @@ export const templateRouter = router({
             codeLength: updateData.reactEmailCode.length,
             codePreview: updateData.reactEmailCode.substring(0, 500),
           });
-          throw new TRPCError({
-            code: "BAD_REQUEST",
-            message: `Invalid React Email code: ${validation.errors.join(", ")}`,
-          });
+          
+          // Return validation errors with the attempted code instead of throwing
+          // This allows the frontend to show a friendly error UI with "Fix with AI" option
+          return {
+            validationFailed: true as const,
+            validationErrors: validation.errors,
+            validationWarnings: validation.warnings || [],
+            attemptedCode: updateData.reactEmailCode,
+            templateId: id,
+          };
         }
 
         // Log warnings if any

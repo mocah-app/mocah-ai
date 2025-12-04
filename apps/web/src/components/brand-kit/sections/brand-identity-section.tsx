@@ -65,6 +65,17 @@ export function BrandIdentitySection({
 
   return (
     <div className="space-y-8 px-6 pt-6">
+
+      {/* OG Image Preview */}
+      {data.ogImage && (
+          <div className="rounded-lg border overflow-hidden bg-muted/50">
+            <img
+              src={data.ogImage}
+              alt="OG Image preview"
+              className="w-full h-24 object-top object-cover"
+            />
+        </div>
+      )}
       {/* Section Header */}
       <div>
         <h3 className="text-base font-semibold">Brand Identity</h3>
@@ -166,22 +177,7 @@ export function BrandIdentitySection({
         </p>
       </div>
 
-      {/* OG Image Preview */}
-      {data.ogImage && (
-        <div className="space-y-2">
-          <Label>Social Preview Image</Label>
-          <div className="rounded-lg border overflow-hidden bg-muted/50">
-            <img
-              src={data.ogImage}
-              alt="OG Image preview"
-              className="w-full h-40 object-cover"
-            />
-          </div>
-          <p className="text-xs text-muted-foreground">
-            Detected from your website's Open Graph image
-          </p>
-        </div>
-      )}
+      
     </div>
   );
 }

@@ -60,22 +60,9 @@ export default function DashboardHeader() {
                 {isLoading ? (
                   <Skeleton className="h-6 w-40 rounded-full animate-pulse" />
                 ) : (
-                  <div className="flex items-center gap-2">
-                    {activeOrganization?.logo ? (
-                      <Avatar className="h-6 w-auto">
-                        <AvatarImage
-                          src={activeOrganization.logo}
-                          className="object-contain p-1"
-                        />
-                        <AvatarFallback>
-                          {activeOrganization.name?.charAt(0) || "B"}
-                        </AvatarFallback>
-                      </Avatar>
-                    ) : (
-                      <Building2 className="h-4 w-4" />
-                    )}
+                  <span className="flex items-center gap-2">
                     {activeOrganization?.name || "Brand Name"}
-                  </div>
+                  </span>
                 )}
                 <div className="text-sm font-normal">
                   <Badge className="text-xs font-normal px-2 py-0.5">

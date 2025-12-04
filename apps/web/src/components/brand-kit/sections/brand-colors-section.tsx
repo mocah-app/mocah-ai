@@ -5,7 +5,8 @@ import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { ColorPicker } from "@/components/ui/color-picker";
 import type { BrandKitData } from "../brand-configuration-modal";
-import { RefreshCw } from "lucide-react";
+import { RefreshCw, AlertTriangle } from "lucide-react";
+import { isLightColor } from "@/lib/color-utils";
 
 interface BrandColorsSectionProps {
   data: BrandKitData;
@@ -64,6 +65,13 @@ export function BrandColorsSection({
   onUpdate,
   disabled,
 }: BrandColorsSectionProps) {
+  // Check contrast between text and background colors
+  const bgColor = data.backgroundColor || "#FFFFFF";
+  const textColor = data.textPrimaryColor || "#374151";
+  const bgIsLight = isLightColor(bgColor);
+  const textIsLight = isLightColor(textColor);
+  const hasContrastIssue = bgIsLight === textIsLight;
+
   return (
     <div className="space-y-8 px-6">
       {/* Section Header */}
@@ -75,7 +83,7 @@ export function BrandColorsSection({
       </div>
 
       {/* Color Preview */}
-      <div className="p-4 rounded-xl border bg-muted/30">
+      <div className="block lg:hidden p-4 rounded-xl border bg-muted/30">
         <p className="text-xs text-muted-foreground mb-3 font-medium">Preview</p>
         <div className="flex gap-3">
           {[
@@ -95,6 +103,28 @@ export function BrandColorsSection({
               </div>
             </div>
           ))}
+        </div>
+        
+        {/* Text on Background Preview */}
+        <div className="mt-4 pt-4 border-t">
+          <p className="text-xs text-muted-foreground mb-2 font-medium">Text Contrast Preview</p>
+          <div 
+            className="p-4 rounded-lg border"
+            style={{ backgroundColor: bgColor }}
+          >
+            <p className="text-sm font-medium" style={{ color: textColor }}>
+              Sample text on background
+            </p>
+            <p className="text-xs mt-1" style={{ color: textColor, opacity: 0.8 }}>
+              This shows how your text will appear.
+            </p>
+          </div>
+          {hasContrastIssue && (
+            <div className="flex items-center gap-2 mt-2 text-amber-600 dark:text-amber-500">
+              <AlertTriangle className="h-3 w-3" />
+              <p className="text-xs">Low contrast - text may be hard to read</p>
+            </div>
+          )}
         </div>
       </div>
 

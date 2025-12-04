@@ -337,26 +337,29 @@ export function BrandConfigurationModal() {
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
               <div className="flex items-end gap-1">
-                {isLoading ? (
-                  <Skeleton className="h-6 w-40 rounded-full animate-pulse" />
-                ) : (
-                  <DialogTitle className="text-xl font-bold flex items-center gap-2">
-                    {activeOrganization?.logo ? (
-                      <Avatar className="h-6 w-6 border border-border rounded-full">
-                        <AvatarImage
-                          src={activeOrganization.logo}
-                          className="object-contain p-1"
-                        />
-                        <AvatarFallback>
-                          {activeOrganization.name?.charAt(0) || "B"}
-                        </AvatarFallback>
-                      </Avatar>
-                    ) : (
-                      <Building2 className="h-4 w-4" />
-                    )}
-                    {activeOrganization?.name || "Brand Name"}
-                  </DialogTitle>
-                )}
+                <DialogTitle className="text-xl font-bold flex items-center gap-2">
+                  {isLoading ? (
+                    <Skeleton className="h-6 w-40 rounded-full animate-pulse" />
+                  ) : (
+                    <>
+                      {activeOrganization?.logo ? (
+                        <Avatar className="h-6 w-6 border border-border rounded-full">
+                          <AvatarImage
+                            src={activeOrganization.logo}
+                            className="object-contain p-1"
+                            alt={activeOrganization.name || "Brand Logo"}
+                          />
+                          <AvatarFallback>
+                            {activeOrganization.name?.charAt(0) || "B"}
+                          </AvatarFallback>
+                        </Avatar>
+                      ) : (
+                        <Building2 className="h-4 w-4" />
+                      )}
+                      {activeOrganization?.name || "Brand Name"}
+                    </>
+                  )}
+                </DialogTitle>
                 <DialogDescription className="text-sm font-normal">
                   <Badge className="text-xs font-normal px-2 py-0.5">
                     Brand Kit

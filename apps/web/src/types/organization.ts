@@ -77,6 +77,7 @@ export interface Organization {
   name: string;
   slug: string;
   logo?: string | null;
+  favicon?: string | null;
   metadata?: OrganizationMetadata;
   brandKit?: BrandKit | null;
   createdAt: Date;

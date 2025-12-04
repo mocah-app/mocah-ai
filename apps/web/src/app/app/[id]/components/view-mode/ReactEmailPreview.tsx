@@ -10,13 +10,38 @@ import {
 } from "@/lib/react-email";
 import type { ElementData } from "@/lib/react-email";
 import Loader from "@/components/loader";
-import { Button } from "@/components/ui/button";
-import { Sparkles } from "lucide-react";
 import { useErrorFix } from "../providers/ErrorFixProvider";
 import { logger } from "@mocah/shared";
 import MocahLoadingIcon from "@/components/mocah-brand/MocahLoadingIcon";
+import { PreviewErrorCard } from "./PreviewErrorCard";
 
-/** Map error codes to user-friendly messages */
+// ============================================================================
+// Types
+// ============================================================================
+
+interface ValidationErrorProps {
+  errors: string[];
+  warnings: string[];
+  attemptedCode: string;
+}
+
+interface ReactEmailPreviewProps {
+  reactEmailCode: string;
+  styleDefinitions?: Record<string, React.CSSProperties>;
+  onElementSelect?: (elementData: ElementData | null) => void;
+  enableSelection?: boolean;
+  renderKey?: number;
+  onRenderComplete?: () => void;
+  validationError?: ValidationErrorProps | null;
+  onFixValidationError?: (errorDetails: string, code: string) => void;
+  onDismissValidationError?: () => void;
+}
+
+// ============================================================================
+// Helpers
+// ============================================================================
+
+/** Map render error codes to user-friendly messages */
 function getErrorMessage(error: unknown): string {
   if (error instanceof RenderError) {
     switch (error.code) {
@@ -37,26 +62,35 @@ function getErrorMessage(error: unknown): string {
   return error instanceof Error ? error.message : "Rendering failed";
 }
 
-interface ReactEmailPreviewProps {
-  reactEmailCode: string;
-  styleDefinitions?: Record<string, React.CSSProperties>;
-  onElementSelect?: (elementData: ElementData | null) => void;
-  enableSelection?: boolean;
-  /** Force re-render key - change this to force a fresh render */
-  renderKey?: number;
-  /** Callback when rendering completes successfully */
-  onRenderComplete?: () => void;
+/** Build prompt for AI to fix validation errors */
+function buildValidationFixPrompt(validationError: ValidationErrorProps): string {
+  const errorsList = validationError.errors
+    .map((e, i) => `${i + 1}. ${e}`)
+    .join("\n");
+
+  const warningsList =
+    validationError.warnings.length > 0
+      ? `\n\n**Warnings (also fix if possible):**\n${validationError.warnings.map((w, i) => `${i + 1}. ${w}`).join("\n")}`
+      : "";
+
+  return `The AI generated code that failed validation. Please fix the following issues:
+
+**Errors:**
+${errorsList}${warningsList}
+
+Please fix ALL these issues while:
+1. Maintaining the exact same visual appearance and layout
+2. Using only email-safe CSS properties and React Email components
+3. Replacing any unsupported properties with email-compatible alternatives
+4. Do NOT use any display, flex, grid, or positioning properties
+5. Use <Section>, <Row>, <Column> for table-based layouts
+6. Remove all 'as' props from Heading components
+
+Fix all issues in a single pass.`;
 }
 
-// Selection indicator styles to inject into iframe
-const getSelectionStyles = (isSafari: boolean) => `
-  ${isSafari ? `
-  [data-element-id] {
-    cursor: pointer !important;
-    -webkit-tap-highlight-color: transparent;
-  }
-  ` : ''}
-  
+/** Selection styles injected into the iframe */
+const SELECTION_STYLES = `
   .mocah-selection-label {
     position: absolute;
     top: -20px;
@@ -85,6 +119,25 @@ const getSelectionStyles = (isSafari: boolean) => `
   }
 `;
 
+const SAFARI_STYLES = `
+  [data-element-id] {
+    cursor: pointer !important;
+    -webkit-tap-highlight-color: transparent;
+  }
+`;
+
+function getSelectionStyles(isSafari: boolean): string {
+  return isSafari ? SAFARI_STYLES + SELECTION_STYLES : SELECTION_STYLES;
+}
+
+function isSafariBrowser(): boolean {
+  return /^((?!chrome|android).)*safari/i.test(navigator.userAgent);
+}
+
+// ============================================================================
+// Component
+// ============================================================================
+
 export const ReactEmailPreview = ({
   reactEmailCode,
   styleDefinitions,
@@ -92,17 +145,23 @@ export const ReactEmailPreview = ({
   enableSelection = false,
   renderKey = 0,
   onRenderComplete,
+  validationError,
+  onFixValidationError,
+  onDismissValidationError,
 }: ReactEmailPreviewProps) => {
+  // State
   const [html, setHtml] = useState<string>("");
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [rawError, setRawError] = useState<unknown>(null);
-  const [selectedElementId, setSelectedElementId] = useState<string | null>(
-    null
-  );
+  const [selectedElementId, setSelectedElementId] = useState<string | null>(null);
   const [isSelectableReady, setIsSelectableReady] = useState(false);
+
+  // Refs
   const iframeRef = useRef<HTMLIFrameElement>(null);
   const selectedElementIdRef = useRef<string | null>(null);
+
+  // Context
   const { onRequestErrorFix } = useErrorFix();
 
   // Keep ref in sync with state for event handlers
@@ -112,11 +171,7 @@ export const ReactEmailPreview = ({
 
   // Reset selectable ready state when enableSelection changes
   useEffect(() => {
-    if (enableSelection) {
-      setIsSelectableReady(false);
-    } else {
-      setIsSelectableReady(true);
-    }
+    setIsSelectableReady(!enableSelection);
   }, [enableSelection]);
 
   // Inject selection styles into iframe
@@ -141,15 +196,12 @@ export const ReactEmailPreview = ({
 
       if (!element || !elementType) return;
 
-      // Add selection class
       element.classList.add("mocah-selected-element");
 
-      // Create label
       const label = doc.createElement("div");
       label.className = "mocah-selection-label";
       label.textContent = elementType;
 
-      // Make parent relative if needed for label positioning
       const htmlElement = element as HTMLElement;
       const computedStyle = doc.defaultView?.getComputedStyle(htmlElement);
       if (computedStyle?.position === "static") {
@@ -161,6 +213,7 @@ export const ReactEmailPreview = ({
     []
   );
 
+  // Render email when code changes
   useEffect(() => {
     async function renderEmail() {
       if (!reactEmailCode) {
@@ -173,24 +226,17 @@ export const ReactEmailPreview = ({
       setRawError(null);
 
       try {
-        // If renderKey changed, clear cache to force fresh render
         if (renderKey > 0) {
           clearRenderCache();
         }
 
-        // If selection is enabled, inject element IDs
         const codeToRender = enableSelection
           ? injectElementIds(reactEmailCode)
           : reactEmailCode;
 
-        // Client-side rendering - runs in browser sandbox
         const renderedHtml = await renderReactEmailClientSide(codeToRender);
         setHtml(renderedHtml);
-        
-        // Notify parent that rendering completed successfully
-        if (onRenderComplete) {
-          onRenderComplete();
-        }
+        onRenderComplete?.();
       } catch (err) {
         console.error("Failed to render React Email:", err);
         setError(getErrorMessage(err));
@@ -201,9 +247,9 @@ export const ReactEmailPreview = ({
     }
 
     renderEmail();
-  }, [reactEmailCode, enableSelection, renderKey]);
+  }, [reactEmailCode, enableSelection, renderKey, onRenderComplete]);
 
-  // Handle iframe load for element selection - must be before conditional returns
+  // Handle iframe load for element selection
   const handleIframeLoad = useCallback(() => {
     if (!enableSelection || !onElementSelect) return;
 
@@ -211,51 +257,38 @@ export const ReactEmailPreview = ({
     if (!iframe?.contentDocument) return;
 
     const doc = iframe.contentDocument;
+    const isSafari = isSafariBrowser();
 
-    // Detect Safari
-    const isSafari = /^((?!chrome|android).)*safari/i.test(navigator.userAgent);
-
-    // Inject selection styles
     injectStyles(doc, isSafari);
-    
-    // Find all selectable elements
+
     const selectableElements = doc.querySelectorAll("[data-element-id]");
-    
-    // Attach click handlers to elements with data-element-id
+
     selectableElements.forEach((element) => {
       const htmlElement = element as HTMLElement;
       const elementId = element.getAttribute("data-element-id");
-      
-      // Safari-specific: Ensure element is interactive 
+
+      // Safari-specific interactivity
       if (isSafari) {
-        htmlElement.style.cursor = 'pointer';
-        htmlElement.style.pointerEvents = 'auto';
-        (htmlElement.style as any).webkitTouchCallout = 'none';
-        (htmlElement.style as any).webkitUserSelect = 'none';
+        htmlElement.style.cursor = "pointer";
+        htmlElement.style.pointerEvents = "auto";
+        (htmlElement.style as any).webkitTouchCallout = "none";
+        (htmlElement.style as any).webkitUserSelect = "none";
       }
-      
+
       const clickHandler = async (e: Event) => {
-        const clickEvent = e as MouseEvent;
-        const clickTarget = clickEvent.target as Element;
-        
-        // Find the closest element with data-element-id from the click target
-        const targetElement = clickTarget.closest('[data-element-id]');
-        
-        // Only handle if this click is meant for THIS specific element
-        // In Safari with capture phase, parent elements catch child clicks
-        if (targetElement !== element) {
-          return;
-        }
-        
+        const clickTarget = (e as MouseEvent).target as Element;
+        const targetElement = clickTarget.closest("[data-element-id]");
+
+        // Only handle if this click is for THIS specific element
+        if (targetElement !== element) return;
+
         e.stopPropagation();
         e.preventDefault();
 
         if (!elementId) return;
 
         try {
-          // Import extractElementData dynamically to avoid circular deps
           const { extractElementData } = await import("@/lib/react-email");
-
           const elementData = extractElementData(
             element as Element,
             reactEmailCode,
@@ -264,19 +297,14 @@ export const ReactEmailPreview = ({
 
           setSelectedElementId(elementId);
           onElementSelect(elementData);
-
-          // Update visual indicator with element type label
           updateSelectionIndicator(doc, element, elementData?.type || null);
-        } catch (error) {
-          logger.error("Failed to extract element data:", {
-            error,
-          });
+        } catch (err) {
+          logger.error("Failed to extract element data:", { error: err });
         }
       };
 
       const mouseEnterHandler = () => {
-        const currentSelectedId = selectedElementIdRef.current;
-        if (element.getAttribute("data-element-id") !== currentSelectedId) {
+        if (element.getAttribute("data-element-id") !== selectedElementIdRef.current) {
           element.classList.add("mocah-hover-element");
         }
       };
@@ -284,8 +312,8 @@ export const ReactEmailPreview = ({
       const mouseLeaveHandler = () => {
         element.classList.remove("mocah-hover-element");
       };
-      
-      // For Safari, try both normal and capture phase
+
+      // Safari needs both capture phases
       if (isSafari) {
         element.addEventListener("click", clickHandler, { capture: true });
         element.addEventListener("click", clickHandler, { capture: false });
@@ -293,15 +321,11 @@ export const ReactEmailPreview = ({
         element.addEventListener("click", clickHandler);
       }
 
-      // Hover effects
       element.addEventListener("mouseenter", mouseEnterHandler);
       element.addEventListener("mouseleave", mouseLeaveHandler);
     });
 
-    // Mark as ready after a short delay to ensure all handlers are attached
-    setTimeout(() => {
-      setIsSelectableReady(true);
-    }, 100);
+    setTimeout(() => setIsSelectableReady(true), 100);
   }, [
     enableSelection,
     onElementSelect,
@@ -311,45 +335,50 @@ export const ReactEmailPreview = ({
     updateSelectionIndicator,
   ]);
 
+  // ============================================================================
+  // Render States
+  // ============================================================================
+
   if (isLoading) {
     return (
       <div className="flex h-full w-full items-center justify-center bg-muted/20">
         <div className="text-center">
           <Loader />
-          <p className="mt-2 text-sm text-muted-foreground">
-            Updating preview...
-          </p>
+          <p className="mt-2 text-sm text-muted-foreground">Updating preview...</p>
         </div>
       </div>
     );
   }
 
   if (error) {
-    const handleFixWithAI = () => {
-      const errorDetails = rawError instanceof RenderError 
-        ? rawError.message 
-        : String(rawError);
-      onRequestErrorFix(errorDetails, reactEmailCode);
-    };
-
     return (
-      <div className="flex h-full w-full items-center justify-center bg-muted/20">
-        <div className="max-w-md rounded-lg border border-destructive/50 bg-destructive/10 p-6 text-center">
-          <p className="mb-2 font-semibold text-destructive">
-            Failed to render preview
-          </p>
-          <p className="text-sm text-destructive/80 mb-4">{error}</p>
-          <Button
-            onClick={handleFixWithAI}
-            variant="default"
-            size="sm"
-            className="gap-2"
-          >
-            <Sparkles className="size-4" />
-            Fix with AI
-          </Button>
-        </div>
-      </div>
+      <PreviewErrorCard
+        title="Failed to render preview"
+        errors={[error]}
+        onFixWithAI={() => {
+          const errorDetails =
+            rawError instanceof RenderError ? rawError.message : String(rawError);
+          onRequestErrorFix(errorDetails, reactEmailCode);
+        }}
+        variant="error"
+      />
+    );
+  }
+
+  if (validationError && onFixValidationError && onDismissValidationError) {
+    return (
+      <PreviewErrorCard
+        title="Validation Issues Found"
+        description={`${validationError.errors.length} issue${validationError.errors.length !== 1 ? "s" : ""} need fixing`}
+        errors={validationError.errors}
+        warnings={validationError.warnings}
+        onFixWithAI={() => {
+          const prompt = buildValidationFixPrompt(validationError);
+          onFixValidationError(prompt, validationError.attemptedCode);
+        }}
+        onDismiss={onDismissValidationError}
+        variant="warning"
+      />
     );
   }
 
@@ -361,21 +390,23 @@ export const ReactEmailPreview = ({
     );
   }
 
-  // Detect Safari
-  const isSafari = /^((?!chrome|android).)*safari/i.test(navigator.userAgent);
+  // ============================================================================
+  // Main Render
+  // ============================================================================
+
+  const isSafari = isSafariBrowser();
 
   return (
-    <div className="w-full h-full overflow-auto max-w-[600px] mx-auto p-2 relative">
+    <div className="relative mx-auto h-full w-full max-w-[600px] overflow-auto p-2">
       <iframe
         ref={iframeRef}
         srcDoc={html}
-        className="w-full h-full border-0"
+        className="h-full w-full border-0"
         sandbox={isSafari ? "allow-same-origin allow-scripts" : "allow-same-origin"}
         title="Email Preview"
         onLoad={enableSelection ? handleIframeLoad : undefined}
       />
-      
-      {/* Loading overlay while making elements selectable */}
+
       {enableSelection && !isSelectableReady && (
         <MocahLoadingIcon isLoading={true} size="sm" />
       )}

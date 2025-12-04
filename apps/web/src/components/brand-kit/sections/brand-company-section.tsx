@@ -135,7 +135,7 @@ export function BrandCompanySection({
 
       {/* Company Summary Card */}
       {(data.companyName || data.industry || data.targetAudience) && (
-        <div className="p-4 rounded-xl border bg-muted/30">
+        <div className="block lg:hidden p-4 rounded-xl border bg-muted/30">
           <div className="flex items-center gap-2 mb-3">
             <Building2 className="h-4 w-4 text-muted-foreground" />
             <p className="text-sm font-medium">Company Profile</p>

@@ -10,12 +10,7 @@ import { logger } from "@mocah/shared/logger";
  * - Comments
  * - Unclosed strings/objects/arrays
  * - Escaped characters in strings
- * - Braces/brackets inside string literals (proper context tracking)
- * - And many more edge cases
- *
- * @param text - The potentially malformed JSON string
- * @param error - The original parsing error
- * @returns Repaired JSON string
+ * - Braces/brackets inside string literals
  */
 export async function repairJsonOutput({
   text,
@@ -44,12 +39,10 @@ export async function repairJsonOutput({
     logger.error("JSON repair failed", {
       component: "ai",
       originalError: error.message,
-      repairError: repairError instanceof Error ? repairError.message : String(repairError),
+      repairError:
+        repairError instanceof Error ? repairError.message : String(repairError),
     });
 
-    // If jsonrepair fails, return original text
-    // The AI SDK will handle the final error
     return text;
   }
 }
-

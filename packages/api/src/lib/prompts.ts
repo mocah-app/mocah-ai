@@ -57,22 +57,38 @@ interface PromptConfig {
 // TIER 1: CRITICAL RULES (Validation Failures) - ~300 tokens
 // ============================================================================
 
-const CRITICAL_RULES = `CRITICAL RULES (validation fails if violated):
+const CRITICAL_RULES = `⚠️ CRITICAL RULES - STRICTLY ENFORCED (code REJECTED if violated):
 
-1. NO HTML TAGS → React Email components only
-   FORBIDDEN: div, span, p, h1-h6, a, button, img, br, hr, strong, em, b, i
-   USE: Html, Head, Body, Container, Section, Row, Column, Heading, Text, Button, Img, Link, Hr
+1. NO BLOCK-LEVEL HTML TAGS - Use React Email components instead
+   ❌ FORBIDDEN: div, span, p, h1-h6, a, button, img, br, hr
+   ✅ REQUIRED: Section, Row, Column (for layout), Heading, Text, Button, Img, Link, Hr
 
-2. NO nested <Text> components
-   BAD:  <Text>Hello <Text>World</Text></Text>
-   FIX:  <Text>Hello</Text><Text>World</Text>
+   WRONG: <div style={{...}}>content</div>
+   RIGHT: <Section style={{...}}>content</Section>
 
-3. NO 'display' CSS property (use Row/Column for layouts)
+   WRONG: <div><div>nested</div></div>
+   RIGHT: <Section><Row><Column>nested</Column></Row></Section>
 
-4. Export format: export default function ComponentName() { return (...); }
-   BAD: export const X = () => ...
+2. INLINE FORMATTING inside <Text> - use HTML inline tags:
+   ✅ ALLOWED inside Text: <b>, <strong>, <em>, <i>, <Link>
+   
+   ✅ CORRECT patterns:
+   <Text style={text}><b>Bold:</b> content here</Text>
+   <Text style={text}>Welcome to <strong style={highlight}>Brand</strong>!</Text>
+   <Text style={text}>Click <Link href="url">here</Link> to continue</Text>
+   <Text style={text}>This is <em>emphasized</em> text</Text>
 
-5. NO 'as' prop on Heading: <Heading style={...}> only`;
+3. NO nested <Text> components (use inline tags instead)
+   ❌ BAD:  <Text>Hello <Text>World</Text></Text>
+   ✅ GOOD:  <Text>Hello <strong>World</strong></Text>
+
+4. NO 'display' CSS property (use Row/Column for layouts)
+
+5. Export format: export default function ComponentName() { return (...); }
+   ❌ BAD: export const X = () => ...
+   ✅ GOOD: export default function ComponentName()
+
+6. NO 'as' prop on Heading: <Heading style={...}> only`;
 
 // ============================================================================
 // TIER 2: COMPONENT REFERENCE - ~200 tokens
@@ -96,38 +112,16 @@ const STYLE_GUIDELINES = `STYLE RULES:
 - Vertical centering: lineHeight = height (e.g., height: '32px', lineHeight: '32px')
 
 EMAIL-SAFE CSS:
-✅ padding, margin, backgroundColor, color, fontSize, fontWeight, textAlign, lineHeight, borderRadius, border, width, height, letterSpacing, verticalAlign
-❌ display, position, transform, flex*, grid*, float, box-shadow, overflow, filter`;
-
-// ============================================================================
-// TIER 4: EXAMPLES (Condensed) - ~300 tokens when included
-// ============================================================================
-
-const CONDENSED_EXAMPLES = `PATTERN EXAMPLES:
-
-// Style objects at top
-const headingStyle = { fontSize: '32px', fontWeight: '700', color: '#1a1a1a', textAlign: 'center' as const, margin: '0 0 16px 0' };
-const buttonStyle = { backgroundColor: '#007bff', color: '#fff', padding: '12px 24px', borderRadius: '6px', textDecoration: 'none' };
-
-// Basic section
-<Section style={{ padding: '40px', textAlign: 'center' as const }}>
-  <Heading style={headingStyle}>Welcome!</Heading>
-  <Text style={{ fontSize: '16px', color: '#666' }}>Your content here</Text>
-  <Button href="https://example.com" style={buttonStyle}>Click Me</Button>
-</Section>
-
-// Multi-column
-<Row>
-  <Column style={{ width: '50%' }}><Text>Left</Text></Column>
-  <Column style={{ width: '50%' }}><Text>Right</Text></Column>
-</Row>`;
+✅ ALLOWED: padding, margin, backgroundColor, color, fontSize, fontWeight, textAlign, lineHeight, borderRadius, border, width, height, letterSpacing, verticalAlign
+❌ FORBIDDEN: display, position, transform, flex*, grid*, float, box-shadow, overflow, filter`;
 
 // ============================================================================
 // VALIDATION CHECKLIST (Modular) - ~100 tokens
 // ============================================================================
 
 const VALIDATION_CHECKLIST = `PRE-OUTPUT CHECKS:
-□ No HTML tags (div, span, p, h1-h6, a, button, img)
+□ No block HTML tags (div, span, p, h1-h6, a, button, img) - use React Email components
+□ Inline tags (<b>, <strong>, <em>, <i>) only inside <Text> components
 □ No nested Text: pattern "Text>.*<Text" = 0 matches
 □ No display: property
 □ No Heading as= prop
@@ -136,18 +130,24 @@ const VALIDATION_CHECKLIST = `PRE-OUTPUT CHECKS:
 □ <Text> count = </Text> count`;
 
 // ============================================================================
-// DESIGN PHILOSOPHY (Brief) - ~150 tokens
+// DESIGN PHILOSOPHY - ~200 tokens
 // ============================================================================
 
-const DESIGN_PHILOSOPHY = `DESIGN APPROACH:
-- Match design to content purpose (urgent sale = bold, newsletter = clean, invitation = elegant)
-- Use white space strategically
-- Typography: vary sizes, use color accents on key words
-- Apply brand colors: primary for CTAs/headers, accent for highlights
-- Use brand font family if specified
-- Match brand voice/tone in all copy (professional, casual, playful, or luxury)
-- Speak directly to the target audience
-- Reflect brand values and personality in messaging`;
+const DESIGN_PHILOSOPHY = `DESIGN CREATIVITY:
+Think: "What makes THIS email memorable and distinctive in an inbox?"
+
+- AVOID generic templates - every email should feel custom-designed for its specific purpose
+- Match design intensity to content purpose (urgent vs calm, promotional vs informational)
+- Explore varied layouts - don't default to centered single-column
+- Create visual hierarchy through strategic size, spacing, and color contrast
+- Use white space intentionally - sometimes less is more impactful
+- Apply brand colors purposefully: primary for CTAs/key elements, accent for highlights
+- Typography should create rhythm: vary sizes and weights to guide the eye
+- Let the content's emotional tone drive design choices
+- Reflect brand voice and personality throughout
+- Design for the target audience's expectations and preferences
+
+Challenge yourself: Would someone recognize this as distinct from a template library?`;
 
 // ============================================================================
 // PROMPT BUILDERS
@@ -291,13 +291,12 @@ export function buildReactEmailPrompt(
   config: PromptConfig = {}
 ): string {
   const {
-    includeExamples = true,
     includeValidation = true,
     verbosity = "standard",
   } = config;
 
   const sections: string[] = [
-    `Create a React Email template.
+    `Create a unique, visually distinctive React Email template.
 
 Request: "${userPrompt}"
 ${buildBrandSection(brandKit)}`,
@@ -308,10 +307,6 @@ ${buildBrandSection(brandKit)}`,
 
   if (verbosity !== "minimal") {
     sections.push(DESIGN_PHILOSOPHY);
-  }
-
-  if (includeExamples && verbosity !== "minimal") {
-    sections.push(CONDENSED_EXAMPLES);
   }
 
   if (includeValidation) {
@@ -359,14 +354,13 @@ Return complete modified component code.`;
 // ============================================================================
 
 /**
- * Build detailed prompt with all examples (for debugging or complex requests)
+ * Build detailed prompt with all guidance (for complex requests)
  */
 export function buildDetailedReactEmailPrompt(
   userPrompt: string,
   brandKit?: BrandKit
 ): string {
   return buildReactEmailPrompt(userPrompt, brandKit, {
-    includeExamples: true,
     includeValidation: true,
     verbosity: "detailed",
   });
@@ -380,7 +374,6 @@ export function buildMinimalReactEmailPrompt(
   brandKit?: BrandKit
 ): string {
   return buildReactEmailPrompt(userPrompt, brandKit, {
-    includeExamples: false,
     includeValidation: true,
     verbosity: "minimal",
   });
@@ -485,7 +478,6 @@ export const STATIC_PROMPT_SECTIONS = {
   criticalRules: CRITICAL_RULES,
   componentReference: COMPONENT_REFERENCE,
   styleGuidelines: STYLE_GUIDELINES,
-  examples: CONDENSED_EXAMPLES,
   validation: VALIDATION_CHECKLIST,
   designPhilosophy: DESIGN_PHILOSOPHY,
 } as const;
@@ -496,10 +488,7 @@ export function estimateTokenCount(config: PromptConfig = {}): number {
   let total = baseTokens;
   
   if (config.verbosity !== "minimal") {
-    total += 150; // Design philosophy
-    if (config.includeExamples !== false) {
-      total += 300; // Examples
-    }
+    total += 200; // Design philosophy
   }
   
   if (config.includeValidation !== false) {

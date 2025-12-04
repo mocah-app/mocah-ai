@@ -45,7 +45,7 @@ export function BrandTypographySection({
       </div>
 
       {/* Typography Preview */}
-      <div className="p-6 rounded-xl border bg-muted/30">
+      <div className="block lg:hidden p-6 rounded-xl border bg-muted/30">
         <p className="text-xs text-muted-foreground mb-4 font-medium">Preview</p>
         <div
           className="space-y-2"
@@ -143,12 +143,12 @@ export function BrandTypographySection({
               <Button
                 key={option.value}
                 variant={isSelected ? "secondary" : "outline"}
-                className="h-auto py-3 flex-col gap-2"
+                className="h-auto py-3 flex- gap-2"
                 onClick={() => onUpdate({ borderRadius: option.value })}
                 disabled={disabled}
               >
                 <div
-                  className="w-12 h-8 border-2"
+                  className="w-10 h-10 border-2"
                   style={{
                     borderRadius: option.value,
                     backgroundColor: isSelected ? "hsl(var(--primary) / 0.1)" : "transparent",

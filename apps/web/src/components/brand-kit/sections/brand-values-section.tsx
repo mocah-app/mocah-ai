@@ -159,7 +159,7 @@ export function BrandValuesSection({
 
       {/* Values Display Preview */}
       {values.length > 0 && (
-        <div className="p-4 rounded-xl border bg-muted/30">
+        <div className="block lg:hidden p-4 rounded-xl border bg-muted/30">
           <p className="text-xs text-muted-foreground mb-3 font-medium">
             Values at a Glance
           </p>

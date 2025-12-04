@@ -26,10 +26,10 @@ export function ColorSection({
 }: ColorSectionProps) {
   // Build presets with brand colors at the front
   const colorPresets = useMemo(() => {
-    const brandColorList = [
-      brandColors?.primary,
-      brandColors?.accent,
-    ].filter((c): c is string => !!c);
+    // Deduplicate brand colors (primary and accent might be the same)
+    const brandColorList = [...new Set(
+      [brandColors?.primary, brandColors?.accent].filter((c): c is string => !!c)
+    )];
     
     // If we have brand colors, prepend them (avoiding duplicates)
     if (brandColorList.length > 0) {

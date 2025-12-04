@@ -139,7 +139,7 @@ export function BrandAIDataSection({
         <TabsContent value="summary" className="mt-4">
           <div className="space-y-4">
             <div className="space-y-2">
-              <Label htmlFor="summary">Website Summary</Label>
+              <Label htmlFor="summary">Brand Summary</Label>
               <Textarea
                 id="summary"
                 value={data.summary || ""}
@@ -169,7 +169,7 @@ export function BrandAIDataSection({
                   value={newLink}
                   onChange={(e) => setNewLink(e.target.value)}
                   onKeyDown={handleKeyDownLink}
-                  placeholder="https://example.com/page"
+                  placeholder={`https://${data.companyName?.toLowerCase().replace(/ /g, "-")}/new-page` || "https://example.com/new-page"}
                   disabled={disabled}
                   className="flex-1 font-sans text-sm"
                 />

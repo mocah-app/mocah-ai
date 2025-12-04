@@ -9,7 +9,8 @@ import {
   Image, 
   Building2, 
   Sparkles,
-  Check 
+  Check, 
+  Flame
 } from "lucide-react";
 
 // ============================================================================
@@ -33,6 +34,7 @@ interface ScrapingProgressProps {
 // ============================================================================
 
 const SCRAPING_STEPS: ScrapingStep[] = [
+  { id: "warming-up", label: "Warming up...", icon: Flame, duration: 3000 },
   { id: "connect", label: "Connecting to website...", icon: Globe, duration: 3000 },
   { id: "colors", label: "Extracting brand colors...", icon: Palette, duration: 4000 },
   { id: "typography", label: "Analyzing typography...", icon: Type, duration: 3000 },

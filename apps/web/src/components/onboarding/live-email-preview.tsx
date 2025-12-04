@@ -66,15 +66,27 @@ export function LiveEmailPreview({ brand }: { brand: BrandPreview }) {
   const buttonBgColor = accentColor || primaryColor;
   const buttonTextColor = getContrastTextColor(buttonBgColor);
   
-  // For text on white background: use black if primaryColor is light, otherwise use primaryColor
-  const greetingTextColor = isLightColor(primaryColor) ? "#000000" : primaryColor;
+  // Determine text colors based on backgroundColor for proper contrast
+  const bgIsLight = isLightColor(backgroundColor);
+  const primaryIsLight = isLightColor(primaryColor);
+  const textIsLight = isLightColor(textColor);
+  
+  // Greeting: use primaryColor if it contrasts with bg, otherwise use black/white
+  const greetingTextColor = bgIsLight === primaryIsLight 
+    ? (bgIsLight ? "#000000" : "#FFFFFF")
+    : primaryColor;
+  
+  // Body text: use textColor if it contrasts with bg, otherwise use black/white
+  const bodyTextColor = bgIsLight === textIsLight
+    ? (bgIsLight ? "#374151" : "#E5E7EB") // Fallback gray tones for contrast
+    : textColor;
 
   return (
     <div className=" flex flex-col space-y-4 bg-card dark:bg-white/35 max-w-md mx-auto p-2 rounded-3xl shadow-2xl">
       {/* Email Client Mockup */}
       <Card className="flex-1 overflow-hidden p-0 relative border border-gray-200">
         <div className="h-full overflow-auto relative">
-          <div className="flex gap-2 p-2 px-4 border-b border-gray-200">
+          <div className="flex gap-2 p-2 px-4 border-b bg-white border-gray-200">
             <div className="bg-red-500 h-3 w-3 rounded-full" />
             <div className="bg-green-500 h-3 w-3 rounded-full" />
             <div className="bg-blue-500 h-3 w-3 rounded-full" />
@@ -132,7 +144,7 @@ export function LiveEmailPreview({ brand }: { brand: BrandPreview }) {
                 </h2>
 
                 {/* Body Text */}
-                <p className="text-base leading-relaxed" style={{ color: textColor }}>
+                <p className="text-base leading-relaxed" style={{ color: bodyTextColor }}>
                   {content.body}
                 </p>
 
@@ -159,7 +171,7 @@ export function LiveEmailPreview({ brand }: { brand: BrandPreview }) {
                         backgroundColor: accentColor || primaryColor,
                       }}
                     />
-                    <p className="text-sm" style={{ color: textColor, opacity: 0.8 }}>
+                    <p className="text-sm" style={{ color: bodyTextColor, opacity: 0.8 }}>
                       AI-powered template generation
                     </p>
                   </div>
@@ -170,7 +182,7 @@ export function LiveEmailPreview({ brand }: { brand: BrandPreview }) {
                         backgroundColor: accentColor || primaryColor,
                       }}
                     />
-                    <p className="text-sm" style={{ color: textColor, opacity: 0.8 }}>
+                    <p className="text-sm" style={{ color: bodyTextColor, opacity: 0.8 }}>
                       Beautiful, responsive designs
                     </p>
                   </div>
@@ -181,7 +193,7 @@ export function LiveEmailPreview({ brand }: { brand: BrandPreview }) {
                         backgroundColor: accentColor || primaryColor,
                       }}
                     />
-                    <p className="text-sm" style={{ color: textColor, opacity: 0.8 }}>
+                    <p className="text-sm" style={{ color: bodyTextColor, opacity: 0.8 }}>
                       Export to any platform
                     </p>
                   </div>
@@ -189,7 +201,7 @@ export function LiveEmailPreview({ brand }: { brand: BrandPreview }) {
               </div>
 
               {/* Footer */}
-              <div className="p-6 text-center text-sm space-y-2" style={{ backgroundColor: `${primaryColor}10`, color: textColor, opacity: 0.7 }}>
+              <div className="p-6 text-center text-sm space-y-2" style={{ backgroundColor: `${primaryColor}10`, color: bodyTextColor, opacity: 0.7 }}>
                 <p>© 2025 {brandName}. All rights reserved.</p>
                 <p className="text-xs">
                   This is a preview of how your brand will look in emails

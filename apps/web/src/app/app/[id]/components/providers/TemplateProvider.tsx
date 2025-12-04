@@ -22,6 +22,13 @@ import {
 // Re-export for consumers
 export { GENERATION_PHASE_MESSAGES, type GenerationPhase } from "./generation-phases";
 
+// Validation error state when AI generates invalid code
+export interface ValidationError {
+  errors: string[];
+  warnings: string[];
+  attemptedCode: string;
+}
+
 interface TemplateState {
   currentTemplate: Template | null;
   versions: TemplateVersion[];
@@ -33,6 +40,7 @@ interface TemplateState {
   streamingProgress: StreamingProgress | null;
   generationPhase: GenerationPhase;
   waitingForRender: boolean; // True when waiting for preview to render after generation
+  validationError: ValidationError | null; // When AI generates code that fails validation
   
   // React Email specific state
   reactEmailCode: string | null;
@@ -53,6 +61,7 @@ interface TemplateActions {
   cancelGeneration: () => void;
   setIsDirty: (dirty: boolean) => void;
   onPreviewRenderComplete: () => void; // Called when preview finishes rendering
+  clearValidationError: () => void; // Clear validation error state
   
   // React Email specific actions
   updateReactEmailCode: (code: string, styleDefinitions?: Record<string, React.CSSProperties>) => void;
@@ -98,6 +107,7 @@ export function TemplateProvider({
     streamingProgress: null,
     generationPhase: 'idle',
     waitingForRender: false,
+    validationError: null,
     reactEmailCode: null,
     styleDefinitions: {},
   });
@@ -174,6 +184,28 @@ export function TemplateProvider({
 
         const result = await updateMutation.mutateAsync(updatePayload);
 
+        // Check if the result is a validation error (returned instead of throwing)
+        if ('validationFailed' in result && result.validationFailed) {
+          logger.warn("⚠️ [TemplateProvider] Validation failed for generated template:", {
+            errors: result.validationErrors,
+            warnings: result.validationWarnings,
+          });
+          
+          setState((prev) => ({
+            ...prev,
+            isStreaming: false,
+            streamingProgress: null,
+            isLoading: false,
+            generationPhase: 'idle',
+            validationError: {
+              errors: result.validationErrors,
+              warnings: result.validationWarnings,
+              attemptedCode: result.attemptedCode,
+            },
+          }));
+          return;
+        }
+
         const processedResult = convertDates(result);
 
         setState((prev) => ({
@@ -185,6 +217,7 @@ export function TemplateProvider({
           streamingProgress: null,
           isLoading: false,
           generationPhase: 'complete',
+          validationError: null, // Clear any previous validation errors
         }));
 
         // Refetch to get the latest data
@@ -289,6 +322,30 @@ export function TemplateProvider({
         }));
 
         const result = await updateMutation.mutateAsync(updatePayload);
+        
+        // Check if the result is a validation error (returned instead of throwing)
+        if ('validationFailed' in result && result.validationFailed) {
+          logger.warn("⚠️ [TemplateProvider] Validation failed for regenerated template:", {
+            errors: result.validationErrors,
+            warnings: result.validationWarnings,
+          });
+          
+          setState((prev) => ({
+            ...prev,
+            isStreaming: false,
+            streamingProgress: null,
+            isLoading: false,
+            waitingForRender: false,
+            generationPhase: 'idle',
+            validationError: {
+              errors: result.validationErrors,
+              warnings: result.validationWarnings,
+              attemptedCode: result.attemptedCode,
+            },
+          }));
+          return;
+        }
+        
         const processedResult = convertDates(result);
 
         logger.info("⏳ [TemplateProvider] Regenerated template saved, waiting for preview render", {
@@ -305,6 +362,7 @@ export function TemplateProvider({
           isLoading: true, // Keep loading true
           waitingForRender: true, // Wait for preview to render
           generationPhase: 'complete',
+          validationError: null, // Clear any previous validation errors
         }));
 
         // Refetch to get the latest data
@@ -728,6 +786,13 @@ export function TemplateProvider({
     });
   }, []);
 
+  const clearValidationError = useCallback(() => {
+    setState((prev) => ({
+      ...prev,
+      validationError: null,
+    }));
+  }, []);
+
   const actions: TemplateActions = {
     loadTemplate,
     saveTemplate,
@@ -742,6 +807,7 @@ export function TemplateProvider({
     cancelGeneration,
     setIsDirty,
     onPreviewRenderComplete,
+    clearValidationError,
     updateReactEmailCode,
     saveReactEmailCode,
     resetReactEmailCode,

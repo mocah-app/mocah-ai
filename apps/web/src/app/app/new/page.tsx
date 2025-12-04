@@ -87,7 +87,7 @@ export default function NewTemplatePage() {
     {
       label: "Monthly Newsletter",
       prompt:
-        "Generate a professional monthly newsletter for a SaaS business that includes: a friendly introduction from the CEO, highlights of 3 major feature updates with screenshots, customer success story spotlight, upcoming webinar announcement, relevant blog article links, and team member introduction section.",
+        "Generate a professional monthly newsletter that includes a friendly introduction from the CEO, highlights of 3 major feature updates with screenshots, customer success story spotlight, upcoming webinar announcement, relevant blog article links",
     },
     {
       label: "Abandoned Cart Reminder",
