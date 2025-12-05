@@ -38,18 +38,13 @@ export const navigationConfig: {
 
 
   privateNav: {
-    title: "Account",
+    title: "Brand",
     links: [
       {
-        label: "Settings",
-        href: "/app/settings",
+        label: "Configuration",
+        href: "/app/?brand=configuration",
         icon: Settings2,
       },
-      {
-        label: "Billing",
-        href: "/app/billing",
-        icon: DollarSign,
-      }
     ],
   },
 };

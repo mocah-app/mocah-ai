@@ -7,7 +7,7 @@ import {
   RenderErrorCode 
 } from '@/lib/react-email';
 import { logger } from '@mocah/shared';
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { CodeEditor } from './CodeEditor';
 
 /** Map error codes to user-friendly messages */
@@ -61,7 +61,7 @@ export function HtmlCodeViewer({
   }, [error, onErrorChange]);
 
   // Render HTML client-side
-  const fetchRenderedHtml = async (forceRefresh = false) => {
+  const fetchRenderedHtml = useCallback(async (forceRefresh = false) => {
     if (!reactEmailCode) {
       setRenderedHtml('<!-- No React Email code to render -->');
       return;
@@ -97,19 +97,19 @@ export function HtmlCodeViewer({
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [reactEmailCode, cachedHtml, onHtmlRendered]);
 
   // Auto-fetch on mount and when code changes
   useEffect(() => {
     fetchRenderedHtml();
-  }, [reactEmailCode]);
+  }, [fetchRenderedHtml]);
 
   // Handle refresh trigger from parent
   useEffect(() => {
     if (refreshTrigger > 0) {
       fetchRenderedHtml(true);
     }
-  }, [refreshTrigger]);
+  }, [refreshTrigger, fetchRenderedHtml]);
 
   return (
     <div className="h-full w-full">

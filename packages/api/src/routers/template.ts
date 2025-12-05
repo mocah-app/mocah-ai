@@ -8,6 +8,7 @@ import {
   buildReactEmailRegenerationPrompt,
   reactEmailGenerationSchema,
 } from "../lib/prompts";
+import { repairHtmlTags } from "../lib/html-tag-repair";
 import { validateReactEmailCode, logger } from "@mocah/shared";
 
 // Valid style type values for templates
@@ -87,6 +88,8 @@ export const templateRouter = router({
       z
         .object({
           category: z.string().optional(),
+          status: z.enum(["DRAFT", "ACTIVE", "ARCHIVED"]).optional(),
+          includeDrafts: z.boolean().optional(), // Explicitly include DRAFT templates
           isPublic: z.boolean().optional(),
           isFavorite: z.boolean().optional(),
           limit: z.number().min(1).max(100).default(50),
@@ -99,6 +102,14 @@ export const templateRouter = router({
         organizationId: ctx.organizationId,
         deletedAt: null,
       };
+
+      // Filter by status - default to ACTIVE only (excludes incomplete drafts)
+      if (input?.status) {
+        where.status = input.status;
+      } else if (!input?.includeDrafts) {
+        // By default, exclude DRAFT templates from dashboard
+        where.status = "ACTIVE";
+      }
 
       if (input?.category) {
         where.category = input.category;
@@ -201,6 +212,17 @@ export const templateRouter = router({
         tokensUsed: result.metadata?.tokensUsed || "unknown",
       });
       logger.info("=".repeat(80) + "\n");
+
+      // Auto-repair HTML tags before validation (safety net for non-compliant AI output)
+      const repairResult = repairHtmlTags(result.reactEmailCode);
+      if (repairResult.changed) {
+        logger.info("🔧 Auto-repaired HTML tags in AI output", {
+          originalLength: result.reactEmailCode.length,
+          repairedLength: repairResult.code.length,
+          changeCount: repairResult.changeCount,
+        });
+        result.reactEmailCode = repairResult.code;
+      }
 
       // Validate generated React Email code
       logger.info("\n" + "=".repeat(80));
@@ -504,6 +526,7 @@ export const templateRouter = router({
         description: z.string().optional(),
         subject: z.string().optional(),
         category: z.string().optional(),
+        status: z.enum(["DRAFT", "ACTIVE", "ARCHIVED"]).optional(),
         isPublic: z.boolean().optional(),
         isFavorite: z.boolean().optional(),
         reactEmailCode: z.string().optional(),
@@ -571,6 +594,17 @@ export const templateRouter = router({
           }
         }
 
+        // Auto-repair HTML tags before validation (safety net for non-compliant AI output)
+        const repairResult = repairHtmlTags(updateData.reactEmailCode);
+        if (repairResult.changed) {
+          logger.info("🔧 Auto-repaired HTML tags in AI output", {
+            originalLength: updateData.reactEmailCode.length,
+            repairedLength: repairResult.code.length,
+            changeCount: repairResult.changeCount,
+          });
+          updateData.reactEmailCode = repairResult.code;
+        }
+
         const validation = validateReactEmailCode(updateData.reactEmailCode);
         
         logger.info("Validation result:", {
@@ -586,10 +620,16 @@ export const templateRouter = router({
             codeLength: updateData.reactEmailCode.length,
             codePreview: updateData.reactEmailCode.substring(0, 500),
           });
-          throw new TRPCError({
-            code: "BAD_REQUEST",
-            message: `Invalid React Email code: ${validation.errors.join(", ")}`,
-          });
+          
+          // Return validation errors with the attempted code instead of throwing
+          // This allows the frontend to show a friendly error UI with "Fix with AI" option
+          return {
+            validationFailed: true as const,
+            validationErrors: validation.errors,
+            validationWarnings: validation.warnings || [],
+            attemptedCode: updateData.reactEmailCode,
+            templateId: id,
+          };
         }
 
         // Log warnings if any

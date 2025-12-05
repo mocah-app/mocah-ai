@@ -20,7 +20,6 @@ export type OrganizationWithRelations = {
     id: string;
     organizationId: string;
     primaryColor: string | null;
-    secondaryColor: string | null;
     accentColor: string | null;
     fontFamily: string | null;
     brandVoice: string | null;

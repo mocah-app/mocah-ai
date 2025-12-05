@@ -3,6 +3,7 @@
 import { ReactEmailPreview } from "../view-mode/ReactEmailPreview";
 import { useEditorMode } from "../providers/EditorModeProvider";
 import { useTemplate } from "../providers/TemplateProvider";
+import { useErrorFix } from "../providers/ErrorFixProvider";
 import type { ElementData } from "@/lib/react-email";
 
 interface ViewModeContentProps {
@@ -16,7 +17,8 @@ interface ViewModeContentProps {
 
 export function ViewModeContent({ template }: ViewModeContentProps) {
   const { state: editorState, actions: editorActions } = useEditorMode();
-  const { actions: templateActions } = useTemplate();
+  const { state: templateState, actions: templateActions } = useTemplate();
+  const { onRequestErrorFix } = useErrorFix();
 
   // Handle element selection in React Email templates
   const handleElementSelect = (elementData: ElementData | null) => {
@@ -28,6 +30,17 @@ export function ViewModeContent({ template }: ViewModeContentProps) {
     }
   };
 
+  // Handle validation error fix - uses the ErrorFixProvider to trigger chat
+  const handleFixValidationError = (errorDetails: string, code: string) => {
+    templateActions.clearValidationError();
+    onRequestErrorFix(errorDetails, code);
+  };
+
+  // Handle dismissing validation error
+  const handleDismissValidationError = () => {
+    templateActions.clearValidationError();
+  };
+
   return (
     <div className="w-full h-full overflow-hidden bg-background">
       <ReactEmailPreview 
@@ -37,6 +50,9 @@ export function ViewModeContent({ template }: ViewModeContentProps) {
         onElementSelect={handleElementSelect}
         renderKey={editorState.previewRenderKey} // Force re-render when this changes
         onRenderComplete={templateActions.onPreviewRenderComplete}
+        validationError={templateState.validationError}
+        onFixValidationError={handleFixValidationError}
+        onDismissValidationError={handleDismissValidationError}
       />
     </div>
   );

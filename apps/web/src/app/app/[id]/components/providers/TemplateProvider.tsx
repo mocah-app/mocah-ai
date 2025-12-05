@@ -12,7 +12,6 @@ import React, {
 import { convertDates, logger } from "@mocah/shared";
 import { useStreamTemplate } from "@/hooks/use-stream-template";
 import { useOrganization } from "@/contexts/organization-context";
-import { useRouter } from "next/navigation";
 import {
   type GenerationPhase,
   type StreamingProgress,
@@ -21,6 +20,16 @@ import {
 
 // Re-export for consumers
 export { GENERATION_PHASE_MESSAGES, type GenerationPhase } from "./generation-phases";
+
+// Template-level error types
+export type TemplateError = "NOT_FOUND" | "LOAD_ERROR" | null;
+
+// Validation error state when AI generates invalid code
+export interface ValidationError {
+  errors: string[];
+  warnings: string[];
+  attemptedCode: string;
+}
 
 interface TemplateState {
   currentTemplate: Template | null;
@@ -33,6 +42,8 @@ interface TemplateState {
   streamingProgress: StreamingProgress | null;
   generationPhase: GenerationPhase;
   waitingForRender: boolean; // True when waiting for preview to render after generation
+  validationError: ValidationError | null; // When AI generates code that fails validation
+  error: TemplateError; // Template-level error (not found, load failed, etc.)
   
   // React Email specific state
   reactEmailCode: string | null;
@@ -53,6 +64,7 @@ interface TemplateActions {
   cancelGeneration: () => void;
   setIsDirty: (dirty: boolean) => void;
   onPreviewRenderComplete: () => void; // Called when preview finishes rendering
+  clearValidationError: () => void; // Clear validation error state
   
   // React Email specific actions
   updateReactEmailCode: (code: string, styleDefinitions?: Record<string, React.CSSProperties>) => void;
@@ -86,7 +98,6 @@ export function TemplateProvider({
   templateId?: string;
 }) {
   const { activeOrganization } = useOrganization();
-  const router = useRouter();
   const [state, setState] = useState<TemplateState>({
     currentTemplate: null,
     versions: [],
@@ -98,6 +109,8 @@ export function TemplateProvider({
     streamingProgress: null,
     generationPhase: 'idle',
     waitingForRender: false,
+    validationError: null,
+    error: null,
     reactEmailCode: null,
     styleDefinitions: {},
   });
@@ -153,6 +166,7 @@ export function TemplateProvider({
           styleType: mappedStyleType,
           styleDefinitions,
           previewText: template.previewText,
+          status: "ACTIVE" as const, // Mark as ACTIVE - generation complete
         };
         
         logger.info("📝 [TemplateProvider] Saving streamed template data:", {
@@ -173,6 +187,28 @@ export function TemplateProvider({
 
         const result = await updateMutation.mutateAsync(updatePayload);
 
+        // Check if the result is a validation error (returned instead of throwing)
+        if ('validationFailed' in result && result.validationFailed) {
+          logger.warn("⚠️ [TemplateProvider] Validation failed for generated template:", {
+            errors: result.validationErrors,
+            warnings: result.validationWarnings,
+          });
+          
+          setState((prev) => ({
+            ...prev,
+            isStreaming: false,
+            streamingProgress: null,
+            isLoading: false,
+            generationPhase: 'idle',
+            validationError: {
+              errors: result.validationErrors,
+              warnings: result.validationWarnings,
+              attemptedCode: result.attemptedCode,
+            },
+          }));
+          return;
+        }
+
         const processedResult = convertDates(result);
 
         setState((prev) => ({
@@ -184,6 +220,7 @@ export function TemplateProvider({
           streamingProgress: null,
           isLoading: false,
           generationPhase: 'complete',
+          validationError: null, // Clear any previous validation errors
         }));
 
         // Refetch to get the latest data
@@ -288,6 +325,30 @@ export function TemplateProvider({
         }));
 
         const result = await updateMutation.mutateAsync(updatePayload);
+        
+        // Check if the result is a validation error (returned instead of throwing)
+        if ('validationFailed' in result && result.validationFailed) {
+          logger.warn("⚠️ [TemplateProvider] Validation failed for regenerated template:", {
+            errors: result.validationErrors,
+            warnings: result.validationWarnings,
+          });
+          
+          setState((prev) => ({
+            ...prev,
+            isStreaming: false,
+            streamingProgress: null,
+            isLoading: false,
+            waitingForRender: false,
+            generationPhase: 'idle',
+            validationError: {
+              errors: result.validationErrors,
+              warnings: result.validationWarnings,
+              attemptedCode: result.attemptedCode,
+            },
+          }));
+          return;
+        }
+        
         const processedResult = convertDates(result);
 
         logger.info("⏳ [TemplateProvider] Regenerated template saved, waiting for preview render", {
@@ -304,6 +365,7 @@ export function TemplateProvider({
           isLoading: true, // Keep loading true
           waitingForRender: true, // Wait for preview to render
           generationPhase: 'complete',
+          validationError: null, // Clear any previous validation errors
         }));
 
         // Refetch to get the latest data
@@ -401,7 +463,8 @@ export function TemplateProvider({
     },
   });
 
-  // tRPC queries - fetch template data with retry for optimistic creation
+  // tRPC queries - fetch template data
+  // Note: No retry needed for NOT_FOUND since skeleton is created before navigation
   const {
     data: templateData,
     isLoading: isQueryLoading,
@@ -411,14 +474,6 @@ export function TemplateProvider({
     { id: templateId! },
     {
       enabled: !!templateId,
-      retry: (failureCount, error: any) => {
-        // Retry up to 3 times if template not found (might be creating in background)
-        if (error?.data?.code === "NOT_FOUND" && failureCount < 3) {
-          return true;
-        }
-        return false;
-      },
-      retryDelay: 500, // Wait 500ms between retries
     }
   );
 
@@ -454,6 +509,28 @@ export function TemplateProvider({
       }));
     }
   }, [templateData]);
+
+  // Handle query errors - set error state for not found UI
+  useEffect(() => {
+    if (queryError) {
+      const errorData = queryError.data as { code?: string } | undefined;
+      if (errorData?.code === "NOT_FOUND") {
+        logger.warn("Template not found", { templateId });
+        setState((prev) => ({
+          ...prev,
+          isLoading: false,
+          error: "NOT_FOUND",
+        }));
+      } else {
+        logger.error("Failed to load template", queryError);
+        setState((prev) => ({
+          ...prev,
+          isLoading: false,
+          error: "LOAD_ERROR",
+        }));
+      }
+    }
+  }, [queryError, templateId]);
 
   const loadTemplate = useCallback(
     async (id: string) => {
@@ -727,6 +804,13 @@ export function TemplateProvider({
     });
   }, []);
 
+  const clearValidationError = useCallback(() => {
+    setState((prev) => ({
+      ...prev,
+      validationError: null,
+    }));
+  }, []);
+
   const actions: TemplateActions = {
     loadTemplate,
     saveTemplate,
@@ -741,6 +825,7 @@ export function TemplateProvider({
     cancelGeneration,
     setIsDirty,
     onPreviewRenderComplete,
+    clearValidationError,
     updateReactEmailCode,
     saveReactEmailCode,
     resetReactEmailCode,

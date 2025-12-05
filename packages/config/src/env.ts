@@ -48,6 +48,9 @@ export const serverEnv = createEnv({
     UPSTASH_REDIS_REST_URL: z.url().optional(),
     UPSTASH_REDIS_REST_TOKEN: z.string().optional(),
 
+    // Firecrawl (Brand Scraping)
+    FIRECRAWL_API_KEY: z.string().optional(),
+
     // Node Environment
     NODE_ENV: z.enum(["development", "test", "production"]).optional(),
   },

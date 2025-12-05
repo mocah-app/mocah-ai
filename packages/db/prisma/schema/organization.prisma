@@ -98,16 +98,54 @@ model TeamMember {
 
 // Custom extensions for Better Auth Organization
 model BrandKit {
-  id          String   @id @default(uuid())
-  organizationId String @unique
-  primaryColor String?
-  secondaryColor String?
-  accentColor   String?
-  fontFamily    String?
-  brandVoice    String?  // "professional", "casual", "playful", "luxury"
-  logo          String?
-  favicon       String?
-  customCss     String?  @db.Text
+  id             String   @id @default(uuid())
+  organizationId String   @unique
+  
+  // Core brand colors
+  primaryColor   String?
+  accentColor    String?
+  
+  // Typography & Voice
+  fontFamily     String?
+  brandVoice     String?  // "professional", "casual", "playful", "luxury"
+  
+  // Brand assets
+  logo           String?
+  favicon        String?
+  customCss      String?  @db.Text
+  
+  // Extended brand data (from scraping)
+  websiteUrl         String?   @db.VarChar(500)
+  backgroundColor    String?   @db.VarChar(20)
+  textPrimaryColor   String?   @db.VarChar(20)
+  borderRadius       String?   @db.VarChar(20)
+  
+  // Brand personality
+  brandTone      String?   @db.VarChar(50)
+  brandEnergy    String?   @db.VarChar(20)
+  targetAudience String?   @db.VarChar(500)
+  
+  // Company info (from JSON extraction)
+  companyName        String?   @db.VarChar(200)
+  companyDescription String?   @db.Text
+  tagline            String?   @db.VarChar(300)
+  industry           String?   @db.VarChar(100)
+  productsServices   Json?     // Array of products/services
+  brandValues        Json?     // Array of brand values
+  socialLinks        Json?     // { twitter, linkedin, facebook, instagram, youtube }
+  contactEmail       String?   @db.VarChar(200)
+  foundingYear       String?   @db.VarChar(10)
+  ogImage            String?   @db.VarChar(500)
+  
+  // Firecrawl content
+  summary            String?   @db.Text
+  links              Json?     // Array of links
+  
+  // Scraping metadata
+  scrapedAt          DateTime?
+  scrapeConfidence   Float?
+  
+  // Timestamps
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
   deletedAt     DateTime?

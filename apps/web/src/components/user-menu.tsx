@@ -7,13 +7,13 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { authClient } from "@/lib/auth-client";
-import { Button } from "./ui/button";
-import { useRouter } from "next/navigation";
-import Link from "next/link";
-import Loader from "./loader";
-import { HelpCircle, Settings, User } from "lucide-react";
-import { ModeToggle } from "./mode-toggle";
 import { queryClient } from "@/utils/trpc";
+import { Bell, DollarSign, Settings, User } from "lucide-react";
+import Link from "next/link";
+import { useRouter } from "next/navigation";
+import Loader from "./loader";
+import { ModeToggle } from "./mode-toggle";
+import { Button } from "./ui/button";
 
 export default function UserMenu() {
   const router = useRouter();
@@ -50,6 +50,19 @@ export default function UserMenu() {
           <Link href="/app/settings" className="w-full justify-start">
             <Settings className="size-4" />
             Settings
+          </Link>
+        </DropdownMenuItem>
+        <DropdownMenuItem asChild>
+          <Link href="/app/billing" className="w-full justify-start">
+            <DollarSign className="size-4" />
+            Billing
+          </Link>
+        </DropdownMenuItem>
+        <DropdownMenuSeparator />
+        <DropdownMenuItem asChild>
+          <Link href="/app/settings?tab=notifications" className="w-full justify-start">
+            <Bell className="size-4" />
+            Notifications
           </Link>
         </DropdownMenuItem>
         <DropdownMenuItem asChild className="w-full">

@@ -29,14 +29,6 @@ export function InfiniteCanvas() {
     setZoomLevel(newZoom);
   }, []);
 
-  // Fit view on mount
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      // fitView will be called via React Flow's useReactFlow hook if needed
-    }, 100);
-    return () => clearTimeout(timer);
-  }, []);
-
   return (
     <div className="h-full w-full">
       <ReactFlow
@@ -74,8 +66,6 @@ export function InfiniteCanvas() {
           <CustomCanvasControl
             zoomLevel={zoomLevel}
             onZoomLevelChange={setZoomLevel}
-          // isHandMode={isHandMode}
-          // setIsHandMode={setIsHandMode}
           />
         </Controls>
       </ReactFlow>

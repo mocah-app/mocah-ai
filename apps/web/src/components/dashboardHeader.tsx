@@ -1,7 +1,7 @@
 "use client";
 import { SidebarTrigger } from "@/components/ui/sidebar";
 import { useOrganization } from "@/contexts/organization-context";
-import { Plus, Search } from "lucide-react";
+import { Building2, Plus, Search } from "lucide-react";
 import * as motion from "motion/react-client";
 import { usePathname, useRouter } from "next/navigation";
 import { useState } from "react";
@@ -19,6 +19,8 @@ import { useSidebar } from "./ui/sidebar";
 import { Skeleton } from "./ui/skeleton";
 import { Tooltip, TooltipContent, TooltipTrigger } from "./ui/tooltip";
 import Link from "next/link";
+import { Badge } from "./ui/badge";
+import { Avatar, AvatarFallback, AvatarImage } from "./ui/avatar";
 
 export default function DashboardHeader() {
   const { isMobile } = useSidebar();
@@ -54,7 +56,20 @@ export default function DashboardHeader() {
             ) : (
               <Button variant="ghost" asChild className="text-xl font-base text-muted-foreground">
                 <Link href="/app">
-                  {activeOrganization?.name || "Select Workspace"}
+                <div className="flex items-end gap-1">
+                {isLoading ? (
+                  <Skeleton className="h-6 w-40 rounded-full animate-pulse" />
+                ) : (
+                  <span className="flex items-center gap-2">
+                    {activeOrganization?.name || "Brand Name"}
+                  </span>
+                )}
+                <div className="text-sm font-normal">
+                  <Badge className="text-xs font-normal px-2 py-0.5">
+                    Brand
+                  </Badge>
+                </div>
+              </div>
                 </Link>
               </Button>
             )}

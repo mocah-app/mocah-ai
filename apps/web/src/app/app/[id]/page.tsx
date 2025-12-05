@@ -22,6 +22,9 @@ import type { TemplateNodeData } from "./components/nodes/TemplateNode";
 import type { ElementData } from "@/lib/react-email";
 import EdgeRayLoader from "@/components/EdgeLoader";
 import MocahLoadingIcon from "@/components/mocah-brand/MocahLoadingIcon";
+import { Button } from "@/components/ui/button";
+import Link from "next/link";
+import { FileQuestion, ArrowLeft } from "lucide-react";
 
 function EditorContent() {
   const { state: templateState, actions: templateActions } = useTemplate();
@@ -373,6 +376,42 @@ ${error}`;
   const hasTemplateNode = canvasState.nodes.some(
     (n) => n.id === "template-node" || n.id.startsWith("template-")
   );
+
+  // Show error UI for not found or load errors
+  if (templateState.error) {
+    return (
+      <div className="h-screen w-full flex bg-dot items-center justify-center relative">
+        <div className="bg-background/80 inset-0 backdrop-blur-ssm rounded-lg p-8 absolute" />
+        <div className="max-w-md w-full mx-auto text-center space-y-6 p-8 relative z-10">
+          <div className="mx-auto flex items-center justify-center">
+            <MocahLoadingIcon isLoading={true} size="sm" />
+          </div>
+          <div className="space-y-2">
+            <h1 className="text-2xl font-semibold tracking-tight">
+              {templateState.error === "NOT_FOUND"
+                ? "Template not found"
+                : "Failed to load template"}
+            </h1>
+            <p className="text-muted-foreground text-balance">
+              {templateState.error === "NOT_FOUND"
+                ? "This template may have been deleted or you don't have access to it."
+                : "Something went wrong while loading this template. Please try again."}
+            </p>
+          </div>
+          <div className="flex flex-col sm:flex-row gap-3 justify-center">
+            <Button asChild variant="outline">
+              <Link href="/app">
+                Dashboard
+              </Link>
+            </Button>
+            <Button asChild>
+              <Link href="/app/new">New Template</Link>
+            </Button>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <DesignChangesProvider

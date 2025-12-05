@@ -130,11 +130,6 @@ export const ChatPanel = ({
       const trimmedPrompt = promptText.trim();
       if (!trimmedPrompt || isLoading) return;
 
-      // Check for duplicates
-      if (messages.some((m) => m.content === trimmedPrompt && m.role === "user")) {
-        return;
-      }
-
       setInput("");
       setIsLoading(true);
 

@@ -21,12 +21,9 @@ export default function SettingsPage() {
   return (
     <div className="flex flex-1 flex-col h-full gap-4 p-1 w-full">
       <div className="flex flex-1 flex-col gap-4 p-4 border border-border">
-        <div className=''>
-          <h1 className="text-xl">Settings</h1>
-          <p className="text-muted-foreground text-xs">
-            Manage your workspace preferences and brand identity
-          </p>
-        </div>
+
+          <h1 className="sr-only">Settings</h1>
+
 
         <Tabs defaultValue="brand" className="space-y-6">
           <TabsList className="grid grid-cols-4">

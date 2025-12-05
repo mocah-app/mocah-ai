@@ -46,7 +46,6 @@ export const SmartEditorPanel = ({
   const brandFont = templateState.brandKit?.fontFamily || null;
   const brandColors = {
     primary: templateState.brandKit?.primaryColor || null,
-    secondary: templateState.brandKit?.secondaryColor || null,
     accent: templateState.brandKit?.accentColor || null,
   };
 

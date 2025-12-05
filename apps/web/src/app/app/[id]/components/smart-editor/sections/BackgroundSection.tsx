@@ -18,11 +18,10 @@ export function BackgroundSection({
 }: BackgroundSectionProps) {
   // Build presets with brand colors after transparent
   const bgPresets = useMemo(() => {
-    const brandColorList = [
-      brandColors?.primary,
-      brandColors?.secondary,
-      brandColors?.accent,
-    ].filter((c): c is string => !!c);
+    // Deduplicate brand colors (primary and accent might be the same)
+    const brandColorList = [...new Set(
+      [brandColors?.primary, brandColors?.accent].filter((c): c is string => !!c)
+    )];
     
     // If we have brand colors, insert them after 'transparent'
     if (brandColorList.length > 0) {
