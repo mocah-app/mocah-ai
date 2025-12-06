@@ -10,8 +10,6 @@ import { EditorModeProvider } from "./components/providers/EditorModeProvider";
 import { DesignChangesProvider } from "./components/providers/DesignChangesProvider";
 import { ErrorFixProvider } from "./components/providers/ErrorFixProvider";
 import { InfiniteCanvas } from "./components/canvas/InfiniteCanvas";
-import { SmartEditorPanel } from "./components/floating-panels/SmartEditorPanel";
-import { ChatPanel } from "./components/floating-panels/ChatPanel";
 import { FloatingNav } from "./components/floating-panels/FloatingNav";
 import { SaveDesignEdit } from "./components/canvas/SaveDesignEdit";
 import { useCanvas } from "./components/providers/CanvasProvider";
@@ -24,7 +22,38 @@ import EdgeRayLoader from "@/components/EdgeLoader";
 import MocahLoadingIcon from "@/components/mocah-brand/MocahLoadingIcon";
 import { Button } from "@/components/ui/button";
 import Link from "next/link";
-import { FileQuestion, ArrowLeft } from "lucide-react";
+import dynamic from "next/dynamic";
+import { Suspense } from "react";
+import { ImageStudioProvider } from "./components/image-studio/ImageStudioContext";
+
+const ImageLibraryPanel = dynamic(
+  () =>
+    import("./components/floating-panels/ImageLibraryPanel").then(
+      (mod) => mod.ImageLibraryPanel
+    ),
+  { ssr: false }
+);
+
+const ChatPanel = dynamic(
+  () => import("./components/floating-panels/ChatPanel").then(
+    (mod) => mod.ChatPanel
+  ),
+  { ssr: false }
+);
+
+const SmartEditorPanel = dynamic(
+  () => import("./components/floating-panels/SmartEditorPanel").then(
+    (mod) => mod.SmartEditorPanel
+  ),
+  { ssr: false }
+);
+
+const ImageStudioModal = dynamic(
+  () => import("./components/image-studio/ImageStudioModal").then(
+    (mod) => mod.ImageStudioModal
+  ),
+  { ssr: false }
+);
 
 function EditorContent() {
   const { state: templateState, actions: templateActions } = useTemplate();
@@ -400,9 +429,7 @@ ${error}`;
           </div>
           <div className="flex flex-col sm:flex-row gap-3 justify-center">
             <Button asChild variant="outline">
-              <Link href="/app">
-                Dashboard
-              </Link>
+              <Link href="/app">Dashboard</Link>
             </Button>
             <Button asChild>
               <Link href="/app/new">New Template</Link>
@@ -414,13 +441,14 @@ ${error}`;
   }
 
   return (
-    <DesignChangesProvider
-      onSaveSmartEditorChanges={handleSaveSmartEditorChanges}
-      onResetSmartEditorChanges={handleResetSmartEditorChanges}
-      isSaving={isSaving}
-    >
-      <ErrorFixProvider onRequestErrorFix={handleRequestErrorFix}>
-        <div className="h-screen w-full relative overflow-hidden flex">
+    <ImageStudioProvider>
+      <DesignChangesProvider
+        onSaveSmartEditorChanges={handleSaveSmartEditorChanges}
+        onResetSmartEditorChanges={handleResetSmartEditorChanges}
+        isSaving={isSaving}
+      >
+        <ErrorFixProvider onRequestErrorFix={handleRequestErrorFix}>
+          <div className="h-screen w-full relative overflow-hidden flex">
           <div className="flex h-dvh">
             <FloatingNav
               activePanel={activePanel}
@@ -443,6 +471,10 @@ ${error}`;
                 editorActions.selectElement(null);
                 editorActions.setDesignMode(false);
               }}
+            />
+            <ImageLibraryPanel
+              isOpen={activePanel === "library"}
+              onClose={() => setActivePanel(null)}
             />
           </div>
           <InfiniteCanvas />
@@ -471,9 +503,15 @@ ${error}`;
             onReset={handleResetChanges}
             isSaving={isSaving}
           />
+
+          {/* Image Studio Modal - triggered by URL param */}
+          <Suspense fallback={null}>
+            <ImageStudioModal />
+          </Suspense>
         </div>
       </ErrorFixProvider>
     </DesignChangesProvider>
+    </ImageStudioProvider>
   );
 }
 

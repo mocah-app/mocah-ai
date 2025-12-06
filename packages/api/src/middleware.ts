@@ -1,5 +1,5 @@
 import { TRPCError } from "@trpc/server";
-import { t } from "./index";
+import { t, protectedProcedure } from "./index";
 
 /**
  * Middleware that requires an active organization to be set in the session
@@ -79,12 +79,12 @@ export const requireOrganizationRole = (allowedRoles: string[]) =>
  * Protected procedure that requires active organization
  * Use this for most organization-scoped endpoints
  */
-export const organizationProcedure = t.procedure.use(requireActiveOrganization);
+export const organizationProcedure = protectedProcedure.use(requireActiveOrganization);
 
 /**
  * Protected procedure that requires admin role
  * Use this for admin-only actions like deleting organization
  */
-export const adminProcedure = t.procedure.use(
+export const adminProcedure = protectedProcedure.use(
   requireOrganizationRole(["owner", "admin"])
 );

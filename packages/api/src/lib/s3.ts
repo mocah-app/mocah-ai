@@ -23,6 +23,7 @@ export const ALLOWED_IMAGE_TYPES = [
   "image/jpeg",
   "image/jpg",
   "image/svg+xml",
+  "image/webp",
 ];
 export const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5MB
 
@@ -32,7 +33,7 @@ export function validateImageFile(
   if (!ALLOWED_IMAGE_TYPES.includes(file.type)) {
     return {
       valid: false,
-      error: "Invalid file type. Only PNG, JPG, and SVG are allowed.",
+      error: "Invalid file type. Only PNG, JPG, WebP, and SVG are allowed.",
     };
   }
 

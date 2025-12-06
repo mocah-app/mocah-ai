@@ -16,6 +16,57 @@ import {
 } from "@mocah/api/lib/s3";
 import { logger } from "@mocah/shared";
 
+// JSONValue type for providerOptions
+type JSONValue =
+  | string
+  | number
+  | boolean
+  | null
+  | JSONValue[]
+  | { [key: string]: JSONValue };
+
+// Models that use image_size parameter instead of aspectRatio
+// These need snake_case since SDK doesn't auto-convert model-specific params
+const IMAGE_SIZE_MODELS = ["fal-ai/qwen-image", "fal-ai/flux-2-flex"];
+
+// Map aspect ratio to image_size for qwen-image model
+// Supported enum values: square_hd, square, portrait_4_3, portrait_16_9, landscape_4_3, landscape_16_9
+// For unsupported ratios, returns { width, height } object
+function aspectRatioToImageSize(
+  aspectRatio: string
+): string | { width: number; height: number } {
+  // Direct mappings to supported enum values
+  const enumMapping: Record<string, string> = {
+    "16:9": "landscape_16_9",
+    "4:3": "landscape_4_3",
+    "1:1": "square_hd",
+    "3:4": "portrait_4_3",
+    "9:16": "portrait_16_9",
+  };
+
+  if (enumMapping[aspectRatio]) {
+    return enumMapping[aspectRatio];
+  }
+
+  // For unsupported ratios, calculate custom dimensions (base ~1024px on longer side)
+  const customSizes: Record<string, { width: number; height: number }> = {
+    "21:9": { width: 1536, height: 660 },
+    "3:2": { width: 1024, height: 683 },
+    "5:4": { width: 1024, height: 819 },
+    "4:5": { width: 819, height: 1024 },
+    "2:3": { width: 683, height: 1024 },
+  };
+
+  return customSizes[aspectRatio] || "landscape_4_3";
+}
+
+// Check if model uses image_size parameter
+function usesImageSizeParam(modelId: string): boolean {
+  return IMAGE_SIZE_MODELS.some(
+    (m) => modelId === m || modelId.startsWith(m + "/")
+  );
+}
+
 const ASPECT_RATIOS = [
   "auto",
   "21:9",
@@ -71,29 +122,50 @@ export async function runFalImageGeneration(
     input.model ||
     (isEditMode ? getDefaultImageEditModelId() : getDefaultImageModelId());
 
+  // @ai-sdk/fal expects camelCase - SDK converts to snake_case internally
+  // Different models use different size parameters:
+  // - nano-banana-pro: aspectRatio ("9:16", "16:9", etc.)
+  // - qwen-image: imageSize ("portrait_16_9", "landscape_16_9", or {width, height})
+  const useImageSize = usesImageSizeParam(modelId);
+
+  // Build providerOptions imperatively to ensure no undefined values
+  const providerOptions: Record<string, JSONValue> = { syncMode: true };
+
+  // Note: use snake_case - SDK doesn't auto-convert model-specific params
+  // qwen-image/image-to-image expects image_url (singular), others expect image_urls (plural)
+  if (input.imageUrls && input.imageUrls.length > 0) {
+    if (modelId === "fal-ai/qwen-image/image-to-image") {
+      providerOptions.image_url = input.imageUrls[0]!;
+    } else {
+      providerOptions.image_urls = input.imageUrls;
+    }
+  }
+  if (input.numImages) providerOptions.numImages = input.numImages;
+  if (input.outputFormat) providerOptions.outputFormat = input.outputFormat;
+  if (!useImageSize && input.resolution) providerOptions.resolution = input.resolution;
+  if (input.limitGenerations !== undefined) providerOptions.limitGenerations = input.limitGenerations;
+  if (input.enableWebSearch !== undefined) providerOptions.enableWebSearch = input.enableWebSearch;
+  if (input.guidanceScale) providerOptions.guidanceScale = input.guidanceScale;
+  if (input.strength !== undefined) providerOptions.strength = input.strength;
+
+  // Add size parameter based on model type
+  // Note: image_size uses snake_case because SDK doesn't auto-convert model-specific params
+  if (input.aspectRatio) {
+    if (useImageSize) {
+      const imageSize = aspectRatioToImageSize(input.aspectRatio);
+      providerOptions.image_size = imageSize;
+    } else {
+      providerOptions.aspectRatio = input.aspectRatio;
+    }
+  }
+
   logger.info("🖼️ Starting Fal image generation", {
     model: modelId,
     isEditMode,
+    aspectRatio: input.aspectRatio,
+    providerOptions,
     prompt: input.prompt.slice(0, 100),
-    imageUrls: input.imageUrls?.length || 0,
   });
-
-  const providerOptions = {
-    ...(input.imageUrls ? { image_urls: input.imageUrls } : {}),
-    ...(input.numImages ? { numImages: input.numImages } : {}),
-    ...(input.aspectRatio ? { aspectRatio: input.aspectRatio } : {}),
-    ...(input.outputFormat ? { outputFormat: input.outputFormat } : {}),
-    ...(input.resolution ? { resolution: input.resolution } : {}),
-    ...(input.limitGenerations !== undefined
-      ? { limitGenerations: input.limitGenerations }
-      : {}),
-    ...(input.enableWebSearch !== undefined
-      ? { enableWebSearch: input.enableWebSearch }
-      : {}),
-    ...(input.guidanceScale ? { guidanceScale: input.guidanceScale } : {}),
-    ...(input.strength !== undefined ? { strength: input.strength } : {}),
-    syncMode: true,
-  } as Record<string, string | number | boolean | string[]>;
 
   let result;
   try {
@@ -254,7 +326,7 @@ export async function runFalImageGeneration(
           : input.outputFormat || inferExtension(contentType) || "png";
 
       const filePath = generateStoragePath(
-        `fal-image-${Date.now()}-${index}.${extension}`,
+        `mocah-image-${Date.now()}-${index}.${extension}`,
         "images"
       );
 

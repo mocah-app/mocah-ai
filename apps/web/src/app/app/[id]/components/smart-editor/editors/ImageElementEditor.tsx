@@ -1,16 +1,30 @@
 "use client";
 
-import React, { useCallback, useEffect, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { ElementData, ElementUpdates } from "@/lib/react-email";
 import type { BrandColors } from "../EditorShell";
-import { ImageSection, LayoutSection } from "../sections";
-import { PropertySection, SelectControl, TextareaControl, TextInputControl } from "../controls";
+import { LayoutSection } from "../sections";
+import { PropertySection, SelectControl, TextInputControl } from "../controls";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
-import { Loader2, Sparkles } from "lucide-react";
+import {
+  Loader2,
+  Sparkles,
+  Upload,
+  FolderOpen,
+  Image as ImageIcon,
+} from "lucide-react";
 import { useTemplate } from "../../providers/TemplateProvider";
 import { useOrganization } from "@/contexts/organization-context";
 import { trpc } from "@/utils/trpc";
+import { cn } from "@/lib/utils";
+import { useRouter, useSearchParams } from "next/navigation";
+import { useImageStudio } from "../../image-studio/ImageStudioContext";
+import Loader from "@/components/loader";
+
+// ============================================================================
+// Types & Constants
+// ============================================================================
 
 interface ImageElementEditorProps {
   elementData: ElementData;
@@ -20,29 +34,41 @@ interface ImageElementEditorProps {
   brandColors?: BrandColors;
 }
 
-/**
- * Editor for Img elements
- */
+const WIDTH_PRESETS = [
+  { value: "auto", label: "Auto" },
+  { value: "100%", label: "100%" },
+  { value: "75%", label: "75%" },
+  { value: "50%", label: "50%" },
+  { value: "200px", label: "200px" },
+  { value: "300px", label: "300px" },
+  { value: "400px", label: "400px" },
+  { value: "600px", label: "600px" },
+];
+
+// ============================================================================
+// Component
+// ============================================================================
+
 export function ImageElementEditor({
   elementData,
   currentStyles,
   onUpdate,
 }: ImageElementEditorProps) {
+  const router = useRouter();
+  const searchParams = useSearchParams();
   const { state: templateState } = useTemplate();
   const { activeOrganization } = useOrganization();
+  const { setOnImageSelect, setInitialImageUrl } = useImageStudio();
   const templateId = templateState.currentTemplate?.id;
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const [prompt, setPrompt] = useState("");
-  const [referenceUrl, setReferenceUrl] = useState<string | undefined>(
-    elementData.attributes?.src as string
-  );
-  const [aspectRatio, setAspectRatio] = useState<string | undefined>();
-  const [isGenerating, setIsGenerating] = useState(false);
-  const [assetScope, setAssetScope] = useState<"template" | "org">("template");
+  const currentSrc = elementData.attributes?.src as string | undefined;
 
-  useEffect(() => {
-    setReferenceUrl(elementData.attributes?.src as string);
-  }, [elementData.attributes?.src]);
+  // Library state
+  const [libraryScope, setLibraryScope] = useState<"template" | "org">("template");
+
+  // Upload state
+  const [isUploading, setIsUploading] = useState(false);
 
   const organizationId = useMemo(
     () =>
@@ -50,262 +76,234 @@ export function ImageElementEditor({
     [templateState.currentTemplate?.organizationId, activeOrganization?.id]
   );
 
+  // Fetch recent images
   const {
-    data: assetData,
-    isFetching: assetsLoading,
-    refetch: refetchAssets,
+    data: recentImages,
+    isLoading: imagesLoading,
+    refetch: refetchImages,
   } = trpc.imageAsset.list.useQuery(
-    assetScope === "template" && templateId
-      ? { templateId, limit: 30 }
-      : { limit: 30 },
+    libraryScope === "template" && templateId
+      ? { templateId, limit: 12 }
+      : { limit: 12 },
     {
-      enabled: assetScope === "org" ? !!organizationId : !!templateId,
+      enabled: libraryScope === "org" ? !!organizationId : !!templateId,
     }
   );
 
-  const handleGenerate = useCallback(
-    async (mode: "generate" | "regenerate") => {
-      if (!organizationId) {
-        toast.error("Select an organization before generating images.");
-        return;
-      }
+  // ============================================================================
+  // Handlers
+  // ============================================================================
 
-      if (!prompt.trim()) {
-        toast.error("Add a prompt to generate an image.");
-        return;
-      }
+  const handleImageSelect = useCallback(
+    (url: string, width?: number, height?: number) => {
+      const styleUpdates: Record<string, string> = {};
+      if (width) styleUpdates.width = `${width}px`;
+      if (height) styleUpdates.height = `${height}px`;
 
-      const useReference =
-        mode === "regenerate" || (!!referenceUrl && referenceUrl.length > 0);
+      onUpdate({
+        attributes: {
+          src: url,
+          alt: elementData.attributes?.alt || "Image",
+        },
+        ...(Object.keys(styleUpdates).length ? { styles: styleUpdates } : {}),
+      });
+    },
+    [onUpdate, elementData.attributes?.alt]
+  );
 
-      if (useReference && !referenceUrl) {
-        toast.error("Add a reference image URL to regenerate.");
-        return;
-      }
+  // Upload mutation
+  const uploadMutation = trpc.storage.uploadImage.useMutation({
+    onSuccess: (data: { url: string }) => {
+      handleImageSelect(data.url);
+      refetchImages();
+      toast.success("Image uploaded successfully");
+    },
+    onError: (error: { message?: string }) => {
+      toast.error(error.message || "Failed to upload image");
+    },
+    onSettled: () => {
+      setIsUploading(false);
+    },
+  });
 
-      const endpoint = useReference
-        ? "/api/image/regenerate"
-        : "/api/image/generate";
+  // Open Image Studio via URL param
+  const handleOpenImageStudio = useCallback(() => {
+    // Set the callback and initial image URL before opening
+    setOnImageSelect(() => handleImageSelect);
+    setInitialImageUrl(currentSrc);
+    
+    const params = new URLSearchParams(searchParams.toString());
+    params.set("imageStudio", "open");
+    router.push(`/app/${templateId}?${params.toString()}`, { scroll: false });
+  }, [router, searchParams, templateId, setOnImageSelect, setInitialImageUrl, currentSrc, handleImageSelect]);
 
-      const body: Record<string, unknown> = {
-        prompt: prompt.trim(),
-        organizationId,
-        templateId: templateState.currentTemplate?.id,
-        versionId: templateState.currentTemplate?.currentVersionId,
-        ...(aspectRatio ? { aspectRatio } : {}),
-      };
+  const handleStyleChange = useCallback(
+    (property: string, value: string) => {
+      onUpdate({
+        styles: { [property]: value },
+      });
+    },
+    [onUpdate]
+  );
 
-      if (useReference && referenceUrl) {
-        body.imageUrls = [referenceUrl];
-      }
-
-      setIsGenerating(true);
-
-      try {
-        const response = await fetch(endpoint, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(body),
-        });
-
-        const data = await response.json();
-        if (!response.ok) {
-          const message =
-            typeof data?.error === "string"
-              ? data.error
-              : "Failed to generate image";
-          throw new Error(message);
-        }
-
-        const first = data.images?.[0];
-        if (!first?.url) {
-          throw new Error("No image returned from Fal");
-        }
-
-        const styleUpdates: Record<string, string> = {};
-        if (first.width) styleUpdates.width = `${first.width}px`;
-        if (first.height) styleUpdates.height = `${first.height}px`;
-
+  const handleAttributeChange = useCallback(
+    (property: string, value: string) => {
+      if (property === "src" || property === "alt") {
         onUpdate({
-          attributes: {
-            src: first.url,
-            alt: elementData.attributes?.alt || prompt.slice(0, 80),
-          },
-          ...(Object.keys(styleUpdates).length ? { styles: styleUpdates } : {}),
+          attributes: { [property]: value },
         });
-
-        setReferenceUrl(first.url);
-        refetchAssets();
-        toast.success("Image updated");
-      } catch (error) {
-        const message =
-          error instanceof Error ? error.message : "Failed to generate image";
-        toast.error(message);
-      } finally {
-        setIsGenerating(false);
+      } else {
+        handleStyleChange(property, value);
       }
     },
-    [
-      organizationId,
-      prompt,
-      referenceUrl,
-      aspectRatio,
-      templateState.currentTemplate?.id,
-      templateState.currentTemplate?.currentVersionId,
-      onUpdate,
-      elementData.attributes?.alt,
-      refetchAssets,
-    ]
+    [onUpdate, handleStyleChange]
   );
 
-  const handleStyleChange = (property: string, value: string) => {
-    onUpdate({
-      styles: { [property]: value },
-    });
-  };
+  const handleFileUpload = useCallback(
+    async (e: React.ChangeEvent<HTMLInputElement>) => {
+      const file = e.target.files?.[0];
+      if (!file) return;
 
-  const handleAttributeChange = (property: string, value: string) => {
-    // src and alt are attributes, width/height are styles
-    if (property === 'src' || property === 'alt') {
-      onUpdate({
-        attributes: { [property]: value },
-      });
-    } else {
-      handleStyleChange(property, value);
-    }
-  };
+      // Validate file type
+      if (!file.type.startsWith("image/")) {
+        toast.error("Please select an image file");
+        return;
+      }
+
+      // Validate file size (max 5MB)
+      if (file.size > 5 * 1024 * 1024) {
+        toast.error("Image must be less than 5MB");
+        return;
+      }
+
+      setIsUploading(true);
+
+      // Convert to base64
+      const reader = new FileReader();
+      reader.onload = () => {
+        const base64 = (reader.result as string).split(",")[1];
+        uploadMutation.mutate({
+          file: {
+            name: file.name,
+            type: file.type,
+            size: file.size,
+            base64Data: base64,
+          },
+          templateId,
+        });
+      };
+      reader.onerror = () => {
+        toast.error("Failed to read file");
+        setIsUploading(false);
+      };
+      reader.readAsDataURL(file);
+
+      // Reset input
+      if (fileInputRef.current) {
+        fileInputRef.current.value = "";
+      }
+    },
+    [uploadMutation, templateId]
+  );
+
+  // ============================================================================
+  // Render
+  // ============================================================================
+
+  const currentAlt = elementData.attributes?.alt as string | undefined;
 
   return (
     <div className="space-y-0">
-      {/* Image Source & Alt (includes size controls) */}
-      <ImageSection
-        src={elementData.attributes?.src as string}
-        alt={elementData.attributes?.alt as string}
-        width={currentStyles.width as string}
-        height={currentStyles.height as string}
-        onChange={handleAttributeChange}
-      />
+      {/* Image Preview & URL */}
+      <PropertySection label="Image">
+        {/* Current Image Preview */}
+        {currentSrc && (
+          <div className="relative rounded-lg overflow-hidden border border-border bg-muted/50 mb-3">
+            <img
+              src={currentSrc}
+              alt={currentAlt || "Image preview"}
+              className="w-full h-auto max-h-40 object-contain"
+            />
+          </div>
+        )}
+
+        {/* Action Buttons */}
+        <div className="grid grid-cols-2 gap-2 mb-3">
+          <Button
+            variant="outline"
+            size="sm"
+            className="h-9"
+            onClick={() => fileInputRef.current?.click()}
+            disabled={isUploading}
+          >
+            {isUploading ? (
+              <Loader />
+            ) : (
+              <Upload className="size-3.5" />
+            )}
+            Upload
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            className="h-9"
+            onClick={handleOpenImageStudio}
+          >
+            <Sparkles className="size-3.5 mr-1.5" />
+            AI Generate
+          </Button>
+        </div>
+
+        {/* Hidden file input */}
+        <input
+          ref={fileInputRef}
+          type="file"
+          accept="image/*"
+          onChange={handleFileUpload}
+          className="hidden"
+        />
+
+        {/* URL Input */}
+        <TextInputControl
+          label="Image URL"
+          value={currentSrc}
+          onChange={(v) => handleAttributeChange("src", v)}
+          type="url"
+          placeholder="https://example.com/image.jpg"
+        />
+
+        <TextInputControl
+          label="Alt Text"
+          value={currentAlt}
+          onChange={(v) => handleAttributeChange("alt", v)}
+          placeholder="Image description"
+        />
+      </PropertySection>
+
+      {/* Size Controls */}
+      <PropertySection label="Size">
+        <div className="grid grid-cols-2 gap-2">
+          <SelectControl
+            label="Width"
+            value={currentStyles.width as string}
+            options={WIDTH_PRESETS}
+            onChange={(v) => handleStyleChange("width", v)}
+            placeholder="Auto"
+          />
+          <TextInputControl
+            label="Height"
+            value={currentStyles.height as string}
+            onChange={(v) => handleStyleChange("height", v)}
+            placeholder="auto"
+          />
+        </div>
+      </PropertySection>
 
       {/* Layout (margin) */}
       <LayoutSection
         margin={currentStyles.margin as string}
         onChange={handleStyleChange}
       />
-
-      <PropertySection label="AI Image (Fal)">
-        <TextareaControl
-          label="Prompt"
-          value={prompt}
-          onChange={setPrompt}
-          placeholder="Generate a hero image for this section..."
-          rows={3}
-        />
-
-        <SelectControl
-          label="Aspect Ratio"
-          value={aspectRatio}
-          options={[
-            { value: "auto", label: "Auto" },
-            { value: "16:9", label: "16:9" },
-            { value: "4:3", label: "4:3" },
-            { value: "1:1", label: "1:1" },
-            { value: "9:16", label: "9:16" },
-            { value: "3:4", label: "3:4" },
-          ]}
-          onChange={setAspectRatio}
-          placeholder="Auto"
-        />
-
-        <TextInputControl
-          label="Reference image (optional)"
-          value={referenceUrl}
-          onChange={setReferenceUrl}
-          type="url"
-          placeholder="Use current image or paste a reference URL"
-        />
-
-        <div className="flex gap-2">
-          <Button
-            size="sm"
-            className="flex-1"
-            onClick={() => handleGenerate("generate")}
-            disabled={isGenerating}
-          >
-            {isGenerating ? (
-              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-            ) : (
-              <Sparkles className="mr-2 h-4 w-4" />
-            )}
-            Generate
-          </Button>
-          <Button
-            size="sm"
-            variant="secondary"
-            className="flex-1"
-            onClick={() => handleGenerate("regenerate")}
-            disabled={isGenerating}
-          >
-            {isGenerating ? (
-              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-            ) : (
-              <Sparkles className="mr-2 h-4 w-4" />
-            )}
-            Regenerate
-          </Button>
-        </div>
-      </PropertySection>
-
-      <PropertySection label="Recent images">
-        <div className="mb-2">
-          <SelectControl
-            label="Source"
-            value={assetScope}
-            options={[
-              { value: "template", label: "This template" },
-              { value: "org", label: "All org images" },
-            ]}
-            onChange={(value) =>
-              setAssetScope(value as "template" | "org")
-            }
-          />
-        </div>
-        {assetsLoading ? (
-          <div className="flex items-center gap-2 text-xs text-muted-foreground">
-            <Loader2 className="h-4 w-4 animate-spin" />
-            Loading images...
-          </div>
-        ) : assetData?.items?.length ? (
-          <div className="grid grid-cols-3 gap-2">
-            {assetData.items.map((asset) => (
-              <button
-                key={asset.id}
-                type="button"
-                onClick={() => {
-                  onUpdate({
-                    attributes: {
-                      src: asset.url,
-                      alt: elementData.attributes?.alt || prompt.slice(0, 80),
-                    },
-                  });
-                  setReferenceUrl(asset.url);
-                }}
-                className="group relative rounded-md border border-border overflow-hidden focus:outline-none focus:ring-2 focus:ring-primary/40"
-              >
-                <img
-                  src={asset.url}
-                  alt={asset.id}
-                  className="h-24 w-full object-cover transition-transform group-hover:scale-105"
-                />
-              </button>
-            ))}
-          </div>
-        ) : (
-          <p className="text-xs text-muted-foreground">
-            Generated images will appear here.
-          </p>
-        )}
-      </PropertySection>
     </div>
   );
 }
-
