@@ -221,6 +221,7 @@ export async function runFalImageGeneration(
   const falImages: Array<{
     url?: string;
     content_type?: string;
+    contentType?: string; // SDK may return camelCase
     width?: number;
     height?: number;
     nsfw?: boolean;
@@ -256,7 +257,7 @@ export async function runFalImageGeneration(
   }> = [];
 
   for (let i = 0; i < Math.max(falImages.length, resultImages.length); i++) {
-    const meta = falImages[i] || {} as any;
+    const meta = falImages[i] || {};
     const img = resultImages[i];
     const metaContentType = meta.contentType || meta.content_type;
     
