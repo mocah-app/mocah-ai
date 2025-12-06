@@ -6,6 +6,9 @@ settings:
 
 catalogs:
   default:
+    '@ai-sdk/fal':
+      specifier: ^1.0.24
+      version: 1.0.24
     '@aws-sdk/client-s3':
       specifier: ^3.823.0
       version: 3.932.0
@@ -75,6 +78,9 @@ importers:
 
   apps/web:
     dependencies:
+      '@ai-sdk/fal':
+        specifier: 'catalog:'
+        version: 1.0.24(zod@4.1.12)
       '@ai-sdk/react':
         specifier: ^2.0.104
         version: 2.0.104(react@19.2.1)(zod@4.1.12)
@@ -367,6 +373,9 @@ importers:
 
   packages/api:
     dependencies:
+      '@ai-sdk/fal':
+        specifier: 'catalog:'
+        version: 1.0.24(zod@4.1.12)
       '@aws-sdk/client-s3':
         specifier: 'catalog:'
         version: 3.932.0
@@ -501,6 +510,12 @@ importers:
         version: 0.15.12(ms@2.1.3)(typescript@5.9.3)
 
 packages:
+
+  '@ai-sdk/fal@1.0.24':
+    resolution: {integrity: sha512-lDw7WwawgOosNM9R+h8zMSvLwoU2hkeuwMrTNxfdlgbCfS1YfgxrEMdimW7hEl1lXOuXW+i45ZDA5Uas7HyrCw==}
+    engines: {node: '>=18'}
+    peerDependencies:
+      zod: ^3.25.76 || ^4.1.8
 
   '@ai-sdk/gateway@2.0.17':
     resolution: {integrity: sha512-oVAG6q72KsjKlrYdLhWjRO7rcqAR8CjokAbYuyVZoCO4Uh2PH/VzZoxZav71w2ipwlXhHCNaInGYWNs889MMDA==}
@@ -4253,6 +4268,12 @@ packages:
         optional: true
 
 snapshots:
+
+  '@ai-sdk/fal@1.0.24(zod@4.1.12)':
+    dependencies:
+      '@ai-sdk/provider': 2.0.0
+      '@ai-sdk/provider-utils': 3.0.18(zod@4.1.12)
+      zod: 4.1.12
 
   '@ai-sdk/gateway@2.0.17(zod@4.1.12)':
     dependencies:

@@ -51,6 +51,15 @@ export const serverEnv = createEnv({
     // Firecrawl (Brand Scraping)
     FIRECRAWL_API_KEY: z.string().optional(),
 
+    // Fal AI (Image Generation)
+    FAL_API_KEY: z.string().min(1),
+    FAL_BASE_URL: z.url().optional(),
+    FAL_IMAGE_MODEL: z.string().optional(), // Text-to-image model
+    FAL_IMAGE_EDIT_MODEL: z.string().optional(), // Image-to-image editing model
+    FAL_IMAGE_RATE_PER_MINUTE: z.coerce.number().optional(),
+    FAL_IMAGE_RATE_PER_DAY: z.coerce.number().optional(),
+    FAL_IMAGE_ENABLED: z.coerce.boolean().optional(),
+
     // Node Environment
     NODE_ENV: z.enum(["development", "test", "production"]).optional(),
   },

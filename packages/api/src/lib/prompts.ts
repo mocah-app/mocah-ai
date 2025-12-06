@@ -116,6 +116,36 @@ EMAIL-SAFE CSS:
 ❌ FORBIDDEN: display, position, transform, flex*, grid*, float, box-shadow, overflow, filter`;
 
 // ============================================================================
+// CONTENT GUIDELINES - ~200 tokens
+// ============================================================================
+
+const CONTENT_GUIDELINES = `CONTENT PRINCIPLES:
+
+- CONCISE: Every word must earn its place. Default to shorter.
+
+- ONE clear CTA per email (not multiple buttons)
+
+- Headlines: 5-10 words max
+
+- Body paragraphs: 2-3 sentences max
+
+- ONE social proof element max (if needed)
+
+- Remove marketing fluff - get to the point
+
+- White space > word count for visual impact
+
+
+
+EMAIL LENGTH TARGETS:
+
+- Transactional: 50-150 words total
+
+- Promotional: 100-200 words total  
+
+- Newsletter: 150-300 words total`;
+
+// ============================================================================
 // VALIDATION CHECKLIST (Modular) - ~100 tokens
 // ============================================================================
 
@@ -134,20 +164,14 @@ const VALIDATION_CHECKLIST = `PRE-OUTPUT CHECKS:
 // ============================================================================
 
 const DESIGN_PHILOSOPHY = `DESIGN CREATIVITY:
-Think: "What makes THIS email memorable and distinctive in an inbox?"
+Balance distinction with restraint. Effective emails are concise and focused.
 
-- AVOID generic templates - every email should feel custom-designed for its specific purpose
-- Match design intensity to content purpose (urgent vs calm, promotional vs informational)
-- Explore varied layouts - don't default to centered single-column
-- Create visual hierarchy through strategic size, spacing, and color contrast
-- Use white space intentionally - sometimes less is more impactful
-- Apply brand colors purposefully: primary for CTAs/key elements, accent for highlights
-- Typography should create rhythm: vary sizes and weights to guide the eye
-- Let the content's emotional tone drive design choices
-- Reflect brand voice and personality throughout
-- Design for the target audience's expectations and preferences
-
-Challenge yourself: Would someone recognize this as distinct from a template library?`;
+- Visual hierarchy through strategic spacing and color, not content volume
+- ONE primary message, ONE primary CTA
+- White space is a design element - use it generously
+- Quality over quantity in every element
+- Remove anything that doesn't directly support the core goal
+- Let visuals carry weight instead of explaining everything in text`;
 
 // ============================================================================
 // PROMPT BUILDERS
@@ -303,6 +327,7 @@ ${buildBrandSection(brandKit)}`,
     CRITICAL_RULES,
     COMPONENT_REFERENCE,
     STYLE_GUIDELINES,
+    CONTENT_GUIDELINES,
   ];
 
   if (verbosity !== "minimal") {
@@ -478,6 +503,7 @@ export const STATIC_PROMPT_SECTIONS = {
   criticalRules: CRITICAL_RULES,
   componentReference: COMPONENT_REFERENCE,
   styleGuidelines: STYLE_GUIDELINES,
+  contentGuidelines: CONTENT_GUIDELINES,
   validation: VALIDATION_CHECKLIST,
   designPhilosophy: DESIGN_PHILOSOPHY,
 } as const;

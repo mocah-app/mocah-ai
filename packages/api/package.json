@@ -22,6 +22,7 @@
     "typescript": "^5"
   },
   "dependencies": {
+    "@ai-sdk/fal": "catalog:",
     "@aws-sdk/client-s3": "catalog:",
     "@mocah/auth": "workspace:*",
     "@mocah/config": "workspace:*",

@@ -15,6 +15,7 @@ model User {
   generationHistory GenerationHistory[]
   aiPrompts     AIPrompt[]
   usageQuotas   UsageQuota[]
+  imageAssets   ImageAsset[]
 
   @@unique([email])
   @@map("user")

@@ -1,0 +1,34 @@
+// media.prisma
+// Global image asset store for generated/regenerated images
+
+model ImageAsset {
+  id              String   @id @default(uuid())
+  organizationId  String
+  userId          String
+  templateId      String?
+  versionId       String?
+  prompt          String   @db.Text
+  model           String
+  requestId       String?
+  url             String   @db.VarChar(1000)
+  storageKey      String   @db.VarChar(500)
+  contentType     String   @db.VarChar(100)
+  aspectRatio     String?  @db.VarChar(20)
+  width           Int?
+  height          Int?
+  nsfw            Boolean  @default(false)
+  metadata        Json?
+  createdAt       DateTime @default(now())
+
+  organization    Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  user            User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  template        Template?    @relation(fields: [templateId], references: [id], onDelete: Cascade)
+  version         TemplateVersion? @relation(fields: [versionId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId])
+  @@index([userId])
+  @@index([templateId])
+  @@index([versionId])
+  @@index([createdAt])
+  @@map("image_asset")
+}

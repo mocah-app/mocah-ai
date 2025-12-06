@@ -33,6 +33,7 @@ model Template {
   exports           Export[]
   categoryRelations TemplateCategoryRelation[]
   messages          ChatMessage[]
+  imageAssets       ImageAsset[]
 
   @@index([organizationId])
   @@index([category])
@@ -72,6 +73,7 @@ model TemplateVersion {
   currentVersionOf Template[] @relation("CurrentVersion")
   parentVersion    TemplateVersion? @relation("VersionChain", fields: [parentVersionId], references: [id], onDelete: SetNull)
   childVersions    TemplateVersion[] @relation("VersionChain")
+  imageAssets      ImageAsset[]
 
   @@unique([templateId, version])
   @@index([templateId])
