@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import {
@@ -54,6 +55,7 @@ export type PreviewImageAsset = {
   height?: number | null;
   aspectRatio?: string | null;
   contentType?: string | null;
+  blurDataUrl?: string | null;
   createdAt: Date | string;
 };
 
@@ -514,17 +516,21 @@ export function ImagePreviewModal({
                   key={image.id}
                   onClick={() => handleThumbnailClick(index)}
                   className={cn(
-                    "w-full aspect-square rounded-md overflow-hidden border border-border transition-all",
+                    "w-full aspect-square rounded-md overflow-hidden border border-border transition-all relative",
                     index === currentIndex
                       ? "border-primary"
                       : "border-transparent hover:border-muted-foreground/30 opacity-40 hover:opacity-100"
                   )}
                 >
-                  <img
+                  <Image
                     src={image.url}
                     alt=""
-                    className="w-full h-full object-cover"
-                    loading="lazy"
+                    fill
+                    sizes="48px"
+                    className="object-cover"
+                    loading={index < 5 ? "eager" : "lazy"}
+                    placeholder={image.blurDataUrl ? "blur" : "empty"}
+                    blurDataURL={image.blurDataUrl ?? undefined}
                   />
                 </Button>
               ))}

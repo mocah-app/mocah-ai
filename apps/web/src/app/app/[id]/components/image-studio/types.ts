@@ -1,15 +1,37 @@
 import { z } from "zod";
+import {
+  MODEL_AUTO,
+  isWebpUnsupported,
+  isEditModel,
+  requiresReferenceImages,
+  getOutputFormatForModel,
+  uploadFileSchema,
+  MAX_FILE_SIZE,
+  ALLOWED_IMAGE_TYPES,
+} from "@mocah/shared";
+
+// Re-export shared types
+export type {
+  GeneratedImage,
+  ImageAsset,
+  PreviewImageAsset,
+} from "@mocah/shared";
+
+// Re-export shared utilities
+export {
+  MODEL_AUTO,
+  isWebpUnsupported,
+  isEditModel,
+  requiresReferenceImages,
+  getOutputFormatForModel,
+  uploadFileSchema,
+  MAX_FILE_SIZE,
+  ALLOWED_IMAGE_TYPES,
+};
 
 // ============================================================================
-// Types
+// Local Types (UI-specific)
 // ============================================================================
-
-export interface GeneratedImage {
-  id: string;
-  url: string;
-  width?: number;
-  height?: number;
-}
 
 export type ImageNodeData = {
   url: string;
@@ -20,10 +42,8 @@ export type ImageNodeData = {
 };
 
 // ============================================================================
-// Constants
+// Constants (UI-specific)
 // ============================================================================
-
-export const MODEL_AUTO = "__auto__"; // Special value for default/env model
 
 export const ASPECT_RATIOS = [
   { value: "auto", label: "Auto" },
@@ -110,41 +130,8 @@ export const PROMPT_TEMPLATES = [
 ] as const;
 
 // ============================================================================
-// Utilities
+// Zod Schemas (UI-specific)
 // ============================================================================
-
-/** Models that don't support webp output (only png/jpeg) */
-export const isWebpUnsupported = (modelValue: string) =>
-  modelValue.includes("flux-2-flex") || modelValue.includes("qwen-image");
-
-/** Edit models include "/edit" or "/image-to-image" in their value */
-export const isEditModel = (value: string) =>
-  value === MODEL_AUTO ||
-  value.includes("/edit") ||
-  value.includes("/image-to-image");
-
-/** Check if a model strictly requires reference images (edit model but NOT auto) */
-export const requiresReferenceImages = (value: string) =>
-  value !== MODEL_AUTO &&
-  (value.includes("/edit") || value.includes("/image-to-image"));
-
-// ============================================================================
-// Zod Schemas
-// ============================================================================
-
-/** URL validation - supports http/https URLs */
-const urlSchema = z.url("Invalid URL format").or(z.literal(""));
-
-/** Reference image URL line validation */
-const referenceUrlLineSchema = z
-  .string()
-  .refine(
-    (val) => {
-      if (!val.trim()) return true; // Empty is OK
-      return val.startsWith("http://") || val.startsWith("https://");
-    },
-    { message: "URL must start with http:// or https://" }
-  );
 
 /** Schema for generation form */
 export const generateFormSchema = z
@@ -183,20 +170,6 @@ export const generateFormSchema = z
   );
 
 export type GenerateFormData = z.infer<typeof generateFormSchema>;
-
-/** Schema for file upload */
-export const uploadFileSchema = z.object({
-  file: z
-    .instanceof(File)
-    .refine((file) => file.type.startsWith("image/"), {
-      message: "Please select an image file",
-    })
-    .refine((file) => file.size <= 5 * 1024 * 1024, {
-      message: "Image must be less than 5MB",
-    }),
-});
-
-export type UploadFileData = z.infer<typeof uploadFileSchema>;
 
 // ============================================================================
 // Form Error Types

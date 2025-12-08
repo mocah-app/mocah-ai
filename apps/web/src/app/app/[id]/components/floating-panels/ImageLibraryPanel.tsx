@@ -1,6 +1,7 @@
 "use client";
 
-import React, { useState, useCallback } from "react";
+import React, { useState, useCallback, useEffect, useRef } from "react";
+import Image from "next/image";
 import { Button } from "@/components/ui/button";
 import {
   Select,
@@ -28,6 +29,8 @@ import { useTemplate } from "../providers/TemplateProvider";
 import { useOrganization } from "@/contexts/organization-context";
 import { ImagePreviewModal, type PreviewImageAsset } from "./ImagePreviewModal";
 import { useRouter, useSearchParams } from "next/navigation";
+import { Skeleton } from "@/components/ui/skeleton";
+import { useDebouncedValue } from "@/hooks/use-debounced-value";
 
 // ============================================================================
 // Types
@@ -54,10 +57,14 @@ export function ImageLibraryPanel({ isOpen, onClose }: ImageLibraryPanelProps) {
   // Filters
   const [scope, setScope] = useState<"template" | "org">("org");
   const [searchQuery, setSearchQuery] = useState("");
+  const debouncedSearch = useDebouncedValue(searchQuery, 300);
 
   // Preview modal
   const [previewOpen, setPreviewOpen] = useState(false);
   const [previewImageId, setPreviewImageId] = useState<string | undefined>();
+
+  // Infinite scroll sentinel ref
+  const sentinelRef = useRef<HTMLDivElement>(null);
 
   // Open Image Studio via URL param
   const handleOpenImageStudio = useCallback(() => {
@@ -66,7 +73,7 @@ export function ImageLibraryPanel({ isOpen, onClose }: ImageLibraryPanelProps) {
     router.push(`/app/${templateId}?${params.toString()}`, { scroll: false });
   }, [router, searchParams, templateId]);
 
-  // Fetch images
+  // Fetch images with server-side search (only when panel is open)
   const {
     data: imageData,
     isLoading,
@@ -76,22 +83,34 @@ export function ImageLibraryPanel({ isOpen, onClose }: ImageLibraryPanelProps) {
   } = trpc.imageAsset.list.useInfiniteQuery(
     {
       templateId: scope === "template" ? templateId : undefined,
+      search: debouncedSearch || undefined,
       limit: 30,
     },
     {
-      enabled: scope === "org" ? !!organizationId : !!templateId,
+      enabled: isOpen && (scope === "org" ? !!organizationId : !!templateId),
       getNextPageParam: (lastPage) => lastPage.nextCursor,
     }
   );
 
-  const allImages = imageData?.pages.flatMap((page) => page.items) ?? [];
+  const filteredImages = imageData?.pages.flatMap((page) => page.items) ?? [];
 
-  // Filter by search query (client-side for prompts)
-  const filteredImages = searchQuery
-    ? allImages.filter((img) =>
-        img.prompt?.toLowerCase().includes(searchQuery.toLowerCase())
-      )
-    : allImages;
+  // Infinite scroll: observe sentinel element
+  useEffect(() => {
+    const sentinel = sentinelRef.current;
+    if (!sentinel || !hasNextPage || isFetchingNextPage) return;
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries[0]?.isIntersecting && hasNextPage && !isFetchingNextPage) {
+          fetchNextPage();
+        }
+      },
+      { rootMargin: "100px" }
+    );
+
+    observer.observe(sentinel);
+    return () => observer.disconnect();
+  }, [hasNextPage, isFetchingNextPage, fetchNextPage]);
 
   // ============================================================================
   // Handlers
@@ -188,8 +207,10 @@ export function ImageLibraryPanel({ isOpen, onClose }: ImageLibraryPanelProps) {
         <ScrollArea className="flex-1 min-h-0 overflow-hidden">
           <div className="p-3">
             {isLoading ? (
-              <div className="flex items-center justify-center h-32">
-                <Loader2 className="size-6 animate-spin text-muted-foreground" />
+              <div className="grid grid-cols-2 gap-2">
+                {Array.from({ length: 6 }).map((_, i) => (
+                  <Skeleton key={i} className="aspect-square rounded-md" />
+                ))}
               </div>
             ) : filteredImages.length === 0 ? (
               <div className="flex flex-col items-center justify-center h-32 text-muted-foreground">
@@ -204,7 +225,7 @@ export function ImageLibraryPanel({ isOpen, onClose }: ImageLibraryPanelProps) {
             ) : (
               <>
                 <div className="grid grid-cols-2 gap-2">
-                  {filteredImages.map((image) => (
+                  {filteredImages.map((image, index) => (
                     <div
                       key={image.id}
                       role="button"
@@ -218,11 +239,16 @@ export function ImageLibraryPanel({ isOpen, onClose }: ImageLibraryPanelProps) {
                         }
                       }}
                     >
-                      <img
+                      <Image
                         src={image.url}
                         alt={image.prompt || "Generated image"}
-                        className="absolute inset-0 w-full h-full object-contain transition-transform group-hover:scale-105"
-                        loading="lazy"
+                        fill
+                        sizes="(max-width: 768px) 50vw, 150px"
+                        className="object-contain transition-transform group-hover:scale-105"
+                        loading={index < 4 ? "eager" : "lazy"}
+                        priority={index < 2}
+                        placeholder={image.blurDataUrl ? "blur" : "empty"}
+                        blurDataURL={image.blurDataUrl ?? undefined}
                       />
                       {/* Hover/Focus Overlay */}
                       <div className="absolute inset-0 bg-black/0 group-hover:bg-black/40 group-focus-within:bg-black/40 transition-colors" />
@@ -256,27 +282,12 @@ export function ImageLibraryPanel({ isOpen, onClose }: ImageLibraryPanelProps) {
                     </div>
                   ))}
                 </div>
-                {/* Load More */}
-                {hasNextPage && (
-                  <div className="flex justify-center mt-3">
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => fetchNextPage()}
-                      disabled={isFetchingNextPage}
-                      className="h-7 text-xs"
-                    >
-                      {isFetchingNextPage ? (
-                        <>
-                          <Loader2 className="size-3 mr-1.5 animate-spin" />
-                          Loading...
-                        </>
-                      ) : (
-                        "Load More"
-                      )}
-                    </Button>
-                  </div>
-                )}
+                {/* Infinite scroll sentinel & loading indicator */}
+                <div ref={sentinelRef} className="h-4 flex justify-center mt-3">
+                  {isFetchingNextPage && (
+                    <Loader2 className="size-4 animate-spin text-muted-foreground" />
+                  )}
+                </div>
               </>
             )}
           </div>

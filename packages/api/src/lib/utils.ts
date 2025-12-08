@@ -1,6 +1,5 @@
 import { PutObjectCommand } from "@aws-sdk/client-s3";
 import { experimental_generateImage as generateImage } from "ai";
-import { z } from "zod";
 import prisma from "@mocah/db";
 import {
   getImageModel,
@@ -14,7 +13,15 @@ import {
   getPublicUrl,
   s3Client,
 } from "@mocah/api/lib/s3";
-import { logger } from "@mocah/shared";
+import {
+  processGeneratedImage,
+  getContentType,
+} from "@mocah/api/lib/image-processing";
+import {
+  logger,
+  imageGenerationInputSchema,
+  type ImageGenerationInput,
+} from "@mocah/shared";
 
 // JSONValue type for providerOptions
 type JSONValue =
@@ -67,41 +74,8 @@ function usesImageSizeParam(modelId: string): boolean {
   );
 }
 
-const ASPECT_RATIOS = [
-  "auto",
-  "21:9",
-  "16:9",
-  "3:2",
-  "4:3",
-  "5:4",
-  "1:1",
-  "4:5",
-  "3:4",
-  "2:3",
-  "9:16",
-] as const;
-
-const OUTPUT_FORMATS = ["png", "jpeg", "webp"] as const;
-const RESOLUTIONS = ["1K", "2K", "4K"] as const;
-
-export const imageGenerationInputSchema = z.object({
-  prompt: z.string().min(1),
-  organizationId: z.string(),
-  templateId: z.string().optional(),
-  versionId: z.string().optional(),
-  imageUrls: z.array(z.string().url()).optional(),
-  numImages: z.number().int().min(1).max(4).optional(),
-  aspectRatio: z.enum(ASPECT_RATIOS).optional(),
-  outputFormat: z.enum(OUTPUT_FORMATS).optional(),
-  resolution: z.enum(RESOLUTIONS).optional(),
-  limitGenerations: z.boolean().optional(),
-  enableWebSearch: z.boolean().optional(),
-  guidanceScale: z.number().min(1).max(20).optional(),
-  strength: z.number().min(0).max(1).optional(),
-  model: z.string().optional(),
-});
-
-export type ImageGenerationInput = z.infer<typeof imageGenerationInputSchema>;
+// Re-export from shared for backwards compatibility
+export { imageGenerationInputSchema, type ImageGenerationInput };
 
 interface GenerationContext {
   userId: string;
@@ -302,12 +276,11 @@ export async function runFalImageGeneration(
 
   const uploads = await Promise.all(
     processedImages.map(async (img, index) => {
-      let buffer: Buffer;
-      let contentType = img.content_type;
+      let originalBuffer: Buffer;
 
       if (img.buffer) {
         // Use buffer directly from base64/uint8Array data
-        buffer = img.buffer;
+        originalBuffer = img.buffer;
       } else if (img.url) {
         // Legacy: download from URL
         const response = await fetch(img.url);
@@ -315,39 +288,49 @@ export async function runFalImageGeneration(
           throw new Error(`Failed to download image from Fal: ${response.status}`);
         }
         const arrayBuffer = await response.arrayBuffer();
-        buffer = Buffer.from(arrayBuffer);
-        contentType = img.content_type || response.headers.get("content-type") || "image/png";
+        originalBuffer = Buffer.from(arrayBuffer);
       } else {
         throw new Error("Image has neither buffer nor URL");
       }
 
-      const extension =
-        input.outputFormat === "jpeg"
-          ? "jpg"
-          : input.outputFormat || inferExtension(contentType) || "png";
-
+      // Process the generated image (optimize + generate blur placeholder)
+      const processed = await processGeneratedImage(originalBuffer, input.outputFormat);
+      
+      const extension = processed.format === "jpeg" ? "jpg" : processed.format;
       const filePath = generateStoragePath(
         `mocah-image-${Date.now()}-${index}.${extension}`,
         "images"
       );
 
+      const finalContentType = getContentType(processed.format);
+
       await s3Client.send(
         new PutObjectCommand({
           Bucket: TIGRIS_BUCKET,
           Key: filePath,
-          Body: buffer,
-          ContentType: contentType || "image/png",
+          Body: processed.buffer,
+          ContentType: finalContentType,
           Metadata: {
             "user-id": ctx.userId,
             "organization-id": input.organizationId,
             ...(input.templateId ? { "template-id": input.templateId } : {}),
             ...(input.versionId ? { "version-id": input.versionId } : {}),
+            optimized: "true",
           },
           ServerSideEncryption: "AES256",
         })
       );
 
       const publicUrl = getPublicUrl(filePath);
+
+      // Log compression stats
+      const savings = ((1 - processed.size / originalBuffer.length) * 100).toFixed(1);
+      logger.info("🖼️ Generated image optimized", {
+        original: `${(originalBuffer.length / 1024).toFixed(1)}KB`,
+        optimized: `${(processed.size / 1024).toFixed(1)}KB`,
+        savings: `${savings}%`,
+        dimensions: `${processed.width}x${processed.height}`,
+      });
 
       const record = await prisma.imageAsset.create({
         data: {
@@ -360,15 +343,18 @@ export async function runFalImageGeneration(
           requestId,
           url: publicUrl,
           storageKey: filePath,
-          contentType: contentType || "image/png",
+          contentType: finalContentType,
           aspectRatio: input.aspectRatio,
-          width: img.width,
-          height: img.height,
+          width: processed.width,
+          height: processed.height,
+          blurDataUrl: processed.blurDataUrl,
           nsfw: img.nsfw || false,
           metadata: {
             provider: "fal",
             requestId,
             providerMetadata: falMetadata,
+            originalSize: originalBuffer.length,
+            optimizedSize: processed.size,
           },
         },
       });
@@ -378,6 +364,7 @@ export async function runFalImageGeneration(
         url: record.url,
         width: record.width,
         height: record.height,
+        blurDataUrl: record.blurDataUrl,
         contentType: record.contentType,
         aspectRatio: record.aspectRatio,
         nsfw: record.nsfw,
@@ -407,10 +394,105 @@ export async function runFalImageGeneration(
   };
 }
 
-function inferExtension(contentType?: string | null) {
-  if (!contentType) return null;
-  if (contentType.includes("jpeg")) return "jpg";
-  if (contentType.includes("png")) return "png";
-  if (contentType.includes("webp")) return "webp";
-  return null;
+// ============================================================================
+// External Image Re-upload to CDN
+// ============================================================================
+
+const MAX_IMAGE_SIZE = 5 * 1024 * 1024; // 5MB
+
+/**
+ * Re-upload an external image URL to our CDN for reliability
+ * Returns the CDN URL if successful, or the original URL on failure
+ */
+export async function reuploadExternalImageToCdn(
+  url: string,
+  options: {
+    type?: "logo" | "image" | "favicon" | "og";
+    userId?: string;
+  } = {}
+): Promise<{ url: string; wasReuploaded: boolean }> {
+  const { type = "image", userId } = options;
+
+  // Skip if already on our CDN
+  if (url.includes("mocah.ai") || url.includes("storage.mocah.ai")) {
+    return { url, wasReuploaded: false };
+  }
+
+  // Skip data URLs
+  if (url.startsWith("data:")) {
+    return { url, wasReuploaded: false };
+  }
+
+  try {
+    // Download the external image
+    const response = await fetch(url, {
+      headers: {
+        "User-Agent": "Mocah/1.0 (Brand Asset Fetcher)",
+      },
+      signal: AbortSignal.timeout(10000), // 10s timeout
+    });
+
+    if (!response.ok) {
+      logger.warn(`[reuploadExternalImageToCdn] Failed to fetch: ${response.status}`, { url });
+      return { url, wasReuploaded: false };
+    }
+
+    const contentType = response.headers.get("content-type") || "image/png";
+    const arrayBuffer = await response.arrayBuffer();
+    const buffer = Buffer.from(arrayBuffer);
+
+    // Validate size
+    if (buffer.length > MAX_IMAGE_SIZE) {
+      logger.warn("[reuploadExternalImageToCdn] File too large", { url, size: buffer.length });
+      return { url, wasReuploaded: false };
+    }
+
+    // Validate content type
+    const validTypes = ["image/png", "image/jpeg", "image/jpg", "image/webp", "image/svg+xml", "image/gif", "image/x-icon", "image/vnd.microsoft.icon"];
+    const normalizedType = (contentType.split(";")[0] || "").trim();
+    if (!validTypes.includes(normalizedType)) {
+      logger.warn(`[reuploadExternalImageToCdn] Invalid content type: ${contentType}`, { url });
+      return { url, wasReuploaded: false };
+    }
+
+    // Extract filename from URL or generate one
+    const urlPath = new URL(url).pathname;
+    const originalName = urlPath.split("/").pop() || `${type}-${Date.now()}`;
+    const ext = normalizedType.split("/")[1]?.replace("x-icon", "ico").replace("vnd.microsoft.icon", "ico") || "png";
+    const filename = originalName.includes(".") ? originalName : `${originalName}.${ext}`;
+
+    // Generate storage path based on type
+    const prefixMap: Record<string, string> = {
+      logo: "logos",
+      favicon: "favicons",
+      og: "og-images",
+      image: "images",
+    };
+    const prefix = prefixMap[type] || "images";
+    const filePath = generateStoragePath(filename, prefix);
+
+    // Upload to our CDN
+    const putCommand = new PutObjectCommand({
+      Bucket: TIGRIS_BUCKET,
+      Key: filePath,
+      Body: buffer,
+      ContentType: normalizedType,
+      Metadata: {
+        ...(userId && { "user-id": userId }),
+        "source-url": encodeURIComponent(url.substring(0, 500)),
+        "upload-timestamp": Date.now().toString(),
+      },
+      ServerSideEncryption: "AES256",
+    });
+
+    await s3Client.send(putCommand);
+
+    const cdnUrl = getPublicUrl(filePath);
+    logger.info(`[reuploadExternalImageToCdn] Success`, { from: url, to: cdnUrl });
+
+    return { url: cdnUrl, wasReuploaded: true };
+  } catch (error) {
+    logger.error("[reuploadExternalImageToCdn] Error", { url, error });
+    return { url, wasReuploaded: false };
+  }
 }

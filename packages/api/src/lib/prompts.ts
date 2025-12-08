@@ -102,6 +102,29 @@ import { Html, Head, Body, Container, Section, Text, Heading, Button, Img, Link,
 import * as React from 'react';`;
 
 // ============================================================================
+// SOCIAL ICONS CDN - ~100 tokens
+// ============================================================================
+
+const SOCIAL_ICONS_CDN = `SOCIAL ICONS:
+For social media icons, use our CDN: https://cdn.mocah.ai/icons/{platform}.png
+
+Available icons: twitter, facebook, instagram, linkedin, youtube, tiktok, pinterest, 
+snapchat, reddit, discord, whatsapp, telegram, apple, google, github, dribbble, behance, 
+medium, spotify, twitch, slack, x
+
+Examples:
+- Twitter/X: https://cdn.mocah.ai/icons/twitter.png or https://cdn.mocah.ai/icons/x.png
+- Facebook: https://cdn.mocah.ai/icons/facebook.png
+- Instagram: https://cdn.mocah.ai/icons/instagram.png
+- LinkedIn: https://cdn.mocah.ai/icons/linkedin.png
+
+Usage: <Img src="https://cdn.mocah.ai/icons/twitter.png" alt="Twitter" width="24" height="24" />
+
+Center all the icons in the footer.
+
+`;
+
+// ============================================================================
 // TIER 3: STYLE GUIDELINES - ~250 tokens
 // ============================================================================
 
@@ -240,9 +263,10 @@ function buildBrandSection(brandKit?: BrandKit): string {
     sections.push(`VISUAL IDENTITY: ${visualParts.join(" | ")}`);
   }
 
-  // Logo (include if available for image reference)
+  // Logo - critical for brand consistency
   if (brandKit.logo && !brandKit.logo.startsWith('data:')) {
-    sections.push(`LOGO URL: ${brandKit.logo}`);
+    sections.push(`BRAND LOGO: ${brandKit.logo}
+⚠️ ALWAYS use this exact logo URL in the email header. Do NOT use placeholder images or omit the logo.`);
   }
 
   // Website Summary (if available from scraping)
@@ -258,6 +282,7 @@ function buildBrandSection(brandKit?: BrandKit): string {
 
   return `\n=== BRAND GUIDELINES ===\n${sections.join("\n")}\n========================\n
 IMPORTANT: Apply these brand guidelines throughout the email:
+- ALWAYS include the brand logo in the email header using the exact URL provided above
 - Use the brand colors (primary for CTAs, accent for highlights)
 - Match the brand voice and tone in all copy
 - Speak to the target audience appropriately
@@ -327,6 +352,7 @@ ${buildBrandSection(brandKit)}`,
     CRITICAL_RULES,
     COMPONENT_REFERENCE,
     STYLE_GUIDELINES,
+    SOCIAL_ICONS_CDN,
     CONTENT_GUIDELINES,
   ];
 
@@ -368,6 +394,8 @@ MODIFICATION RULES:
 - Respect previous customizations
 
 ${CRITICAL_RULES}
+
+${SOCIAL_ICONS_CDN}
 
 ${VALIDATION_CHECKLIST}
 
@@ -503,6 +531,7 @@ export const STATIC_PROMPT_SECTIONS = {
   criticalRules: CRITICAL_RULES,
   componentReference: COMPONENT_REFERENCE,
   styleGuidelines: STYLE_GUIDELINES,
+  socialIconsCdn: SOCIAL_ICONS_CDN,
   contentGuidelines: CONTENT_GUIDELINES,
   validation: VALIDATION_CHECKLIST,
   designPhilosophy: DESIGN_PHILOSOPHY,

@@ -295,15 +295,30 @@ function BrandSetupContent() {
 
         if (!newOrg) throw new Error("Failed to create organization");
 
-      // Upload logo if we have a file
+      // Upload logo if we have a file, or re-upload external scraped logo to our CDN
       let logoUrl = values.logo || "";
       if (logoFile) {
-          const fileData = await fileToApiFormat(logoFile);
-          const uploadResult = await uploadLogoMutation.mutateAsync({
-            file: fileData,
-            organizationId: newOrg.id,
+        // User uploaded a new logo file
+        const fileData = await fileToApiFormat(logoFile);
+        const uploadResult = await uploadLogoMutation.mutateAsync({
+          file: fileData,
+          organizationId: newOrg.id,
+        });
+        logoUrl = uploadResult.url;
+      } else if (logoUrl && !logoUrl.startsWith("data:") && !logoUrl.includes("mocah.ai")) {
+        // We have a scraped external logo - re-upload to our CDN for reliability
+        try {
+          const reuploadResult = await trpcClient.storage.reuploadExternalImage.mutate({
+            url: logoUrl,
+            type: "logo",
           });
-          logoUrl = uploadResult.url;
+          if (reuploadResult.wasReuploaded) {
+            logoUrl = reuploadResult.url;
+          }
+        } catch (e) {
+          // If re-upload fails, continue with external URL (non-blocking)
+          console.warn("Failed to re-upload logo to CDN, using external URL:", e);
+        }
       }
 
       // Update organization with brand kit

@@ -10,6 +10,7 @@ import { TRPCError } from "@trpc/server";
 import { protectedProcedure, router } from "../index";
 import { scrapeBrand, isValidUrl, normalizeUrl } from "../lib/firecrawl";
 import { mapFirecrawlToBrandKit } from "../lib/brand-mapper";
+import { reuploadExternalImageToCdn } from "../lib/utils";
 import type { Prisma } from "@mocah/db";
 
 // ============================================================================
@@ -119,6 +120,20 @@ export const brandBuilderRouter = router({
 
         const mappedData = mapFirecrawlToBrandKit(result.data);
 
+        // Re-upload external images to our CDN for reliability
+        const userId = ctx.session.user.id;
+        const [logoResult, faviconResult, ogImageResult] = await Promise.all([
+          mappedData.logo 
+            ? reuploadExternalImageToCdn(mappedData.logo, { type: "logo", userId }) 
+            : { url: null, wasReuploaded: false },
+          mappedData.favicon 
+            ? reuploadExternalImageToCdn(mappedData.favicon, { type: "favicon", userId }) 
+            : { url: null, wasReuploaded: false },
+          mappedData.ogImage 
+            ? reuploadExternalImageToCdn(mappedData.ogImage, { type: "og", userId }) 
+            : { url: null, wasReuploaded: false },
+        ]);
+
         // Prepare data for Prisma (handle null -> undefined conversion for JSON fields)
         const brandKitData = {
           // Colors
@@ -133,10 +148,10 @@ export const brandBuilderRouter = router({
           // Layout
           borderRadius: mappedData.borderRadius,
 
-          // Images
-          logo: mappedData.logo,
-          favicon: mappedData.favicon,
-          ogImage: mappedData.ogImage,
+          // Images - use CDN URLs when available
+          logo: logoResult.url,
+          favicon: faviconResult.url,
+          ogImage: ogImageResult.url,
 
           // Personality
           brandVoice: mappedData.brandVoice,

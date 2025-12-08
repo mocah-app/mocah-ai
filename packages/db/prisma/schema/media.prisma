@@ -17,6 +17,7 @@ model ImageAsset {
   width           Int?
   height          Int?
   nsfw            Boolean  @default(false)
+  blurDataUrl     String?  @db.Text // Base64 LQIP placeholder for next/image blur
   metadata        Json?
   createdAt       DateTime @default(now())
 

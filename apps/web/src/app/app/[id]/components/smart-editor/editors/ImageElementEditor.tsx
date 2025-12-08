@@ -1,26 +1,36 @@
 "use client";
 
-import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import React, { useCallback, useMemo, useRef, useState } from "react";
+import Image from "next/image";
 import type { ElementData, ElementUpdates } from "@/lib/react-email";
 import type { BrandColors } from "../EditorShell";
 import { LayoutSection } from "../sections";
 import { PropertySection, SelectControl, TextInputControl } from "../controls";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
-import {
-  Loader2,
-  Sparkles,
-  Upload,
-  FolderOpen,
-  Image as ImageIcon,
-} from "lucide-react";
+import { Sparkles, Upload } from "lucide-react";
 import { useTemplate } from "../../providers/TemplateProvider";
 import { useOrganization } from "@/contexts/organization-context";
 import { trpc } from "@/utils/trpc";
-import { cn } from "@/lib/utils";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useImageStudio } from "../../image-studio/ImageStudioContext";
+import { useImageUpload } from "../../image-studio/hooks";
 import Loader from "@/components/loader";
+
+// Check if URL is from an allowed domain for next/image optimization
+function isAllowedImageDomain(url: string): boolean {
+  try {
+    const parsedUrl = new URL(url);
+    const allowedHosts = [
+      "images.unsplash.com",
+      "storage.mocah.ai",
+      "fly.storage.tigris.dev",
+    ];
+    return allowedHosts.some((host) => parsedUrl.hostname === host);
+  } catch {
+    return false;
+  }
+}
 
 // ============================================================================
 // Types & Constants
@@ -67,27 +77,10 @@ export function ImageElementEditor({
   // Library state
   const [libraryScope, setLibraryScope] = useState<"template" | "org">("template");
 
-  // Upload state
-  const [isUploading, setIsUploading] = useState(false);
-
   const organizationId = useMemo(
     () =>
       templateState.currentTemplate?.organizationId || activeOrganization?.id,
     [templateState.currentTemplate?.organizationId, activeOrganization?.id]
-  );
-
-  // Fetch recent images
-  const {
-    data: recentImages,
-    isLoading: imagesLoading,
-    refetch: refetchImages,
-  } = trpc.imageAsset.list.useQuery(
-    libraryScope === "template" && templateId
-      ? { templateId, limit: 12 }
-      : { limit: 12 },
-    {
-      enabled: libraryScope === "org" ? !!organizationId : !!templateId,
-    }
   );
 
   // ============================================================================
@@ -111,20 +104,28 @@ export function ImageElementEditor({
     [onUpdate, elementData.attributes?.alt]
   );
 
-  // Upload mutation
-  const uploadMutation = trpc.storage.uploadImage.useMutation({
-    onSuccess: (data: { url: string }) => {
-      handleImageSelect(data.url);
-      refetchImages();
-      toast.success("Image uploaded successfully");
-    },
-    onError: (error: { message?: string }) => {
-      toast.error(error.message || "Failed to upload image");
-    },
-    onSettled: () => {
-      setIsUploading(false);
+  // Presigned upload hook
+  const { uploadFile, isUploading } = useImageUpload({
+    organizationId,
+    templateId,
+    onSuccess: (image) => {
+      handleImageSelect(image.url, image.width, image.height);
     },
   });
+
+  // Fetch recent images
+  const {
+    data: recentImages,
+    isLoading: imagesLoading,
+    refetch: refetchImages,
+  } = trpc.imageAsset.list.useQuery(
+    libraryScope === "template" && templateId
+      ? { templateId, limit: 12 }
+      : { limit: 12 },
+    {
+      enabled: libraryScope === "org" ? !!organizationId : !!templateId,
+    }
+  );
 
   // Open Image Studio via URL param
   const handleOpenImageStudio = useCallback(() => {
@@ -164,46 +165,15 @@ export function ImageElementEditor({
       const file = e.target.files?.[0];
       if (!file) return;
 
-      // Validate file type
-      if (!file.type.startsWith("image/")) {
-        toast.error("Please select an image file");
-        return;
-      }
-
-      // Validate file size (max 5MB)
-      if (file.size > 5 * 1024 * 1024) {
-        toast.error("Image must be less than 5MB");
-        return;
-      }
-
-      setIsUploading(true);
-
-      // Convert to base64
-      const reader = new FileReader();
-      reader.onload = () => {
-        const base64 = (reader.result as string).split(",")[1];
-        uploadMutation.mutate({
-          file: {
-            name: file.name,
-            type: file.type,
-            size: file.size,
-            base64Data: base64,
-          },
-          templateId,
-        });
-      };
-      reader.onerror = () => {
-        toast.error("Failed to read file");
-        setIsUploading(false);
-      };
-      reader.readAsDataURL(file);
+      // Use the presigned upload hook
+      await uploadFile(file);
 
       // Reset input
       if (fileInputRef.current) {
         fileInputRef.current.value = "";
       }
     },
-    [uploadMutation, templateId]
+    [uploadFile]
   );
 
   // ============================================================================
@@ -218,12 +188,24 @@ export function ImageElementEditor({
       <PropertySection label="Image">
         {/* Current Image Preview */}
         {currentSrc && (
-          <div className="relative rounded-lg overflow-hidden border border-border bg-muted/50 mb-3">
-            <img
-              src={currentSrc}
-              alt={currentAlt || "Image preview"}
-              className="w-full h-auto max-h-40 object-contain"
-            />
+          <div className="relative rounded-lg overflow-hidden border border-border bg-muted/50 mb-3 aspect-video">
+            {isAllowedImageDomain(currentSrc) ? (
+              <Image
+                src={currentSrc}
+                alt={currentAlt || "Image preview"}
+                fill
+                sizes="300px"
+                className="object-contain"
+              />
+            ) : (
+              // Fallback to img for external URLs not in allowed domains
+              // eslint-disable-next-line @next/next/no-img-element
+              <img
+                src={currentSrc}
+                alt={currentAlt || "Image preview"}
+                className="w-full h-full object-contain"
+              />
+            )}
           </div>
         )}
 

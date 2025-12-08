@@ -24,6 +24,8 @@
   "dependencies": {
     "@ai-sdk/fal": "catalog:",
     "@aws-sdk/client-s3": "catalog:",
+    "@aws-sdk/s3-request-presigner": "catalog:",
+    "sharp": "^0.34.5",
     "@mocah/auth": "workspace:*",
     "@mocah/config": "workspace:*",
     "@mocah/db": "workspace:*",

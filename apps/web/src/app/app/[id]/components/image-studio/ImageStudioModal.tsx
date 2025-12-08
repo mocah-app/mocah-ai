@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useCallback, useEffect, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 import {
   Dialog,
   DialogContent,
@@ -13,11 +13,11 @@ import { toast } from "sonner";
 import { Sparkles, X } from "lucide-react";
 import { useTemplate } from "../providers/TemplateProvider";
 import { useOrganization } from "@/contexts/organization-context";
-import { trpc } from "@/utils/trpc";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useImageStudio } from "./ImageStudioContext";
 import { ImageStudioControls } from "./ImageStudioControls";
 import { ImageStudioPreview } from "./ImageStudioPreview";
+import { useImageUpload, useImageGeneration } from "./hooks";
 import {
   MODEL_AUTO,
   isWebpUnsupported,
@@ -67,15 +67,11 @@ export function ImageStudioModal() {
   );
 
   // Generation state
-  const [isGenerating, setIsGenerating] = useState(false);
   const [generatedImages, setGeneratedImages] = useState<GeneratedImage[]>([]);
   const [selectedImage, setSelectedImage] = useState<GeneratedImage | null>(
     null
   );
   const [loadingImages, setLoadingImages] = useState<Set<string>>(new Set());
-
-  // Upload state
-  const [isUploading, setIsUploading] = useState(false);
 
   // Tab state
   const [activeTab, setActiveTab] = useState<string>("generate");
@@ -83,6 +79,36 @@ export function ImageStudioModal() {
   const organizationId =
     templateState.currentTemplate?.organizationId || activeOrganization?.id;
   const templateId = templateState.currentTemplate?.id;
+  const versionId = templateState.currentTemplate?.currentVersionId;
+
+  // Upload hook (presigned URL flow)
+  const { uploadFile, isUploading } = useImageUpload({
+    organizationId,
+    templateId,
+    versionId,
+    onSuccess: (image) => {
+      setLoadingImages((prev) => new Set(prev).add(image.id));
+      setGeneratedImages((prev) => [image, ...prev]);
+      setSelectedImage(image);
+    },
+  });
+
+  // Generation hook (with cancellation support)
+  const { generate, cancel: cancelGeneration, isGenerating } = useImageGeneration({
+    organizationId,
+    templateId,
+    versionId,
+    onSuccess: (images) => {
+      // Mark new images as loading
+      setLoadingImages((prev) => {
+        const next = new Set(prev);
+        images.forEach((img) => next.add(img.id));
+        return next;
+      });
+      setGeneratedImages((prev) => [...images, ...prev]);
+      setSelectedImage(images[0] ?? null);
+    },
+  });
 
   // ============================================================================
   // Effects
@@ -98,13 +124,15 @@ export function ImageStudioModal() {
     );
   }, [router, searchParams, templateState.currentTemplate?.id]);
 
-  // Clear callback when modal closes
+  // Clear callback and cancel pending requests when modal closes
   useEffect(() => {
     if (!isOpen) {
       setOnImageSelect(null);
       setInitialImageUrl(undefined);
       setInitialPrompt(undefined);
       setInitialReferenceImageUrl(undefined);
+      // Cancel any in-flight generation
+      cancelGeneration();
     }
   }, [
     isOpen,
@@ -112,6 +140,7 @@ export function ImageStudioModal() {
     setInitialImageUrl,
     setInitialPrompt,
     setInitialReferenceImageUrl,
+    cancelGeneration,
   ]);
 
   // Initialize prompt and reference images from context when modal opens
@@ -162,124 +191,32 @@ export function ImageStudioModal() {
   }, [isCopied]);
 
   // ============================================================================
-  // Upload Mutation
-  // ============================================================================
-
-  const uploadMutation = trpc.storage.uploadImage.useMutation({
-    onSuccess: (data) => {
-      const newImage: GeneratedImage = {
-        id: data.id,
-        url: data.url,
-      };
-      setLoadingImages((prev) => new Set(prev).add(newImage.id));
-      setGeneratedImages((prev) => [newImage, ...prev]);
-      setSelectedImage(newImage);
-      toast.success("Image uploaded successfully");
-    },
-    onError: (error) => {
-      toast.error(error.message || "Failed to upload image");
-    },
-    onSettled: () => {
-      setIsUploading(false);
-    },
-  });
-
-  // ============================================================================
   // Handlers
   // ============================================================================
 
   const handleGenerate = useCallback(async () => {
-    if (!organizationId) {
-      toast.error("Select an organization before generating images.");
-      return;
-    }
-
-    setIsGenerating(true);
     setSelectedImage(null);
 
-    try {
-      const body: Record<string, unknown> = {
-        prompt: prompt.trim(),
-        organizationId,
-        templateId: templateState.currentTemplate?.id,
-        versionId: templateState.currentTemplate?.currentVersionId,
-        aspectRatio: aspectRatio !== "auto" ? aspectRatio : undefined,
-        outputFormat,
-        numImages: 1,
-      };
-
-      // Only pass model if explicitly selected (not "auto")
-      if (model && model !== MODEL_AUTO) {
-        body.model = model;
-      }
-
-      // Add reference images if enabled and provided
-      if (useReferenceImages && referenceImages.length > 0) {
-        body.imageUrls = referenceImages;
-      }
-
-      const response = await fetch("/api/image/generate", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(body),
-      });
-
-      const data = await response.json();
-      if (!response.ok) {
-        throw new Error(data?.error || "Failed to generate image");
-      }
-
-      const newImages: GeneratedImage[] = (data.images || []).map(
-        (img: any) => ({
-          id: img.id || crypto.randomUUID(),
-          url: img.url,
-          width: img.width,
-          height: img.height,
-        })
-      );
-
-      if (newImages.length === 0) {
-        throw new Error("No images generated");
-      }
-
-      // Mark new images as loading
-      setLoadingImages((prev) => {
-        const next = new Set(prev);
-        newImages.forEach((img) => next.add(img.id));
-        return next;
-      });
-
-      setGeneratedImages((prev) => [...newImages, ...prev]);
-      setSelectedImage(newImages[0]);
-      toast.success(
-        `${newImages.length} image${newImages.length > 1 ? "s" : ""} generated successfully!`
-      );
-    } catch (error) {
-      const message =
-        error instanceof Error ? error.message : "Failed to generate image";
-      toast.error(message);
-    } finally {
-      setIsGenerating(false);
-    }
+    await generate({
+      prompt,
+      model,
+      aspectRatio,
+      outputFormat,
+      imageUrls: useReferenceImages && referenceImages.length > 0 ? referenceImages : undefined,
+      numImages: 1,
+    });
   }, [
-    organizationId,
+    generate,
     prompt,
     model,
     aspectRatio,
     outputFormat,
     useReferenceImages,
     referenceImages,
-    templateState.currentTemplate?.id,
-    templateState.currentTemplate?.currentVersionId,
   ]);
 
   const handleFileUpload = useCallback(
     async (file: File) => {
-      if (!organizationId) {
-        toast.error("Select an organization before uploading images.");
-        return;
-      }
-
       // Validate with Zod
       const result = uploadFileSchema.safeParse({ file });
       if (!result.success) {
@@ -287,29 +224,10 @@ export function ImageStudioModal() {
         return;
       }
 
-      setIsUploading(true);
-
-      // Convert to base64
-      const reader = new FileReader();
-      reader.onload = () => {
-        const base64 = (reader.result as string).split(",")[1];
-        uploadMutation.mutate({
-          file: {
-            name: file.name,
-            type: file.type,
-            size: file.size,
-            base64Data: base64,
-          },
-          templateId,
-        });
-      };
-      reader.onerror = () => {
-        toast.error("Failed to read file");
-        setIsUploading(false);
-      };
-      reader.readAsDataURL(file);
+      // Use the presigned upload hook
+      await uploadFile(file);
     },
-    [organizationId, templateId, uploadMutation]
+    [uploadFile]
   );
 
   const handleCopyImageUrl = useCallback(() => {
@@ -361,6 +279,51 @@ export function ImageStudioModal() {
     });
   }, []);
 
+  const handleClearImages = useCallback(() => {
+    setGeneratedImages([]);
+    setSelectedImage(null);
+  }, []);
+
+  // Memoize control props to prevent unnecessary re-renders
+  const controlProps = useMemo(
+    () => ({
+      prompt,
+      setPrompt,
+      model,
+      setModel,
+      aspectRatio,
+      setAspectRatio,
+      outputFormat,
+      setOutputFormat,
+      useReferenceImages,
+      setUseReferenceImages,
+      referenceImageUrls,
+      setReferenceImageUrls,
+      referenceImages,
+      setReferenceImages,
+      onGenerate: handleGenerate,
+      onFileUpload: handleFileUpload,
+      isGenerating,
+      isUploading,
+      activeTab,
+      setActiveTab,
+    }),
+    [
+      prompt,
+      model,
+      aspectRatio,
+      outputFormat,
+      useReferenceImages,
+      referenceImageUrls,
+      referenceImages,
+      handleGenerate,
+      handleFileUpload,
+      isGenerating,
+      isUploading,
+      activeTab,
+    ]
+  );
+
   // ============================================================================
   // Render
   // ============================================================================
@@ -392,28 +355,7 @@ export function ImageStudioModal() {
         {/* Main Content */}
         <div className="flex flex-1 overflow-hidden">
           {/* Left Panel - Controls */}
-          <ImageStudioControls
-            prompt={prompt}
-            setPrompt={setPrompt}
-            model={model}
-            setModel={setModel}
-            aspectRatio={aspectRatio}
-            setAspectRatio={setAspectRatio}
-            outputFormat={outputFormat}
-            setOutputFormat={setOutputFormat}
-            useReferenceImages={useReferenceImages}
-            setUseReferenceImages={setUseReferenceImages}
-            referenceImageUrls={referenceImageUrls}
-            setReferenceImageUrls={setReferenceImageUrls}
-            referenceImages={referenceImages}
-            setReferenceImages={setReferenceImages}
-            onGenerate={handleGenerate}
-            onFileUpload={handleFileUpload}
-            isGenerating={isGenerating}
-            isUploading={isUploading}
-            activeTab={activeTab}
-            setActiveTab={setActiveTab}
-          />
+          <ImageStudioControls {...controlProps} />
 
           {/* Right Panel - Preview & Results */}
           <ImageStudioPreview
@@ -428,7 +370,7 @@ export function ImageStudioModal() {
             onUseAsReference={handleUseAsReference}
             onUseImage={handleUseImage}
             onCopyImageUrl={handleCopyImageUrl}
-            onClearImages={() => setGeneratedImages([])}
+            onClearImages={handleClearImages}
             onImageLoad={handleImageLoad}
             onImageLoadStart={handleImageLoadStart}
             onImageError={handleImageError}
