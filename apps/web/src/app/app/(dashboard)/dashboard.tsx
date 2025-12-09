@@ -230,7 +230,7 @@ export default function Dashboard() {
               {templates.length} of {templateCount}
             </span>
           )}
-          <Button onClick={handleCreateTemplate} className="self-end ml-auto" disabled={isDataLoading}>
+          <Button onClick={handleCreateTemplate} className="self-end ml-auto" disabled={orgLoading}>
             <Plus className="h-4 w-4" />
             Create
           </Button>

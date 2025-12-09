@@ -58,7 +58,7 @@ interface TemplateActions {
   deleteVersion: (versionId: string) => Promise<void>;
   updateElement: (elementPath: string, data: any) => void;
   regenerateElement: (elementPath: string, prompt: string) => Promise<void>;
-  regenerateTemplate: (prompt: string) => Promise<void>;
+  regenerateTemplate: (prompt: string, imageUrls?: string[]) => Promise<void>;
   generateTemplate: (prompt: string) => Promise<Template | null>;
   generateTemplateStream: (prompt: string, imageUrls?: string[]) => Promise<void>;
   cancelGeneration: () => void;
@@ -616,7 +616,7 @@ export function TemplateProvider({
   );
 
   const regenerateTemplate = useCallback(
-    async (prompt: string) => {
+    async (prompt: string, imageUrls?: string[]) => {
       if (!state.currentTemplate) {
         throw new Error("No template loaded");
       }
@@ -633,9 +633,10 @@ export function TemplateProvider({
         logger.info("🔄 [TemplateProvider] Starting template regeneration with streaming", {
           templateId: state.currentTemplate.id,
           promptPreview: prompt.substring(0, 100),
+          imageCount: imageUrls?.length || 0,
         });
 
-        await regenerateStream(prompt);
+        await regenerateStream(prompt, imageUrls);
       } catch (error) {
         console.error("Failed to regenerate template:", error);
         setState((prev) => ({

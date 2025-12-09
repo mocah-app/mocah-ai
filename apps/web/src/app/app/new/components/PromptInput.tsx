@@ -7,15 +7,8 @@ import React from "react";
 import Loader from "@/components/loader";
 import AttachmentPopover from "./AttachmentPopover";
 import ImagePreviewBlob from "./ImagePreviewBlob";
+import type { Attachment } from "@/types/images";
 
-export interface Attachment {
-  id: string;
-  url: string;
-  type: "upload" | "url";
-  status: "uploading" | "ready" | "error";
-  previewUrl: string;
-  fileName?: string;
-}
 
 export interface PromptInputProps {
   value: string;

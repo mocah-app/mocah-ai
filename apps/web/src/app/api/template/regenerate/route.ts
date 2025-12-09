@@ -37,7 +37,7 @@ export async function POST(req: NextRequest) {
     }
 
     // 2. Parse request body
-    const { prompt, templateId } = await req.json();
+    const { prompt, templateId, imageUrls } = await req.json();
 
     if (!prompt || !templateId) {
       return new Response(JSON.stringify({ error: "Missing required fields" }), {
@@ -120,6 +120,7 @@ export async function POST(req: NextRequest) {
       promptPreview: prompt.substring(0, 100),
       hasCurrentCode: !!template.reactEmailCode,
       currentCodeLength: template.reactEmailCode?.length || 0,
+      imageCount: (imageUrls as string[] | undefined)?.length || 0,
     });
 
     // 6. Start streaming with AI SDK (enhanced reliability)
@@ -132,12 +133,14 @@ export async function POST(req: NextRequest) {
         schemaDescription: TEMPLATE_SCHEMA_DESCRIPTION,
         temperature: 0.7,
         maxRetries: 3,
+        imageUrls: imageUrls as string[] | undefined, // Pass images as multi-modal content
         onError: (error: unknown) => {
           logger.error("Stream error in template regeneration", {
             error: String(error),
             userId: session.user.id,
             templateId,
             promptPreview: prompt.substring(0, 100),
+            imageCount: (imageUrls as string[] | undefined)?.length || 0,
           });
         },
       }

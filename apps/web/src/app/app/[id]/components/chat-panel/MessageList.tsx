@@ -7,9 +7,10 @@ interface MessageListProps {
   messages: Message[];
   isLoading: boolean;
   isOpen: boolean;
+  onImageClick?: (imageUrls: string[], clickedIndex: number) => void;
 }
 
-export const MessageList = ({ messages, isLoading, isOpen }: MessageListProps) => {
+export const MessageList = ({ messages, isLoading, isOpen, onImageClick }: MessageListProps) => {
   const showLoading = isLoading;
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
@@ -29,7 +30,13 @@ export const MessageList = ({ messages, isLoading, isOpen }: MessageListProps) =
       ) : (
         <>
           {messages.map((msg, index) => (
-            <MessageItem key={msg.id} message={msg} index={index} isOpen={isOpen} />
+            <MessageItem 
+              key={msg.id} 
+              message={msg} 
+              index={index} 
+              isOpen={isOpen}
+              onImageClick={onImageClick}
+            />
           ))}
           <div ref={messagesEndRef} />
         </>

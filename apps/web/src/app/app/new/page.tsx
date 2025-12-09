@@ -1,16 +1,8 @@
 "use client";
 
+import { useImageUpload } from "@/app/app/[id]/components/image-studio/hooks/useImageUpload";
 import DashboardHeader from "@/components/dashboardHeader";
 import { Button } from "@/components/ui/button";
-import { useOrganization } from "@/contexts/organization-context";
-import { useTemplateCreation } from "@/utils/store-prompt-in-session";
-import { trpc } from "@/utils/trpc";
-import { CircleChevronUp } from "lucide-react";
-import { useRouter } from "next/navigation";
-import React, { useState, useRef, useCallback } from "react";
-import { toast } from "sonner";
-import PromptInput, { type Attachment } from "./components/PromptInput";
-import { useImageUpload } from "@/app/app/[id]/components/image-studio/hooks/useImageUpload";
 import {
   Dialog,
   DialogContent,
@@ -20,6 +12,15 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
+import { useOrganization } from "@/contexts/organization-context";
+import type { Attachment } from "@/types/images";
+import { useTemplateCreation } from "@/utils/store-prompt-in-session";
+import { trpc } from "@/utils/trpc";
+import { CircleChevronUp } from "lucide-react";
+import { useRouter } from "next/navigation";
+import React, { useCallback, useRef, useState } from "react";
+import { toast } from "sonner";
+import PromptInput from "./components/PromptInput";
 
 export default function NewTemplatePage() {
   const router = useRouter();

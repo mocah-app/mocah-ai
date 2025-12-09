@@ -25,13 +25,31 @@ interface MessageItemProps {
   message: Message;
   index: number;
   isOpen: boolean;
+  onImageClick?: (imageUrls: string[], clickedIndex: number) => void;
 }
 
-export const MessageItem = ({ message, index, isOpen }: MessageItemProps) => {
+export const MessageItem = ({
+  message,
+  index,
+  isOpen,
+  onImageClick,
+}: MessageItemProps) => {
   const { state: templateState } = useTemplate();
 
   return (
     <div>
+      {/* Show attached images for user messages - above the message bubble */}
+      {message.role === "user" &&
+        message.imageUrls &&
+        message.imageUrls.length > 0 && (
+          <div className="flex justify-end mb-2">
+            <MessageImageList
+              imageUrls={message.imageUrls}
+              onImageClick={onImageClick}
+            />
+          </div>
+        )}
+
       <div
         className={cn(
           "flex gap-3 transition-all duration-300 ease-in-out",
@@ -42,7 +60,7 @@ export const MessageItem = ({ message, index, isOpen }: MessageItemProps) => {
       >
         <div
           className={cn(
-            "p-3 rounded-lg text-sm max-w-[80%] whitespace-pre-wrap wrap-break-word relative",
+            "p-3 rounded-lg text-sm max-w-[95%] whitespace-pre-wrap wrap-break-word relative",
             message.role === "assistant"
               ? "text-muted-foreground"
               : "bg-secondary text-secondary-foreground max-h-80 overflow-y-auto",
@@ -57,28 +75,11 @@ export const MessageItem = ({ message, index, isOpen }: MessageItemProps) => {
           ) : (
             <>
               {message.content}
-              
-              {/* Show attached images for user messages */}
-              {message.role === "user" && message.imageUrls && message.imageUrls.length > 0 && (
-                <div className="mt-3 flex gap-2 flex-wrap">
-                  {message.imageUrls.map((url, idx) => (
-                    <div key={idx} className="relative w-20 h-20 rounded-lg overflow-hidden border border-border">
-                      <Image
-                        src={url}
-                        alt={`Attachment ${idx + 1}`}
-                        fill
-                        className="object-cover"
-                        unoptimized
-                      />
-                    </div>
-                  ))}
-                </div>
-              )}
-              
+
               {message.persistenceError && (
                 <div className="mt-2 text-xs text-amber-600 dark:text-amber-500 flex items-center gap-1">
                   <span>⚠️</span>
-                  <span>Not saved to database</span>
+                  <span>Message not saved</span>
                 </div>
               )}
             </>
@@ -90,14 +91,15 @@ export const MessageItem = ({ message, index, isOpen }: MessageItemProps) => {
       {message.role === "assistant" && (
         <>
           {/* While streaming: show live progress with full code */}
-          {message.isStreaming && templateState.streamingProgress?.reactEmailCode && (
-            <div className="mt-3 space-y-2 animate-in fade-in slide-in-from-bottom-4">
-              <StreamingProgress
-                progress={templateState.streamingProgress}
-                isComplete={false}
-              />
-            </div>
-          )}
+          {message.isStreaming &&
+            templateState.streamingProgress?.reactEmailCode && (
+              <div className="mt-3 space-y-2 animate-in fade-in slide-in-from-bottom-4">
+                <StreamingProgress
+                  progress={templateState.streamingProgress}
+                  isComplete={false}
+                />
+              </div>
+            )}
           {/* After completion: show saved generation result with code preview */}
           {!message.isStreaming && message.generationResult?.codePreview && (
             <div className="mt-3 space-y-2">
@@ -117,3 +119,34 @@ export const MessageItem = ({ message, index, isOpen }: MessageItemProps) => {
   );
 };
 
+interface MessageImageListProps {
+  imageUrls: string[];
+  onImageClick?: (imageUrls: string[], clickedIndex: number) => void;
+}
+
+const MessageImageList = ({
+  imageUrls,
+  onImageClick,
+}: MessageImageListProps) => {
+  return (
+    <div className="flex gap-2 flex-wrap">
+      {imageUrls.map((url, idx) => (
+        <button
+          key={idx}
+          onClick={() => onImageClick?.(imageUrls, idx)}
+          className="relative w-20 h-20 rounded-lg overflow-hidden border border-border hover:border-primary transition-all hover:scale-105 cursor-pointer group"
+          title="Click to preview"
+        >
+          <Image
+            src={url}
+            alt={`Attachment ${idx + 1}`}
+            fill
+            className="object-cover"
+            unoptimized
+          />
+          <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-colors" />
+        </button>
+      ))}
+    </div>
+  );
+};
