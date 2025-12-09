@@ -90,8 +90,20 @@ export function ImageElementEditor({
   const handleImageSelect = useCallback(
     (url: string, width?: number, height?: number) => {
       const styleUpdates: Record<string, string> = {};
-      if (width) styleUpdates.width = `${width}px`;
-      if (height) styleUpdates.height = `${height}px`;
+      
+      // Only apply generated image dimensions if element doesn't already have them set
+      // This preserves existing layout and prevents breaking the template
+      const hasExistingWidth = currentStyles.width && currentStyles.width !== 'auto';
+      const hasExistingHeight = currentStyles.height && currentStyles.height !== 'auto';
+      
+      if (width && !hasExistingWidth) {
+        // Cap width at 600px (standard email width) to prevent layout breaks
+        const cappedWidth = Math.min(width, 600);
+        styleUpdates.width = `${cappedWidth}px`;
+      }
+      if (height && !hasExistingHeight) {
+        styleUpdates.height = `${height}px`;
+      }
 
       onUpdate({
         attributes: {
@@ -101,7 +113,7 @@ export function ImageElementEditor({
         ...(Object.keys(styleUpdates).length ? { styles: styleUpdates } : {}),
       });
     },
-    [onUpdate, elementData.attributes?.alt]
+    [onUpdate, elementData.attributes?.alt, currentStyles.width, currentStyles.height]
   );
 
   // Presigned upload hook

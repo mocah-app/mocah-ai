@@ -91,7 +91,7 @@ export function findElementAtLine(ast: any, line: number) {
 }
 
 /**
- * Extract text content from JSX element
+ * Extract text content from JSX element (recursively handles nested elements)
  */
 export function extractTextContent(node: any): string {
   if (!node) return '';
@@ -111,10 +111,30 @@ export function extractTextContent(node: any): string {
       } else if (child.expression.type === 'Identifier') {
         textContent += `{${child.expression.name}}`;
       }
+    } else if (child.type === 'JSXElement') {
+      // Recursively extract text from nested JSX elements (e.g., <strong>, <Link>)
+      textContent += extractTextContent(child);
     }
   }
   
   return textContent.trim();
+}
+
+/**
+ * Check if element has nested JSX formatting (e.g., <strong>, <Link>, etc.)
+ */
+export function hasNestedFormatting(node: any): boolean {
+  if (!node) return false;
+  
+  const children = node.children || [];
+  
+  for (const child of children) {
+    if (child.type === 'JSXElement') {
+      return true;
+    }
+  }
+  
+  return false;
 }
 
 /**
@@ -260,4 +280,3 @@ export function getElementClassName(node: any): string | null {
   
   return classNameProp?.value?.value || null;
 }
-

@@ -73,6 +73,7 @@ function EditorContent({ templateId }: { templateId: string }) {
   const [errorFixPrompt, setErrorFixPrompt] = React.useState<
     string | undefined
   >(undefined);
+  const [initialChatInput, setInitialChatInput] = React.useState<string | undefined>(undefined);
   const [isSaving, setIsSaving] = useState(false);
 
   // Check if there are ANY pending changes across all elements (smart editor)
@@ -260,6 +261,17 @@ function EditorContent({ templateId }: { templateId: string }) {
       }
     }
   };
+
+  // Handle opening chat with initial text
+  const handleOpenChatWithText = useCallback((text: string) => {
+    setInitialChatInput(text);
+    setActivePanel("chat");
+    // Close editor and deselect element if open
+    if (editorState.selectedElement) {
+      editorActions.selectElement(null);
+    }
+    editorActions.setDesignMode(false);
+  }, [editorState.selectedElement, editorActions]);
 
   // Handle error fix request from preview component
   const handleRequestErrorFix = useCallback((error: string, _code: string) => {
@@ -467,6 +479,8 @@ ${error}`;
               onPromptConsumed={clearPrompt}
               errorFixPrompt={errorFixPrompt}
               onErrorFixConsumed={() => setErrorFixPrompt(undefined)}
+              initialInput={initialChatInput}
+              onInputConsumed={() => setInitialChatInput(undefined)}
             />
             <SmartEditorPanel
               isOpen={activePanel === "editor"}
@@ -475,6 +489,7 @@ ${error}`;
                 editorActions.selectElement(null);
                 editorActions.setDesignMode(false);
               }}
+              onOpenChat={handleOpenChatWithText}
             />
             <ImageLibraryPanel
               isOpen={activePanel === "library"}

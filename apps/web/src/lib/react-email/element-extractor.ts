@@ -7,6 +7,7 @@ import {
   parseJSX,
   findElementAtLine,
   extractTextContent,
+  hasNestedFormatting,
   evaluateObjectExpression,
   getElementStyleProp,
   getElementClassName,
@@ -37,10 +38,11 @@ export interface ElementData {
     | "Preview";
   line: number;
   content: string;
+  hasNestedFormatting?: boolean; // NEW: Has nested JSX elements like <strong>, <Link>
   styleType: "inline" | "predefined-class" | "style-object";
   styleName?: string;
   inlineStyles?: React.CSSProperties;
-  computedStyles?: React.CSSProperties; // NEW: Styles from DOM
+  computedStyles?: React.CSSProperties; // Styles from DOM
   className?: string;
   attributes: Record<string, any>;
 }
@@ -106,6 +108,9 @@ export function extractElementData(
 
   // Extract content from children
   const content = extractTextContent({ children });
+  
+  // NEW: Check if element has nested formatting
+  const elementHasNestedFormatting = hasNestedFormatting({ children });
 
   // Extract other attributes
   const attributes: Record<string, any> = {};
@@ -140,10 +145,11 @@ export function extractElementData(
     type: type as ElementData["type"],
     line,
     content,
+    hasNestedFormatting: elementHasNestedFormatting, // NEW
     styleType,
     styleName,
     inlineStyles,
-    computedStyles, // NEW
+    computedStyles,
     className,
     attributes,
   };
@@ -221,9 +227,9 @@ export function getEditableProperties(type: string): string[] {
     ],
     Link: ["fontSize", "color", "textDecoration"],
     Img: ["width", "height", "objectFit"],
-    Section: [...baseProperties, "textAlign"],
+    Section: [...baseProperties, "textAlign", "width"],
     Container: [...baseProperties, "maxWidth"],
-    Row: [...baseProperties],
+    Row: [...baseProperties, "width"],
     Column: [...baseProperties, "width"],
   };
 

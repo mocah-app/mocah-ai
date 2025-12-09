@@ -16,6 +16,7 @@ interface LinkElementEditorProps {
   onUpdate: (updates: ElementUpdates) => void;
   brandFont?: string | null;
   brandColors?: BrandColors;
+  onOpenChat?: (text: string) => void;
 }
 
 /**
@@ -26,6 +27,7 @@ export function LinkElementEditor({
   currentStyles,
   onUpdate,
   brandColors,
+  onOpenChat,
 }: LinkElementEditorProps) {
   const handleStyleChange = (property: string, value: string) => {
     onUpdate({
@@ -50,6 +52,8 @@ export function LinkElementEditor({
         content={elementData.content}
         onChange={handleContentChange}
         label="Link Text"
+        hasNestedFormatting={elementData.hasNestedFormatting}
+        onOpenChat={onOpenChat}
       />
 
       {/* Link URL */}
@@ -76,4 +80,3 @@ export function LinkElementEditor({
     </div>
   );
 }
-

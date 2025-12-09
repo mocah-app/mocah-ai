@@ -452,7 +452,7 @@ export const ReactEmailPreview = ({
   const isSafari = isSafariBrowser();
 
   return (
-    <div className="relative mx-auto h-full w-full max-w-[600px] overflow-auto p-2">
+    <div className="relative mx-auto h-full w-full overflow-auto">
       <iframe
         ref={iframeRef}
         srcDoc={html}

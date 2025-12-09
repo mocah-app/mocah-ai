@@ -1,6 +1,7 @@
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
+import { isSafari } from "@/lib/browser-detect";
 import { MessageCircle, Send, Square, X, Plus } from "lucide-react";
 import { useParams } from "next/navigation";
 import React, { useCallback, useEffect, useRef, useState } from "react";
@@ -44,6 +45,8 @@ export const ChatPanel = ({
   onPromptConsumed,
   errorFixPrompt,
   onErrorFixConsumed,
+  initialInput,
+  onInputConsumed,
 }: {
   isOpen: boolean;
   onClose: () => void;
@@ -52,6 +55,8 @@ export const ChatPanel = ({
   onPromptConsumed?: () => void;
   errorFixPrompt?: string;
   onErrorFixConsumed?: () => void;
+  initialInput?: string;
+  onInputConsumed?: () => void;
 }) => {
   const { state: templateState, actions: templateActions } = useTemplate();
   const { activeOrganization } = useOrganization();
@@ -66,6 +71,7 @@ export const ChatPanel = ({
   const [attachments, setAttachments] = useState<Attachment[]>([]);
   const [isUrlDialogOpen, setIsUrlDialogOpen] = useState(false);
   const [urlInput, setUrlInput] = useState("");
+  const [textareaMinHeight, setTextareaMinHeight] = useState(100);
 
   // Image preview modal state
   const [imagePreviewOpen, setImagePreviewOpen] = useState(false);
@@ -113,6 +119,14 @@ export const ChatPanel = ({
       );
     },
   });
+
+  // ==================== BROWSER DETECTION ====================
+  useEffect(() => {
+    // Safari has issues with textarea auto-grow, so use fixed max height
+    if (isSafari()) {
+      setTextareaMinHeight(140);
+    }
+  }, []);
 
   // ==================== TRANSITIONS ====================
   const [enableTransition, setEnableTransition] = useState(
@@ -620,6 +634,17 @@ export const ChatPanel = ({
     onErrorFixConsumed,
   ]);
 
+  // ==================== SET INITIAL INPUT (without auto-sending) ====================
+  useEffect(() => {
+    if (!isOpen || !initialInput) {
+      return;
+    }
+
+    // Set the input value without auto-sending
+    setInput(initialInput);
+    onInputConsumed?.();
+  }, [isOpen, initialInput, onInputConsumed]);
+
   // ==================== CANCEL GENERATION ====================
   const handleCancel = useCallback(async () => {
     templateActions.cancelGeneration();
@@ -688,7 +713,7 @@ export const ChatPanel = ({
       {/* Input */}
       <div
         className={cn(
-          "border-t border-border transition-all duration-300 ease-in-out",
+          "border-t border-border transition-all duration-300 ease-in-out overflow-hidden",
           isOpen ? "translate-y-0 opacity-100" : "translate-y-4 opacity-0"
         )}
         style={{ transitionDelay: isOpen ? "150ms" : "0ms" }}
@@ -717,12 +742,13 @@ export const ChatPanel = ({
             placeholder={isLoading ? "Generating..." : "Write your message..."}
             maxLength={1000}
             rows={3}
+            style={{ minHeight: `${textareaMinHeight}px`, maxHeight: "180px" }}
             disabled={isLoading}
-            className="focus:outline-none focus:ring-[0.2px] rounded-none focus:ring-teal-500 focus:ring-offset-0 focus:ring-offset-transparent resize-none min-h-[100px] max-h-[180px] disabled:opacity-50 pr-10"
+            className="focus:outline-none focus:ring-[0.2px] rounded-nodne rounded-2xl focus:ring-teal-500 focus:ring-offset-0 focus:ring-offset-transparent resize-none disabled:opacity-50 pr-10 pb-10"
           />
 
           {/* Attachment Controls */}
-          <div className="absolute px-1 pr-5 bottom-1.5 w-full flex items-center gap-1 mt-1 mb-1  justify-between">
+          <div className="absolute px-1 pr-5 left-2 bottom-2 w-full flex items-center gap-1 mt-1 mb-1  justify-between">
             <AttachmentPopover
               onUploadClick={handleUploadClick}
               onPasteUrlClick={handlePasteUrlClick}

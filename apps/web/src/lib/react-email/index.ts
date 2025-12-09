@@ -10,6 +10,7 @@ export {
   injectElementIds,
   findElementAtLine,
   extractTextContent,
+  hasNestedFormatting,
   extractStyleDefinitions,
   evaluateObjectExpression,
   findStyleDefinition,

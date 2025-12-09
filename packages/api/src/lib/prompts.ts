@@ -350,7 +350,21 @@ export function buildReactEmailPrompt(
 Request: "${userPrompt}"
 ${buildBrandSection(brandKit)}
 
-Note: If reference images are provided, use them as visual inspiration for layout, colors, typography, spacing, and design patterns. Unless the user explicityly asks you to replicate what is in the images, you should create a new design.`,
+📸 IMAGE REFERENCE INSTRUCTIONS:
+If reference images are provided by the user, analyze them carefully and use your judgment to determine how closely to follow them:
+
+- If the user's request suggests they want to REPLICATE the design (e.g., "like this", "similar to the attached", "based on this image", "recreate this"), then PRIORITIZE matching the image closely:
+  * Match layout structure, section arrangement, and visual hierarchy
+  * Follow the color scheme, typography, and spacing patterns.
+  * Use the same text and colors as the reference image.
+  * Replicate button styles, image placements, and design elements
+  * Maintain the overall aesthetic and visual style
+  
+- If the user wants INSPIRATION (e.g., "inspired by", "use as reference", "take ideas from"), create a unique design that incorporates the visual style and patterns from the reference.
+
+- If the user simply mentions having an image without specific intent, use it as a helpful visual guide while prioritizing their written requirements and brand guidelines.
+
+IMPORTANT: Pay close attention to the user's language to understand their intent. When they explicitly reference the attached image in their request, that's a strong signal to prioritize visual matching.`,
   ];
 
   sections.push(
@@ -391,6 +405,12 @@ ${currentTemplateCode}
 
 REQUEST: "${userPrompt}"
 ${buildBrandSection(brandKit)}
+
+📸 IMAGE REFERENCE INSTRUCTIONS:
+If reference images are provided, use your judgment to determine how closely to follow them based on the user's language:
+- If they explicitly reference the image (e.g., "like this", "match the attached", "based on this design"), prioritize closely matching the visual design, layout, and styling from the image
+- If they want inspiration, incorporate visual elements while maintaining uniqueness
+- Always balance image references with the user's written requirements and brand guidelines
 
 MODIFICATION RULES:
 - Preserve structure unless explicitly asked to change

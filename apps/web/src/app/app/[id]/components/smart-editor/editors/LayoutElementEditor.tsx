@@ -32,6 +32,12 @@ export function LayoutElementEditor({
 
   const isContainer = elementData.type === 'Container';
   const isColumn = elementData.type === 'Column';
+  const isSection = elementData.type === 'Section';
+  const isRow = elementData.type === 'Row';
+
+  // Determine which width property to use
+  const widthProperty = isContainer ? 'maxWidth' : 'width';
+  const widthLabel = isContainer ? 'Max Width' : 'Width';
 
   return (
     <div className="space-y-0">
@@ -48,18 +54,16 @@ export function LayoutElementEditor({
         </div>
       </PropertySection>
 
-      {/* Width for Container/Column */}
-      {(isContainer || isColumn) && (
-        <PropertySection label="Size">
-          <SelectControl
-            label={isContainer ? 'Max Width' : 'Width'}
-            value={isContainer ? currentStyles.maxWidth as string : currentStyles.width as string}
-            options={WIDTH_PRESETS}
-            onChange={(v) => handleStyleChange(isContainer ? 'maxWidth' : 'width', v)}
-            placeholder="Auto"
-          />
-        </PropertySection>
-      )}
+      {/* Width for all layout elements */}
+      <PropertySection label="Size">
+        <SelectControl
+          label={widthLabel}
+          value={(isContainer ? currentStyles.maxWidth : currentStyles.width) as string}
+          options={WIDTH_PRESETS}
+          onChange={(v) => handleStyleChange(widthProperty, v)}
+          placeholder="Auto"
+        />
+      </PropertySection>
 
       {/* Text Alignment */}
       <PropertySection label="Content Alignment">
@@ -86,4 +90,3 @@ export function LayoutElementEditor({
     </div>
   );
 }
-
