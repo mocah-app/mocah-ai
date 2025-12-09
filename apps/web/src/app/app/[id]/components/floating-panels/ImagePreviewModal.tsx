@@ -79,6 +79,7 @@ type ImageNodeData = {
 // ============================================================================
 
 const ImageNode = memo(({ data }: NodeProps<Node<ImageNodeData>>) => {
+  // Brand kit images already use regular img tags in the canvas
   return (
     <div className="rounded-lg overflow-hidden shadow-2xl">
       <img
@@ -509,31 +510,45 @@ export function ImagePreviewModal({
           </div>
           <ScrollArea className="flex-1">
             <div className="p-2 space-y-2">
-              {images.map((image, index) => (
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  key={image.id}
-                  onClick={() => handleThumbnailClick(index)}
-                  className={cn(
-                    "w-full aspect-square rounded-md overflow-hidden border border-border transition-all relative",
-                    index === currentIndex
-                      ? "border-primary"
-                      : "border-transparent hover:border-muted-foreground/30 opacity-40 hover:opacity-100"
-                  )}
-                >
-                  <Image
-                    src={image.url}
-                    alt=""
-                    fill
-                    sizes="48px"
-                    className="object-cover"
-                    loading={index < 5 ? "eager" : "lazy"}
-                    placeholder={image.blurDataUrl ? "blur" : "empty"}
-                    blurDataURL={image.blurDataUrl ?? undefined}
-                  />
-                </Button>
-              ))}
+              {images.map((image, index) => {
+                const isBrandKitImage = image.id.startsWith("brandkit-");
+                return (
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    key={image.id}
+                    onClick={() => handleThumbnailClick(index)}
+                    className={cn(
+                      "w-full aspect-square rounded-md overflow-hidden border border-border transition-all relative",
+                      index === currentIndex
+                        ? "border-primary"
+                        : "border-transparent hover:border-muted-foreground/30 opacity-40 hover:opacity-100"
+                    )}
+                  >
+                    {isBrandKitImage ? (
+                      // Use regular img tag for brand kit images
+                      <img
+                        src={image.url}
+                        alt=""
+                        className="absolute inset-0 w-full h-full object-cover"
+                        loading={index < 5 ? "eager" : "lazy"}
+                      />
+                    ) : (
+                      // Use Next.js Image for regular images
+                      <Image
+                        src={image.url}
+                        alt=""
+                        fill
+                        sizes="48px"
+                        className="object-cover"
+                        loading={index < 5 ? "eager" : "lazy"}
+                        placeholder={image.blurDataUrl ? "blur" : "empty"}
+                        blurDataURL={image.blurDataUrl ?? undefined}
+                      />
+                    )}
+                  </Button>
+                );
+              })}
             </div>
           </ScrollArea>
         </div>

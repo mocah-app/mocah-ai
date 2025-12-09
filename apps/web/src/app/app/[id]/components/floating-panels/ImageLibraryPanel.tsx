@@ -31,6 +31,7 @@ import { ImagePreviewModal, type PreviewImageAsset } from "./ImagePreviewModal";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useDebouncedValue } from "@/hooks/use-debounced-value";
+import Loader from "@/components/loader";
 
 // ============================================================================
 // Types
@@ -55,7 +56,7 @@ export function ImageLibraryPanel({ isOpen, onClose }: ImageLibraryPanelProps) {
     templateState.currentTemplate?.organizationId || activeOrganization?.id;
 
   // Filters
-  const [scope, setScope] = useState<"template" | "org">("org");
+  const [scope, setScope] = useState<"template" | "org" | "brandKit">("org");
   const [searchQuery, setSearchQuery] = useState("");
   const debouncedSearch = useDebouncedValue(searchQuery, 300);
 
@@ -73,7 +74,15 @@ export function ImageLibraryPanel({ isOpen, onClose }: ImageLibraryPanelProps) {
     router.push(`/app/${templateId}?${params.toString()}`, { scroll: false });
   }, [router, searchParams, templateId]);
 
-  // Fetch images with server-side search (only when panel is open)
+  // Fetch brand kit data
+  const { data: brandKitData, isLoading: isBrandKitLoading } = trpc.brandKit.getActive.useQuery(
+    undefined,
+    {
+      enabled: isOpen && scope === "brandKit" && !!organizationId,
+    }
+  );
+
+  // Fetch images with server-side search (only when panel is open and not brandKit scope)
   const {
     data: imageData,
     isLoading,
@@ -87,12 +96,70 @@ export function ImageLibraryPanel({ isOpen, onClose }: ImageLibraryPanelProps) {
       limit: 30,
     },
     {
-      enabled: isOpen && (scope === "org" ? !!organizationId : !!templateId),
+      enabled: isOpen && scope !== "brandKit" && (scope === "org" ? !!organizationId : !!templateId),
       getNextPageParam: (lastPage) => lastPage.nextCursor,
     }
   );
 
-  const filteredImages = imageData?.pages.flatMap((page) => page.items) ?? [];
+  // Map brand kit images to the same format as image assets
+  const brandKitImages = React.useMemo(() => {
+    if (scope !== "brandKit" || !brandKitData) return [];
+    
+    const images: PreviewImageAsset[] = [];
+    
+    if (brandKitData.logo) {
+      images.push({
+        id: "brandkit-logo",
+        url: brandKitData.logo,
+        prompt: "Brand Logo",
+        model: null,
+        width: null,
+        height: null,
+        aspectRatio: null,
+        contentType: null,
+        blurDataUrl: null,
+        createdAt: brandKitData.createdAt,
+      });
+    }
+    
+    if (brandKitData.favicon) {
+      images.push({
+        id: "brandkit-favicon",
+        url: brandKitData.favicon,
+        prompt: "Brand Favicon",
+        model: null,
+        width: null,
+        height: null,
+        aspectRatio: null,
+        contentType: null,
+        blurDataUrl: null,
+        createdAt: brandKitData.createdAt,
+      });
+    }
+    
+    if (brandKitData.ogImage) {
+      images.push({
+        id: "brandkit-ogimage",
+        url: brandKitData.ogImage,
+        prompt: "Brand OG Image",
+        model: null,
+        width: null,
+        height: null,
+        aspectRatio: null,
+        contentType: null,
+        blurDataUrl: null,
+        createdAt: brandKitData.createdAt,
+      });
+    }
+    
+    return images;
+  }, [scope, brandKitData]);
+
+  const filteredImages = scope === "brandKit" 
+    ? brandKitImages 
+    : (imageData?.pages.flatMap((page) => page.items) ?? []);
+  
+  const isLoadingImages = scope === "brandKit" ? isBrandKitLoading : isLoading;
 
   // Infinite scroll: observe sentinel element
   useEffect(() => {
@@ -177,7 +244,7 @@ export function ImageLibraryPanel({ isOpen, onClose }: ImageLibraryPanelProps) {
           <div className="grid grid-cols-[1fr_auto] gap-2">
             <Select
               value={scope}
-              onValueChange={(v) => setScope(v as "template" | "org")}
+              onValueChange={(v) => setScope(v as "template" | "org" | "brandKit")}
             >
               <SelectTrigger className="h-8 w-full text-xs">
                 <SelectValue />
@@ -185,6 +252,7 @@ export function ImageLibraryPanel({ isOpen, onClose }: ImageLibraryPanelProps) {
               <SelectContent>
                 <SelectItem value="org">All Organization Images</SelectItem>
                 <SelectItem value="template">This Template Only</SelectItem>
+                <SelectItem value="brandKit">Brand Kit</SelectItem>
               </SelectContent>
             </Select>
           <span className="text-xs border border-border rounded-md p-1 flex items-center justify-center text-muted-foreground">
@@ -206,7 +274,7 @@ export function ImageLibraryPanel({ isOpen, onClose }: ImageLibraryPanelProps) {
         {/* Image Grid */}
         <ScrollArea className="flex-1 min-h-0 overflow-hidden">
           <div className="p-3">
-            {isLoading ? (
+            {isLoadingImages ? (
               <div className="grid grid-cols-2 gap-2">
                 {Array.from({ length: 6 }).map((_, i) => (
                   <Skeleton key={i} className="aspect-square rounded-md" />
@@ -217,7 +285,9 @@ export function ImageLibraryPanel({ isOpen, onClose }: ImageLibraryPanelProps) {
                 <ImageIcon className="size-10 opacity-30 mb-2" />
                 <p className="text-xs text-center">No images found</p>
                 <p className="text-[10px] text-center">
-                  {searchQuery
+                  {scope === "brandKit"
+                    ? "No brand kit images available"
+                    : searchQuery
                     ? "Try a different search"
                     : "Generate images to see them here"}
                 </p>
@@ -225,33 +295,47 @@ export function ImageLibraryPanel({ isOpen, onClose }: ImageLibraryPanelProps) {
             ) : (
               <>
                 <div className="grid grid-cols-2 gap-2">
-                  {filteredImages.map((image, index) => (
-                    <div
-                      key={image.id}
-                      role="button"
-                      tabIndex={0}
-                      className="group w-full h-auto relative aspect-square rounded-md overflow-hidden border border-border bg-muted cursor-pointer hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                      onClick={(e) => handleOpenPreview(e, image.id)}
-                      onKeyDown={(e) => {
-                        if (e.key === "Enter" || e.key === " ") {
-                          e.preventDefault();
-                          handleOpenPreview(e as unknown as React.MouseEvent, image.id);
-                        }
-                      }}
-                    >
-                      <Image
-                        src={image.url}
-                        alt={image.prompt || "Generated image"}
-                        fill
-                        sizes="(max-width: 768px) 50vw, 150px"
-                        className="object-contain transition-transform group-hover:scale-105"
-                        loading={index < 4 ? "eager" : "lazy"}
-                        priority={index < 2}
-                        placeholder={image.blurDataUrl ? "blur" : "empty"}
-                        blurDataURL={image.blurDataUrl ?? undefined}
-                      />
-                      {/* Hover/Focus Overlay */}
-                      <div className="absolute inset-0 bg-black/0 group-hover:bg-black/40 group-focus-within:bg-black/40 transition-colors" />
+                  {filteredImages.map((image, index) => {
+                    const isBrandKitImage = image.id.startsWith("brandkit-");
+                    return (
+                      <div
+                        key={image.id}
+                        role="button"
+                        tabIndex={0}
+                        className="group w-full h-auto relative aspect-square rounded-md overflow-hidden border border-border bg-muted cursor-pointer hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                        onClick={(e) => handleOpenPreview(e, image.id)}
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter" || e.key === " ") {
+                            e.preventDefault();
+                            handleOpenPreview(e as unknown as React.MouseEvent, image.id);
+                          }
+                        }}
+                      >
+                        {isBrandKitImage ? (
+                          // Use regular img tag for brand kit images to avoid Next.js hostname config issues
+                          <img
+                            src={image.url}
+                            alt={image.prompt || "Brand image"}
+                            className="absolute inset-0 w-full h-full object-contain transition-transform group-hover:scale-105"
+                            loading={index < 4 ? "eager" : "lazy"}
+                          />
+                        ) : (
+                          // Use Next.js Image for regular images
+                          <Image
+                            src={image.url}
+                            alt={image.prompt || "Generated image"}
+                            fill
+                            sizes="(max-width: 768px) 50vw, 150px"
+                            className="object-contain transition-transform group-hover:scale-105"
+                            loading={index < 4 ? "eager" : "lazy"}
+                            priority={index < 2}
+                            placeholder={image.blurDataUrl ? "blur" : "empty"}
+                            blurDataURL={image.blurDataUrl ?? undefined}
+                          />
+                        )}
+
+                        {/* Hover/Focus Overlay */}
+                        <div className="absolute inset-0 bg-black/0 group-hover:bg-black/40 group-focus-within:bg-black/40 transition-colors" />
 
                       {/* Hover/Focus Actions */}
                       <div className="absolute inset-0 flex items-center justify-center gap-2 opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 transition-opacity">
@@ -271,21 +355,22 @@ export function ImageLibraryPanel({ isOpen, onClose }: ImageLibraryPanelProps) {
                         </button>
                       </div>
 
-                      {/* Prompt hint at bottom */}
-                      {image.prompt && (
-                        <div className="absolute bottom-0 left-0 right-0 p-1.5 bg-linear-to-t from-black/60 to-transparent opacity-0 group-hover:opacity-100 transition-opacity">
-                          <p className="text-[9px] text-white line-clamp-1">
-                            {image.prompt}
-                          </p>
-                        </div>
-                      )}
-                    </div>
-                  ))}
+                        {/* Prompt hint at bottom */}
+                        {image.prompt && (
+                          <div className="absolute bottom-0 left-0 right-0 p-1.5 bg-linear-to-t from-black/60 to-transparent opacity-0 group-hover:opacity-100 transition-opacity">
+                            <p className="text-[9px] text-white line-clamp-1">
+                              {image.prompt}
+                            </p>
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
                 </div>
                 {/* Infinite scroll sentinel & loading indicator */}
                 <div ref={sentinelRef} className="h-4 flex justify-center mt-3">
                   {isFetchingNextPage && (
-                    <Loader2 className="size-4 animate-spin text-muted-foreground" />
+                    <Loader size="sm" />
                   )}
                 </div>
               </>

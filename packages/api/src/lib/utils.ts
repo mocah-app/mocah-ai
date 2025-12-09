@@ -22,6 +22,7 @@ import {
   imageGenerationInputSchema,
   type ImageGenerationInput,
 } from "@mocah/shared";
+import { buildImageGenerationPrompt } from "@mocah/api/lib/prompts";
 
 // JSONValue type for providerOptions
 type JSONValue =
@@ -87,6 +88,82 @@ export async function runFalImageGeneration(
 ) {
   const started = Date.now();
   
+  // Fetch brand kit data to enhance prompt with brand context
+  let brandKit = null;
+  try {
+    const organization = await prisma.organization.findUnique({
+      where: { id: input.organizationId },
+      select: {
+        brandKit: {
+          select: {
+            // Core colors
+            primaryColor: true,
+            accentColor: true,
+            backgroundColor: true,
+            textPrimaryColor: true,
+            
+            // Typography & Voice
+            fontFamily: true,
+            brandVoice: true,
+            
+            // Layout
+            borderRadius: true,
+            
+            // Brand personality
+            brandTone: true,
+            brandEnergy: true,
+            targetAudience: true,
+            
+            // Company information
+            companyName: true,
+            companyDescription: true,
+            tagline: true,
+            industry: true,
+            productsServices: true,
+            brandValues: true,
+            contactEmail: true,
+            foundingYear: true,
+            
+            // Website data
+            websiteUrl: true,
+            summary: true,
+          },
+        },
+      },
+    });
+    
+    if (organization?.brandKit) {
+      const rawBrandKit = organization.brandKit;
+      // Transform JSON fields to expected types
+      brandKit = {
+        ...rawBrandKit,
+        productsServices: Array.isArray(rawBrandKit.productsServices) 
+          ? (rawBrandKit.productsServices as string[]) 
+          : null,
+        brandValues: Array.isArray(rawBrandKit.brandValues) 
+          ? (rawBrandKit.brandValues as string[]) 
+          : null,
+      };
+    }
+  } catch (error) {
+    logger.warn("Failed to fetch brand kit for image generation", {
+      organizationId: input.organizationId,
+      error,
+    });
+    // Continue without brand context if fetch fails
+  }
+  
+  // Enhance prompt with brand context
+  const enhancedPrompt = brandKit 
+    ? buildImageGenerationPrompt(input.prompt, brandKit as any)
+    : input.prompt;
+    
+  logger.info("🎨 Enhanced prompt with brand context", {
+    originalPrompt: input.prompt.slice(0, 100),
+    hasBrandContext: !!brandKit,
+    companyName: brandKit?.companyName,
+  });
+  
   // Use edit model when imageUrls are provided, otherwise use generation model
   const isEditMode = input.imageUrls && input.imageUrls.length > 0;
   const model = isEditMode
@@ -145,7 +222,7 @@ export async function runFalImageGeneration(
   try {
     result = await generateImage({
       model,
-      prompt: input.prompt,
+      prompt: enhancedPrompt,
       providerOptions: {
         fal: providerOptions,
       },

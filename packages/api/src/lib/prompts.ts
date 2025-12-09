@@ -511,6 +511,89 @@ export const promptSuggestions = {
 };
 
 // ============================================================================
+// IMAGE GENERATION PROMPTS
+// ============================================================================
+
+/**
+ * Build concise brand context for image generation
+ * Focuses on visual aspects most relevant to image creation
+ */
+export function buildImageBrandContext(brandKit?: BrandKit): string {
+  if (!brandKit) return "";
+
+  const sections: string[] = [];
+
+  // Company Identity (brief)
+  if (brandKit.companyName) {
+    let identity = `Brand: ${brandKit.companyName}`;
+    if (brandKit.industry) identity += ` (${brandKit.industry})`;
+    sections.push(identity);
+  }
+
+  // Brand Description (for context)
+  if (brandKit.companyDescription) {
+    const desc = brandKit.companyDescription.length > 200 
+      ? brandKit.companyDescription.substring(0, 200) + "..."
+      : brandKit.companyDescription;
+    sections.push(`About: ${desc}`);
+  }
+
+  // Visual Style & Personality
+  const styleElements: string[] = [];
+  
+  // Colors - most important for image generation
+  if (brandKit.primaryColor) styleElements.push(`Primary color: ${brandKit.primaryColor}`);
+  if (brandKit.accentColor) styleElements.push(`Accent color: ${brandKit.accentColor}`);
+  
+  // Brand personality - affects visual mood
+  if (brandKit.brandVoice) styleElements.push(`Voice: ${brandKit.brandVoice}`);
+  if (brandKit.brandTone) styleElements.push(`Tone: ${brandKit.brandTone}`);
+  if (brandKit.brandEnergy) styleElements.push(`Energy: ${brandKit.brandEnergy}`);
+  
+  if (styleElements.length > 0) {
+    sections.push(`Visual Style: ${styleElements.join(" | ")}`);
+  }
+
+  // Target Audience - helps with appropriate imagery
+  if (brandKit.targetAudience) {
+    sections.push(`Target Audience: ${brandKit.targetAudience}`);
+  }
+
+  // Brand Values - influences visual themes
+  if (brandKit.brandValues && brandKit.brandValues.length > 0) {
+    sections.push(`Brand Values: ${brandKit.brandValues.slice(0, 3).join(", ")}`);
+  }
+
+  // Industry context from website summary
+  if (brandKit.summary) {
+    const summary = brandKit.summary.length > 150 
+      ? brandKit.summary.substring(0, 150) + "..."
+      : brandKit.summary;
+    sections.push(`Context: ${summary}`);
+  }
+
+  if (sections.length === 0) return "";
+
+  return `\n--- BRAND CONTEXT ---\n${sections.join("\n")}\n--- END BRAND CONTEXT ---\n\nIMPORTANT: Generate an image that aligns with this brand's visual identity, personality, and target audience. Use the brand colors when appropriate, and match the brand's tone and energy level.`;
+}
+
+/**
+ * Enhance image generation prompt with brand context
+ */
+export function buildImageGenerationPrompt(
+  userPrompt: string,
+  brandKit?: BrandKit
+): string {
+  const brandContext = buildImageBrandContext(brandKit);
+  
+  if (!brandContext) {
+    return userPrompt;
+  }
+
+  return `${userPrompt}${brandContext}`;
+}
+
+// ============================================================================
 // UTILITY EXPORTS (for prompt caching strategies)
 // ============================================================================
 
