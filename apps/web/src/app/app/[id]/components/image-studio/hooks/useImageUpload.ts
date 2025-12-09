@@ -13,6 +13,7 @@ interface UseImageUploadOptions {
   organizationId: string | undefined;
   templateId: string | undefined;
   versionId?: string | null | undefined;
+  purpose?: "image" | "logo" | "template-reference";
   onSuccess?: (image: GeneratedImage) => void;
   onError?: (error: Error) => void;
 }
@@ -56,6 +57,7 @@ export function useImageUpload({
   organizationId,
   templateId,
   versionId,
+  purpose,
   onSuccess,
   onError,
 }: UseImageUploadOptions): UseImageUploadReturn {
@@ -132,6 +134,7 @@ export function useImageUpload({
             fileSize: file.size,
             templateId,
             versionId: versionId ?? undefined,
+            purpose,
           });
 
         // Parse URL for debugging

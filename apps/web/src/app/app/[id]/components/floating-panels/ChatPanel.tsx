@@ -14,6 +14,7 @@ export const ChatPanel = ({
   isOpen,
   onClose,
   initialPrompt,
+  initialImageUrls = [],
   onPromptConsumed,
   errorFixPrompt,
   onErrorFixConsumed,
@@ -21,6 +22,7 @@ export const ChatPanel = ({
   isOpen: boolean;
   onClose: () => void;
   initialPrompt?: string;
+  initialImageUrls?: string[];
   onPromptConsumed?: () => void;
   errorFixPrompt?: string;
   onErrorFixConsumed?: () => void;
@@ -39,6 +41,7 @@ export const ChatPanel = ({
   const hasAutoSentRef = useRef(false);
   const currentStreamingIdRef = useRef<string | null>(null);
   const latestStreamingProgressRef = useRef<GenerationResult | null>(null);
+  const initialImageUrlsRef = useRef<string[]>(initialImageUrls);
 
   // ==================== tRPC for persistence ====================
   const utils = trpc.useUtils();
@@ -65,14 +68,18 @@ export const ChatPanel = ({
   // Load messages from DB on mount (only once when data arrives)
   useEffect(() => {
     if (!isInitialized && persistedMessages && !isLoadingMessages) {
-      const dbMessages: Message[] = persistedMessages.map((msg) => ({
-        id: msg.id,
-        role: msg.role as "user" | "assistant",
-        content: msg.content,
-        isStreaming: msg.isStreaming,
-        isPersisted: true,
-        generationResult: (msg.metadata as GenerationResult | null) ?? undefined,
-      }));
+      const dbMessages: Message[] = persistedMessages.map((msg) => {
+        const metadata = msg.metadata as any;
+        return {
+          id: msg.id,
+          role: msg.role as "user" | "assistant",
+          content: msg.content,
+          isStreaming: msg.isStreaming,
+          isPersisted: true,
+          generationResult: msg.role === "assistant" ? (metadata as GenerationResult | null) ?? undefined : undefined,
+          imageUrls: msg.role === "user" && metadata?.imageUrls ? metadata.imageUrls : undefined,
+        };
+      });
 
       // If no messages, add greeting
       if (dbMessages.length === 0) {
@@ -137,11 +144,15 @@ export const ChatPanel = ({
       const userMsgId = crypto.randomUUID();
       const assistantMsgId = crypto.randomUUID();
 
+      // Check if this is the first message and we have initial image URLs
+      const imageUrls = !hasAutoSentRef.current ? initialImageUrlsRef.current : undefined;
+
       const userMessage: Message = {
         id: userMsgId,
         role: "user",
         content: trimmedPrompt,
         isPersisted: false,
+        imageUrls: imageUrls && imageUrls.length > 0 ? imageUrls : undefined,
       };
 
       const assistantMessage: Message = {
@@ -160,20 +171,22 @@ export const ChatPanel = ({
 
       try {
         // 3. Start generation immediately (UX: user sees streaming right away)
+        // imageUrls was already determined above when creating the user message
         const generationPromise = isNewTemplate
-          ? templateActions.generateTemplateStream(trimmedPrompt)
+          ? templateActions.generateTemplateStream(trimmedPrompt, imageUrls)
           : templateActions.regenerateTemplate(trimmedPrompt);
 
         // 4. Define message persistence function
         const persistMessages = async () => {
           try {
-            // Persist user message
+            // Persist user message (with imageUrls in metadata if present)
             const dbUser = await createMessageMutation.mutateAsync({
               templateId,
               role: "user",
               content: trimmedPrompt,
               isStreaming: false,
-            });
+              metadata: imageUrls && imageUrls.length > 0 ? { imageUrls } : undefined,
+            } as any);
 
             // Persist assistant message
             const dbAssistant = await createMessageMutation.mutateAsync({
@@ -314,11 +327,12 @@ export const ChatPanel = ({
     ) {
       return;
     }
-
-    hasAutoSentRef.current = true;
     
-    // Send the initial prompt
+    // Send the initial prompt (hasAutoSentRef is still false, so imageUrls will be used)
     handleSend(initialPrompt);
+    
+    // Mark as sent AFTER calling handleSend
+    hasAutoSentRef.current = true;
     onPromptConsumed?.();
   }, [
     isOpen,

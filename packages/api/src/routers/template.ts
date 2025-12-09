@@ -208,8 +208,6 @@ export const templateRouter = router({
         previewText: result.previewText,
         styleType: result.styleType,
         codeLength: result.reactEmailCode?.length || 0,
-        model: result.metadata?.model || "unknown",
-        tokensUsed: result.metadata?.tokensUsed || "unknown",
       });
       logger.info("=".repeat(80) + "\n");
 
@@ -251,16 +249,6 @@ export const templateRouter = router({
         });
       }
 
-      // Parse styleDefinitions from JSON string if provided
-      let styleDefinitions = {};
-      if (result.styleDefinitionsJson) {
-        try {
-          styleDefinitions = JSON.parse(result.styleDefinitionsJson);
-        } catch {
-          // Ignore parse errors, use empty object
-        }
-      }
-
       // 3. Create template
       const template = await ctx.db.template.create({
         data: {
@@ -270,7 +258,7 @@ export const templateRouter = router({
           description: `Generated from prompt: ${input.prompt}`,
           reactEmailCode: result.reactEmailCode,
           styleType: validateStyleType(result.styleType),
-          styleDefinitions,
+          styleDefinitions: {},
           previewText: result.previewText,
         },
       });
@@ -286,12 +274,11 @@ export const templateRouter = router({
           createdBy: ctx.session?.user?.id,
           reactEmailCode: result.reactEmailCode,
           styleType: validateStyleType(result.styleType),
-          styleDefinitions,
+          styleDefinitions: {},
           previewText: result.previewText,
           metadata: {
             generatedFrom: "ai",
             prompt: input.prompt,
-            ...result.metadata,
           },
         },
       });
@@ -394,16 +381,6 @@ export const templateRouter = router({
         TEMPLATE_GENERATION_MODEL
       );
 
-      // Parse styleDefinitions from JSON string if provided
-      let styleDefinitions = {};
-      if (result.styleDefinitionsJson) {
-        try {
-          styleDefinitions = JSON.parse(result.styleDefinitionsJson);
-        } catch {
-          // Ignore parse errors, use empty object
-        }
-      }
-
       // Create new version
       const version = await ctx.db.templateVersion.create({
         data: {
@@ -415,12 +392,11 @@ export const templateRouter = router({
           createdBy: ctx.session.user.id,
           reactEmailCode: result.reactEmailCode,
           styleType: validateStyleType(result.styleType),
-          styleDefinitions,
+          styleDefinitions: {},
           previewText: result.previewText,
           metadata: {
             generatedFrom: "ai",
             prompt: input.prompt,
-            ...result.metadata,
           },
         },
       });
@@ -433,7 +409,7 @@ export const templateRouter = router({
           subject: result.subject,
           reactEmailCode: result.reactEmailCode,
           styleType: validateStyleType(result.styleType),
-          styleDefinitions,
+          styleDefinitions: {},
           previewText: result.previewText,
         },
       });

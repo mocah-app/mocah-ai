@@ -87,13 +87,13 @@ export function useStreamTemplate({
   });
 
   const generate = useCallback(
-    async (prompt: string) => {
+    async (prompt: string, imageUrls?: string[]) => {
       setIsGenerating(true);
       setRetryCount(0);
       lastPromptRef.current = prompt;
 
       // Build request body based on whether it's generation or regeneration
-      const body: Record<string, string> = { prompt };
+      const body: Record<string, any> = { prompt };
       
       if (templateId) {
         // Regeneration: needs templateId
@@ -101,6 +101,11 @@ export function useStreamTemplate({
       } else if (organizationId) {
         // Generation: needs organizationId
         body.organizationId = organizationId;
+      }
+
+      // Add imageUrls if provided
+      if (imageUrls && imageUrls.length > 0) {
+        body.imageUrls = imageUrls;
       }
       
       lastBodyRef.current = body;

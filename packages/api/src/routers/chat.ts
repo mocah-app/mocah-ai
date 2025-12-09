@@ -79,6 +79,7 @@ export const chatRouter = router({
         role: z.enum(["user", "assistant"]),
         content: z.string(),
         isStreaming: z.boolean().optional().default(false),
+        metadata: z.any().optional(), // Accept any metadata (imageUrls for user, generationResult for assistant)
       })
     )
     .mutation(async ({ ctx, input }) => {
@@ -95,6 +96,7 @@ export const chatRouter = router({
           role: input.role,
           content: input.content,
           isStreaming: input.isStreaming,
+          ...(input.metadata && { metadata: input.metadata }),
         },
       });
 

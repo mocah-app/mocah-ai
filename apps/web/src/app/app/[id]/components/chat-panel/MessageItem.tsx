@@ -2,6 +2,7 @@ import { cn } from "@/lib/utils";
 import Loader from "@/components/loader";
 import { useTemplate } from "../providers/TemplateProvider";
 import { StreamingProgress } from "./StreamingProgress";
+import Image from "next/image";
 
 export interface GenerationResult {
   subject?: string;
@@ -17,6 +18,7 @@ export interface Message {
   isPersisted?: boolean;
   persistenceError?: boolean; // Indicates message failed to save to DB
   generationResult?: GenerationResult; // Store the generated content with this message
+  imageUrls?: string[]; // Reference images attached to the message
 }
 
 interface MessageItemProps {
@@ -55,6 +57,24 @@ export const MessageItem = ({ message, index, isOpen }: MessageItemProps) => {
           ) : (
             <>
               {message.content}
+              
+              {/* Show attached images for user messages */}
+              {message.role === "user" && message.imageUrls && message.imageUrls.length > 0 && (
+                <div className="mt-3 flex gap-2 flex-wrap">
+                  {message.imageUrls.map((url, idx) => (
+                    <div key={idx} className="relative w-20 h-20 rounded-lg overflow-hidden border border-border">
+                      <Image
+                        src={url}
+                        alt={`Attachment ${idx + 1}`}
+                        fill
+                        className="object-cover"
+                        unoptimized
+                      />
+                    </div>
+                  ))}
+                </div>
+              )}
+              
               {message.persistenceError && (
                 <div className="mt-2 text-xs text-amber-600 dark:text-amber-500 flex items-center gap-1">
                   <span>⚠️</span>

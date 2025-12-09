@@ -11,6 +11,7 @@ import {
   createPresignedUploadUrl,
   PRESIGNED_URL_EXPIRY,
   MAX_FILE_SIZE,
+  STORAGE_PREFIX_TEMPLATE_REFERENCES,
 } from "../lib/s3";
 import {
   processUploadedImage,
@@ -58,19 +59,25 @@ export const storageRouter = router({
   createUploadUrl: organizationProcedure
     .input(createUploadUrlSchema)
     .mutation(async ({ input, ctx }) => {
-      const { fileName, contentType, templateId, versionId } = input;
+      const { fileName, contentType, templateId, versionId, purpose } = input;
 
       logger.info("📤 Creating presigned upload URL", {
         fileName,
         contentType,
         templateId,
         versionId,
+        purpose,
         userId: ctx.session!.user.id,
         organizationId: ctx.organizationId,
       });
 
-      // Generate storage path
-      const storageKey = generateStoragePath(fileName, "images");
+      // Generate storage path based on purpose
+      const prefix = purpose === "template-reference" 
+        ? STORAGE_PREFIX_TEMPLATE_REFERENCES 
+        : purpose === "logo" 
+        ? "logos" 
+        : "images";
+      const storageKey = generateStoragePath(fileName, prefix);
 
       // Build metadata for S3
       const sanitizedName = encodeURIComponent(fileName);

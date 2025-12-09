@@ -60,7 +60,7 @@ interface TemplateActions {
   regenerateElement: (elementPath: string, prompt: string) => Promise<void>;
   regenerateTemplate: (prompt: string) => Promise<void>;
   generateTemplate: (prompt: string) => Promise<Template | null>;
-  generateTemplateStream: (prompt: string) => Promise<void>;
+  generateTemplateStream: (prompt: string, imageUrls?: string[]) => Promise<void>;
   cancelGeneration: () => void;
   setIsDirty: (dirty: boolean) => void;
   onPreviewRenderComplete: () => void; // Called when preview finishes rendering
@@ -745,7 +745,7 @@ export function TemplateProvider({
   }, [refetch]);
 
   const generateTemplateStream = useCallback(
-    async (prompt: string) => {
+    async (prompt: string, imageUrls?: string[]) => {
       if (!activeOrganization?.id) {
         throw new Error("No organization selected");
       }
@@ -759,7 +759,7 @@ export function TemplateProvider({
       }));
 
       try {
-        await generateStream(prompt);
+        await generateStream(prompt, imageUrls);
       } catch (error) {
         console.error("Failed to generate template stream:", error);
         setState((prev) => ({

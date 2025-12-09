@@ -348,13 +348,18 @@ export function buildReactEmailPrompt(
     `Create a unique, visually distinctive React Email template.
 
 Request: "${userPrompt}"
-${buildBrandSection(brandKit)}`,
+${buildBrandSection(brandKit)}
+
+Note: If reference images are provided, use them as visual inspiration for layout, colors, typography, spacing, and design patterns. Unless the user explicityly asks you to replicate what is in the images, you should create a new design.`,
+  ];
+
+  sections.push(
     CRITICAL_RULES,
     COMPONENT_REFERENCE,
     STYLE_GUIDELINES,
     SOCIAL_ICONS_CDN,
-    CONTENT_GUIDELINES,
-  ];
+    CONTENT_GUIDELINES
+  );
 
   if (verbosity !== "minimal") {
     sections.push(DESIGN_PHILOSOPHY);
@@ -464,23 +469,6 @@ export const reactEmailGenerationSchema = z.object({
     .enum(["inline", "predefined-classes", "style-objects"])
     .default("style-objects")
     .describe("Styling approach. Default: style-objects."),
-
-  styleDefinitionsJson: z
-    .string()
-    .optional()
-    .describe("Optional JSON of extracted style objects."),
-
-  metadata: z
-    .object({
-      generatedAt: z.string().describe("ISO 8601 timestamp"),
-      model: z.string().describe("Model identifier"),
-      tokensUsed: z.number().int().min(0).describe("Tokens consumed"),
-      emailType: z
-        .string()
-        .nullish()
-        .describe("Category: welcome, newsletter, promotional, transactional, notification"),
-    })
-    .describe("Generation metadata"),
 });
 
 export const TEMPLATE_SCHEMA_NAME = "ReactEmailTemplate";

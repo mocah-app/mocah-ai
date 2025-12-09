@@ -37,7 +37,7 @@ export async function POST(req: NextRequest) {
     }
 
     // 2. Parse request body
-    const { prompt, organizationId } = await req.json();
+    const { prompt, organizationId, imageUrls } = await req.json();
 
     if (!prompt || !organizationId) {
       return new Response(JSON.stringify({ error: "Missing required fields" }), {
@@ -90,7 +90,7 @@ export async function POST(req: NextRequest) {
       });
     }
 
-    // 4. Build React Email prompt
+    // 4. Build React Email prompt (without image URLs in text - they'll be sent as message parts)
     const promptText = buildReactEmailPrompt(prompt, brandKit as any);
 
     // 5. Start streaming with AI SDK (enhanced reliability)
@@ -103,12 +103,14 @@ export async function POST(req: NextRequest) {
         schemaDescription: TEMPLATE_SCHEMA_DESCRIPTION,
         temperature: 0.7,
         maxRetries: 3,
+        imageUrls: imageUrls as string[] | undefined, // Pass images as multi-modal content
         onError: (error: unknown) => {
           logger.error("Stream error in template generation", {
             error: String(error),
             userId: session.user.id,
             organizationId,
             promptPreview: prompt.substring(0, 100),
+            imageCount: (imageUrls as string[] | undefined)?.length || 0,
           });
         },
       }

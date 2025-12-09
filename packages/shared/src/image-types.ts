@@ -136,6 +136,7 @@ export const createUploadUrlSchema = z.object({
   fileSize: z.number().max(MAX_FILE_SIZE, "File too large. Maximum size is 5MB."),
   templateId: z.string().optional(),
   versionId: z.string().optional(),
+  purpose: z.enum(["image", "logo", "template-reference"]).optional(),
 });
 
 export const confirmUploadSchema = z.object({
