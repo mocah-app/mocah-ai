@@ -1,5 +1,5 @@
 import { nextCookies } from "better-auth/next-js";
-import { betterAuth, type BetterAuthOptions } from "better-auth";
+import { betterAuth } from "better-auth";
 import { organization } from "better-auth/plugins";
 import { stripe } from "@better-auth/stripe";
 import { prismaAdapter } from "better-auth/adapters/prisma";
@@ -13,11 +13,20 @@ const stripeClient = new Stripe(serverEnv.STRIPE_SECRET_KEY, {
   apiVersion: "2025-10-29.clover",
 });
 
-export const auth = betterAuth<BetterAuthOptions>({
+const authInstance = betterAuth({
   database: prismaAdapter(prisma, {
     provider: "postgresql",
   }),
   trustedOrigins: [serverEnv.CORS_ORIGIN || ""],
+  session: {
+    // Declare organization plugin session fields for proper TypeScript inference
+    additionalFields: {
+      activeOrganizationId: {
+        type: "string",
+        required: false,
+      },
+    },
+  },
   emailVerification: {
     sendVerificationEmail: async ({ user, url, token }) => {
       await EmailService.sendVerificationEmail({ user, url, token });
@@ -102,3 +111,5 @@ export const auth = betterAuth<BetterAuthOptions>({
     }),
   ],
 });
+
+export const auth = authInstance;

@@ -5,6 +5,7 @@ import { brandKitRouter } from "./brand-kit";
 import { brandBuilderRouter } from "./brandkit-builder";
 import { templateRouter } from "./template";
 import { chatRouter } from "./chat";
+import { imageAssetRouter } from "./image-asset";
 
 export const appRouter = router({
   healthCheck: publicProcedure.query(() => {
@@ -24,6 +25,7 @@ export const appRouter = router({
   brandBuilder: brandBuilderRouter,
   template: templateRouter,
   chat: chatRouter,
+  imageAsset: imageAssetRouter,
 });
 
 export type AppRouter = typeof appRouter;

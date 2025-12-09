@@ -22,6 +22,7 @@ model Organization {
   aiPrompts   AIPrompt[]
   usageQuotas UsageQuota[]
   integrations Integration[]
+  imageAssets ImageAsset[]
 
   @@index([slug])
   @@map("organization")

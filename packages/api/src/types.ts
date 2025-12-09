@@ -2,9 +2,10 @@ import type { auth } from "@mocah/auth";
 import type { PrismaClient } from "@mocah/db";
 
 /**
- * Inferred types from auth and database
+ * Inferred session type from Better Auth
+ * @see https://www.better-auth.com/docs/concepts/typescript#inferring-types
  */
-type SessionResult = Awaited<ReturnType<typeof auth.api.getSession>>;
+export type Session = typeof auth.$Infer.Session;
 
 /**
  * Type for organization with included relations
@@ -43,15 +44,22 @@ export type OrganizationWithRelations = {
  * API Context type
  */
 export interface ApiContext {
-  session: SessionResult;
+  session: Session | null;
   db: PrismaClient;
   activeOrganization: OrganizationWithRelations | null;
 }
 
 /**
+ * Protected context with guaranteed session
+ */
+export interface ProtectedContext extends ApiContext {
+  session: Session;
+}
+
+/**
  * Extended context with organization guarantee
  */
-export interface OrganizationContext extends ApiContext {
+export interface OrganizationContext extends ProtectedContext {
   organizationId: string;
   organization: NonNullable<OrganizationWithRelations>;
 }

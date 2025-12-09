@@ -190,4 +190,8 @@ body {
     background-image: radial-gradient(circle, var(--foreground) 0.5px, transparent 0.5px);
     background-size: 18px 18px;
   }
+
+  ::selection {
+    @apply bg-primary text-primary-foreground;
+  }
 }

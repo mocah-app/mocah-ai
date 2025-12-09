@@ -102,6 +102,29 @@ import { Html, Head, Body, Container, Section, Text, Heading, Button, Img, Link,
 import * as React from 'react';`;
 
 // ============================================================================
+// SOCIAL ICONS CDN - ~100 tokens
+// ============================================================================
+
+const SOCIAL_ICONS_CDN = `SOCIAL ICONS:
+For social media icons, use our CDN: https://cdn.mocah.ai/icons/{platform}.png
+
+Available icons: twitter, facebook, instagram, linkedin, youtube, tiktok, pinterest, 
+snapchat, reddit, discord, whatsapp, telegram, apple, google, github, dribbble, behance, 
+medium, spotify, twitch, slack, x
+
+Examples:
+- Twitter/X: https://cdn.mocah.ai/icons/twitter.png or https://cdn.mocah.ai/icons/x.png
+- Facebook: https://cdn.mocah.ai/icons/facebook.png
+- Instagram: https://cdn.mocah.ai/icons/instagram.png
+- LinkedIn: https://cdn.mocah.ai/icons/linkedin.png
+
+Usage: <Img src="https://cdn.mocah.ai/icons/twitter.png" alt="Twitter" width="24" height="24" />
+
+Center all the icons in the footer.
+
+`;
+
+// ============================================================================
 // TIER 3: STYLE GUIDELINES - ~250 tokens
 // ============================================================================
 
@@ -114,6 +137,36 @@ const STYLE_GUIDELINES = `STYLE RULES:
 EMAIL-SAFE CSS:
 ✅ ALLOWED: padding, margin, backgroundColor, color, fontSize, fontWeight, textAlign, lineHeight, borderRadius, border, width, height, letterSpacing, verticalAlign
 ❌ FORBIDDEN: display, position, transform, flex*, grid*, float, box-shadow, overflow, filter`;
+
+// ============================================================================
+// CONTENT GUIDELINES - ~200 tokens
+// ============================================================================
+
+const CONTENT_GUIDELINES = `CONTENT PRINCIPLES:
+
+- CONCISE: Every word must earn its place. Default to shorter.
+
+- ONE clear CTA per email (not multiple buttons)
+
+- Headlines: 5-10 words max
+
+- Body paragraphs: 2-3 sentences max
+
+- ONE social proof element max (if needed)
+
+- Remove marketing fluff - get to the point
+
+- White space > word count for visual impact
+
+
+
+EMAIL LENGTH TARGETS:
+
+- Transactional: 50-150 words total
+
+- Promotional: 100-200 words total  
+
+- Newsletter: 150-300 words total`;
 
 // ============================================================================
 // VALIDATION CHECKLIST (Modular) - ~100 tokens
@@ -134,20 +187,14 @@ const VALIDATION_CHECKLIST = `PRE-OUTPUT CHECKS:
 // ============================================================================
 
 const DESIGN_PHILOSOPHY = `DESIGN CREATIVITY:
-Think: "What makes THIS email memorable and distinctive in an inbox?"
+Balance distinction with restraint. Effective emails are concise and focused.
 
-- AVOID generic templates - every email should feel custom-designed for its specific purpose
-- Match design intensity to content purpose (urgent vs calm, promotional vs informational)
-- Explore varied layouts - don't default to centered single-column
-- Create visual hierarchy through strategic size, spacing, and color contrast
-- Use white space intentionally - sometimes less is more impactful
-- Apply brand colors purposefully: primary for CTAs/key elements, accent for highlights
-- Typography should create rhythm: vary sizes and weights to guide the eye
-- Let the content's emotional tone drive design choices
-- Reflect brand voice and personality throughout
-- Design for the target audience's expectations and preferences
-
-Challenge yourself: Would someone recognize this as distinct from a template library?`;
+- Visual hierarchy through strategic spacing and color, not content volume
+- ONE primary message, ONE primary CTA
+- White space is a design element - use it generously
+- Quality over quantity in every element
+- Remove anything that doesn't directly support the core goal
+- Let visuals carry weight instead of explaining everything in text`;
 
 // ============================================================================
 // PROMPT BUILDERS
@@ -216,9 +263,10 @@ function buildBrandSection(brandKit?: BrandKit): string {
     sections.push(`VISUAL IDENTITY: ${visualParts.join(" | ")}`);
   }
 
-  // Logo (include if available for image reference)
+  // Logo - critical for brand consistency
   if (brandKit.logo && !brandKit.logo.startsWith('data:')) {
-    sections.push(`LOGO URL: ${brandKit.logo}`);
+    sections.push(`BRAND LOGO: ${brandKit.logo}
+⚠️ ALWAYS use this exact logo URL in the email header. Do NOT use placeholder images or omit the logo.`);
   }
 
   // Website Summary (if available from scraping)
@@ -234,6 +282,7 @@ function buildBrandSection(brandKit?: BrandKit): string {
 
   return `\n=== BRAND GUIDELINES ===\n${sections.join("\n")}\n========================\n
 IMPORTANT: Apply these brand guidelines throughout the email:
+- ALWAYS include the brand logo in the email header using the exact URL provided above
 - Use the brand colors (primary for CTAs, accent for highlights)
 - Match the brand voice and tone in all copy
 - Speak to the target audience appropriately
@@ -303,6 +352,8 @@ ${buildBrandSection(brandKit)}`,
     CRITICAL_RULES,
     COMPONENT_REFERENCE,
     STYLE_GUIDELINES,
+    SOCIAL_ICONS_CDN,
+    CONTENT_GUIDELINES,
   ];
 
   if (verbosity !== "minimal") {
@@ -343,6 +394,8 @@ MODIFICATION RULES:
 - Respect previous customizations
 
 ${CRITICAL_RULES}
+
+${SOCIAL_ICONS_CDN}
 
 ${VALIDATION_CHECKLIST}
 
@@ -478,6 +531,8 @@ export const STATIC_PROMPT_SECTIONS = {
   criticalRules: CRITICAL_RULES,
   componentReference: COMPONENT_REFERENCE,
   styleGuidelines: STYLE_GUIDELINES,
+  socialIconsCdn: SOCIAL_ICONS_CDN,
+  contentGuidelines: CONTENT_GUIDELINES,
   validation: VALIDATION_CHECKLIST,
   designPhilosophy: DESIGN_PHILOSOPHY,
 } as const;

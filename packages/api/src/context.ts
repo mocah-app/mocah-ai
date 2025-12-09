@@ -13,9 +13,8 @@ export async function createContext(req: NextRequest): Promise<ApiContext> {
 
 	// Get active organization if user is authenticated
 	let activeOrganization: OrganizationWithRelations | null = null;
-	if (session?.session) {
-		// @ts-expect-error - Better Auth organization plugin extends session with activeOrganizationId
-		const activeOrgId = session.session.activeOrganizationId as string | undefined;
+	if (session) {
+		const activeOrgId = session.session.activeOrganizationId;
 		
 		if (activeOrgId) {
 			try {

@@ -1,5 +1,5 @@
 import { initTRPC, TRPCError } from "@trpc/server";
-import type { ApiContext } from "./types";
+import type { ApiContext, Session } from "./types";
 
 export const t = initTRPC.context<ApiContext>().create();
 
@@ -18,7 +18,8 @@ export const protectedProcedure = t.procedure.use(({ ctx, next }) => {
   return next({
     ctx: {
       ...ctx,
-      session: ctx.session,
+      // Explicit cast to non-nullable session after null check
+      session: ctx.session as Session,
     },
   });
 });

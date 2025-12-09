@@ -7,6 +7,7 @@ import "./src/env";
 const nextConfig: NextConfig = {
   typedRoutes: true,
   reactCompiler: true,
+  serverExternalPackages: ["sharp"],
   images: {
     remotePatterns: [
       {
@@ -20,6 +21,10 @@ const nextConfig: NextConfig = {
       {
         protocol: "https",
         hostname: "fly.storage.tigris.dev",
+      },
+      {
+        protocol: "https",
+        hostname: "mocah-user-brand-assets.fly.storage.tigris.dev",
       },
     ],
   },
