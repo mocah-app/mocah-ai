@@ -16,6 +16,8 @@ interface UseStreamTemplateOptions {
   maxRetries?: number;
   /** API endpoint (default: /api/template/generate) */
   apiEndpoint?: string;
+  /** Whether to include brand guide (default: true) */
+  includeBrandGuide?: boolean;
 }
 
 /**
@@ -29,6 +31,7 @@ export function useStreamTemplate({
   onError,
   maxRetries = 2,
   apiEndpoint = "/api/template/generate",
+  includeBrandGuide = true,
 }: UseStreamTemplateOptions) {
   const [isGenerating, setIsGenerating] = useState(false);
   const [retryCount, setRetryCount] = useState(0);
@@ -87,7 +90,7 @@ export function useStreamTemplate({
   });
 
   const generate = useCallback(
-    async (prompt: string, imageUrls?: string[]) => {
+    async (prompt: string, imageUrls?: string[], brandGuidePreference?: boolean) => {
       setIsGenerating(true);
       setRetryCount(0);
       lastPromptRef.current = prompt;
@@ -107,12 +110,15 @@ export function useStreamTemplate({
       if (imageUrls && imageUrls.length > 0) {
         body.imageUrls = imageUrls;
       }
+
+      // Add brand guide preference (use parameter if provided, otherwise use hook option)
+      body.includeBrandGuide = brandGuidePreference !== undefined ? brandGuidePreference : includeBrandGuide;
       
       lastBodyRef.current = body;
 
       await submit(body);
     },
-    [submit, organizationId, templateId]
+    [submit, organizationId, templateId, includeBrandGuide]
   );
 
   const cancel = useCallback(() => {

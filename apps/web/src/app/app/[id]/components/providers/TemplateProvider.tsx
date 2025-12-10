@@ -58,9 +58,9 @@ interface TemplateActions {
   deleteVersion: (versionId: string) => Promise<void>;
   updateElement: (elementPath: string, data: any) => void;
   regenerateElement: (elementPath: string, prompt: string) => Promise<void>;
-  regenerateTemplate: (prompt: string, imageUrls?: string[]) => Promise<void>;
+  regenerateTemplate: (prompt: string, imageUrls?: string[], includeBrandGuide?: boolean) => Promise<void>;
   generateTemplate: (prompt: string) => Promise<Template | null>;
-  generateTemplateStream: (prompt: string, imageUrls?: string[]) => Promise<void>;
+  generateTemplateStream: (prompt: string, imageUrls?: string[], includeBrandGuide?: boolean) => Promise<void>;
   cancelGeneration: () => void;
   setIsDirty: (dirty: boolean) => void;
   onPreviewRenderComplete: () => void; // Called when preview finishes rendering
@@ -616,7 +616,7 @@ export function TemplateProvider({
   );
 
   const regenerateTemplate = useCallback(
-    async (prompt: string, imageUrls?: string[]) => {
+    async (prompt: string, imageUrls?: string[], includeBrandGuide?: boolean) => {
       if (!state.currentTemplate) {
         throw new Error("No template loaded");
       }
@@ -636,7 +636,7 @@ export function TemplateProvider({
           imageCount: imageUrls?.length || 0,
         });
 
-        await regenerateStream(prompt, imageUrls);
+        await regenerateStream(prompt, imageUrls, includeBrandGuide);
       } catch (error) {
         console.error("Failed to regenerate template:", error);
         setState((prev) => ({
@@ -649,7 +649,7 @@ export function TemplateProvider({
         throw error;
       }
     },
-    [state.currentTemplate, regenerateStream]
+    [state.currentTemplate, regenerateStream, activeOrganization]
   );
 
   const generateTemplate = useCallback(
@@ -746,7 +746,7 @@ export function TemplateProvider({
   }, [refetch]);
 
   const generateTemplateStream = useCallback(
-    async (prompt: string, imageUrls?: string[]) => {
+    async (prompt: string, imageUrls?: string[], includeBrandGuide?: boolean) => {
       if (!activeOrganization?.id) {
         throw new Error("No organization selected");
       }
@@ -760,7 +760,7 @@ export function TemplateProvider({
       }));
 
       try {
-        await generateStream(prompt, imageUrls);
+        await generateStream(prompt, imageUrls, includeBrandGuide);
       } catch (error) {
         console.error("Failed to generate template stream:", error);
         setState((prev) => ({

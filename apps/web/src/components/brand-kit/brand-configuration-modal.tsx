@@ -376,7 +376,7 @@ export function BrandConfigurationModal() {
         </DialogHeader>
 
         {/* Content */}
-        <div className="flex flex-1 h-full overflow-hidden">
+        <div className="flex flex-col md:flex-row flex-1 h-full overflow-hidden">
           {/* Sidebar Navigation */}
           <BrandConfigNav
             activeSection={activeSection}
@@ -384,7 +384,7 @@ export function BrandConfigurationModal() {
           />
 
           {/* Main Content Area - Split Layout */}
-          <div className="flex-1 flex overflow-hidden">
+          <div className="flex-1 flex overflow-hidden border-t md:border-t-0 md:border-x border-border">
             {isLoading ? (
               <div className="flex-1 flex items-center justify-center">
                 <MocahLoadingIcon />

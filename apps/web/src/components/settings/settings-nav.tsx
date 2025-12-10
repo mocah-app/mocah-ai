@@ -3,33 +3,14 @@
 import * as motion from "motion/react-client";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
-import {
-  Building2,
-  FileText,
-  Globe,
-  Heart,
-  Package,
-  Palette,
-  Share2,
-  Sparkles,
-  Type,
-} from "lucide-react";
+import { Bell, DollarSign, Palette } from "lucide-react";
 import { useEffect, useRef } from "react";
 
 // ============================================================================
 // Types
 // ============================================================================
 
-export type SectionId =
-  | "identity"
-  | "colors"
-  | "typography"
-  | "personality"
-  | "company"
-  | "social"
-  | "products"
-  | "values"
-  | "ai-data";
+export type SectionId = "brand" | "notifications" | "billing";
 
 interface NavItem {
   id: SectionId;
@@ -38,7 +19,7 @@ interface NavItem {
   description?: string;
 }
 
-interface BrandConfigNavProps {
+interface SettingsNavProps {
   activeSection: SectionId;
   onNavigate: (sectionId: SectionId) => void;
 }
@@ -49,58 +30,22 @@ interface BrandConfigNavProps {
 
 const NAV_ITEMS: NavItem[] = [
   {
-    id: "identity",
-    label: "Identity",
-    icon: Building2,
-    description: "Name, logo, and tagline",
-  },
-  {
-    id: "colors",
-    label: "Colors",
+    id: "brand",
+    label: "Brand",
     icon: Palette,
-    description: "Brand color palette",
+    description: "Brand settings and preferences",
   },
   {
-    id: "typography",
-    label: "Typography",
-    icon: Type,
-    description: "Fonts and styling",
+    id: "notifications",
+    label: "Notifications",
+    icon: Bell,
+    description: "Notification preferences",
   },
   {
-    id: "personality",
-    label: "Personality",
-    icon: Sparkles,
-    description: "Voice, tone, and energy",
-  },
-  {
-    id: "company",
-    label: "Company",
-    icon: Globe,
-    description: "Business details",
-  },
-  {
-    id: "social",
-    label: "Social Links",
-    icon: Share2,
-    description: "Social media profiles",
-  },
-  {
-    id: "products",
-    label: "Products",
-    icon: Package,
-    description: "Products & services",
-  },
-  {
-    id: "values",
-    label: "Values",
-    icon: Heart,
-    description: "Brand values",
-  },
-  {
-    id: "ai-data",
-    label: "AI Data",
-    icon: FileText,
-    description: "Scraped content",
+    id: "billing",
+    label: "Billing",
+    icon: DollarSign,
+    description: "Manage your subscription and billing",
   },
 ];
 
@@ -108,10 +53,10 @@ const NAV_ITEMS: NavItem[] = [
 // Component
 // ============================================================================
 
-export function BrandConfigNav({
+export function SettingsNav({
   activeSection,
   onNavigate,
-}: BrandConfigNavProps) {
+}: SettingsNavProps) {
   const scrollContainerRef = useRef<HTMLDivElement>(null);
   const navItemRefs = useRef<Record<SectionId, HTMLDivElement | null>>(
     {} as any
@@ -219,7 +164,7 @@ function NavItem({
         {isActive && (
           <motion.div
             className="absolute left-0 md:left-0 top-auto md:top-1/2 md:-translate-y-1/2 bottom-0 md:bottom-auto w-full md:w-0.5 h-0.5 md:h-6 bg-primary rounded-full md:rounded-full"
-            layoutId="brandNavActiveIndicator"
+            layoutId="settingsNavActiveIndicator"
             transition={{
               type: "spring",
               stiffness: 380,
@@ -233,4 +178,3 @@ function NavItem({
 }
 
 export { NAV_ITEMS };
-

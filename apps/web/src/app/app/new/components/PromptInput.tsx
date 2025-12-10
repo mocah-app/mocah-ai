@@ -1,14 +1,14 @@
 "use client";
 
+import Loader from "@/components/loader";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
+import type { Attachment } from "@/types/images";
 import { Send } from "lucide-react";
 import React from "react";
-import Loader from "@/components/loader";
 import AttachmentPopover from "./AttachmentPopover";
+import FilterPopover from "./FilterPopover";
 import ImagePreviewBlob from "./ImagePreviewBlob";
-import type { Attachment } from "@/types/images";
-
 
 export interface PromptInputProps {
   value: string;
@@ -22,6 +22,8 @@ export interface PromptInputProps {
   onPasteUrlClick: () => void;
   onPaste?: (e: React.ClipboardEvent<HTMLTextAreaElement>) => void;
   placeholder?: string;
+  includeBrandGuide: boolean;
+  onBrandGuideChange: (include: boolean) => void;
 }
 
 export default function PromptInput({
@@ -36,6 +38,8 @@ export default function PromptInput({
   onPasteUrlClick,
   onPaste,
   placeholder = "Please create black friday email showing our trending products",
+  includeBrandGuide,
+  onBrandGuideChange,
 }: PromptInputProps) {
   const hasUploadingAttachment = attachments.some(
     (att) => att.status === "uploading"
@@ -63,7 +67,12 @@ export default function PromptInput({
               onPasteUrlClick={onPasteUrlClick}
               disabled={isLoading}
             />
-            
+            <FilterPopover
+              disabled={isLoading}
+              includeBrandGuide={includeBrandGuide}
+              onBrandGuideChange={onBrandGuideChange}
+            />
+
             {/* Attachment Preview Blobs */}
             {attachments.map((attachment) => (
               <ImagePreviewBlob

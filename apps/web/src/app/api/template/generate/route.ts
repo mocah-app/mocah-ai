@@ -12,6 +12,7 @@ import {
   cacheMembership,
   getCachedBrandKit,
   cacheBrandKit,
+  getCachedBrandGuidePreference,
 } from "./cache";
 
 // Schema metadata for AI reliability (also exported from prompts.ts after rebuild)
@@ -37,7 +38,7 @@ export async function POST(req: NextRequest) {
     }
 
     // 2. Parse request body
-    const { prompt, organizationId, imageUrls } = await req.json();
+    const { prompt, organizationId, imageUrls, includeBrandGuide } = await req.json();
 
     if (!prompt || !organizationId) {
       return new Response(JSON.stringify({ error: "Missing required fields" }), {
@@ -50,7 +51,13 @@ export async function POST(req: NextRequest) {
 
     // 3. Check cache first, then DB if needed
     let isMember = await getCachedMembership(userId, organizationId);
-    let brandKit = await getCachedBrandKit(organizationId);
+    
+    // Check brand guide preference (default to true if not provided for backward compatibility)
+    const shouldIncludeBrandGuide = includeBrandGuide !== undefined 
+      ? includeBrandGuide 
+      : (await getCachedBrandGuidePreference(userId, organizationId)) ?? true;
+    
+    let brandKit = shouldIncludeBrandGuide ? await getCachedBrandKit(organizationId) : null;
 
     // Collect promises for any cache misses
     const dbQueries: Promise<void>[] = [];
@@ -66,7 +73,7 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    if (brandKit === null) {
+    if (shouldIncludeBrandGuide && brandKit === null) {
       dbQueries.push(
         prisma.organization.findUnique({
           where: { id: organizationId },

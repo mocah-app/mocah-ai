@@ -18,7 +18,7 @@ import { useTemplateCreation } from "@/utils/store-prompt-in-session";
 import { trpc } from "@/utils/trpc";
 import { CircleChevronUp } from "lucide-react";
 import { useRouter } from "next/navigation";
-import React, { useCallback, useRef, useState } from "react";
+import React, { useCallback, useRef, useState, useEffect } from "react";
 import { toast } from "sonner";
 import PromptInput from "./components/PromptInput";
 
@@ -31,7 +31,24 @@ export default function NewTemplatePage() {
   const [attachments, setAttachments] = useState<Attachment[]>([]);
   const [isUrlDialogOpen, setIsUrlDialogOpen] = useState(false);
   const [urlInput, setUrlInput] = useState("");
+  const [includeBrandGuide, setIncludeBrandGuide] = useState(true);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // Fetch brand guide preference
+  const { data: brandGuidePreference } = trpc.brandGuide.getPreference.useQuery(
+    undefined,
+    {
+      enabled: !!activeOrganization?.id,
+      refetchOnWindowFocus: false,
+    }
+  );
+
+  // Update local state when preference is fetched
+  useEffect(() => {
+    if (brandGuidePreference !== undefined) {
+      setIncludeBrandGuide(brandGuidePreference);
+    }
+  }, [brandGuidePreference]);
 
   const createSkeletonMutation = trpc.template.create.useMutation({
     onSuccess: () => {
@@ -313,6 +330,8 @@ export default function NewTemplatePage() {
           onUploadClick={handleUploadClick}
           onPasteUrlClick={handlePasteUrlClick}
           onPaste={handlePaste}
+          includeBrandGuide={includeBrandGuide}
+          onBrandGuideChange={setIncludeBrandGuide}
         />
 
         {/* Hidden file input */}

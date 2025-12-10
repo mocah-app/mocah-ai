@@ -12,6 +12,7 @@ import {
   cacheMembership,
   getCachedBrandKit,
   cacheBrandKit,
+  getCachedBrandGuidePreference,
 } from "../generate/cache";
 
 // Schema metadata for AI reliability
@@ -37,7 +38,7 @@ export async function POST(req: NextRequest) {
     }
 
     // 2. Parse request body
-    const { prompt, templateId, imageUrls } = await req.json();
+    const { prompt, templateId, imageUrls, includeBrandGuide } = await req.json();
 
     if (!prompt || !templateId) {
       return new Response(JSON.stringify({ error: "Missing required fields" }), {
@@ -72,7 +73,13 @@ export async function POST(req: NextRequest) {
 
     // 4. Check cache first, then DB if needed
     let isMember = await getCachedMembership(userId, template.organizationId);
-    let brandKit = await getCachedBrandKit(template.organizationId);
+    
+    // Check brand guide preference (default to true if not provided for backward compatibility)
+    const shouldIncludeBrandGuide = includeBrandGuide !== undefined 
+      ? includeBrandGuide 
+      : (await getCachedBrandGuidePreference(userId, template.organizationId)) ?? true;
+    
+    let brandKit = shouldIncludeBrandGuide ? await getCachedBrandKit(template.organizationId) : null;
 
     // Collect promises for any cache misses
     const dbQueries: Promise<void>[] = [];
@@ -88,7 +95,7 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    if (brandKit === null && template.organization.brandKit) {
+    if (shouldIncludeBrandGuide && brandKit === null && template.organization.brandKit) {
       brandKit = template.organization.brandKit;
       dbQueries.push(
         cacheBrandKit(template.organizationId, brandKit)

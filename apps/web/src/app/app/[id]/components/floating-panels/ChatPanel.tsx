@@ -14,6 +14,7 @@ import { toast } from "sonner";
 import type { Message, GenerationResult } from "../chat-panel/MessageItem";
 import { MessageList } from "../chat-panel/MessageList";
 import AttachmentPopover from "@/app/app/new/components/AttachmentPopover";
+import FilterPopover from "@/app/app/new/components/FilterPopover";
 import ImagePreviewBlob from "@/app/app/new/components/ImagePreviewBlob";
 import { useImageUpload } from "../image-studio/hooks/useImageUpload";
 import { useOrganization } from "@/contexts/organization-context";
@@ -72,6 +73,7 @@ export const ChatPanel = ({
   const [isUrlDialogOpen, setIsUrlDialogOpen] = useState(false);
   const [urlInput, setUrlInput] = useState("");
   const [textareaMinHeight, setTextareaMinHeight] = useState(100);
+  const [includeBrandGuide, setIncludeBrandGuide] = useState(true);
 
   // Image preview modal state
   const [imagePreviewOpen, setImagePreviewOpen] = useState(false);
@@ -92,6 +94,22 @@ export const ChatPanel = ({
       { templateId },
       { enabled: !!templateId && !!templateState.currentTemplate }
     );
+
+  // Fetch brand guide preference
+  const { data: brandGuidePreference } = trpc.brandGuide.getPreference.useQuery(
+    undefined,
+    {
+      enabled: !!activeOrganization?.id,
+      refetchOnWindowFocus: false,
+    }
+  );
+
+  // Update local state when preference is fetched
+  React.useEffect(() => {
+    if (brandGuidePreference !== undefined) {
+      setIncludeBrandGuide(brandGuidePreference);
+    }
+  }, [brandGuidePreference]);
 
   const createMessageMutation = trpc.chat.create.useMutation();
   const updateMessageMutation = trpc.chat.update.useMutation();
@@ -404,8 +422,8 @@ export const ChatPanel = ({
         // 3. Start generation immediately (UX: user sees streaming right away)
         // imageUrls was already determined above when creating the user message
         const generationPromise = isNewTemplate
-          ? templateActions.generateTemplateStream(trimmedPrompt, imageUrls)
-          : templateActions.regenerateTemplate(trimmedPrompt, imageUrls);
+          ? templateActions.generateTemplateStream(trimmedPrompt, imageUrls, includeBrandGuide)
+          : templateActions.regenerateTemplate(trimmedPrompt, imageUrls, includeBrandGuide);
 
         // 4. Define message persistence function
         const persistMessages = async () => {
@@ -749,11 +767,18 @@ export const ChatPanel = ({
 
           {/* Attachment Controls */}
           <div className="absolute px-1 pr-5 left-2 bottom-2 w-full flex items-center gap-1 mt-1 mb-1  justify-between">
-            <AttachmentPopover
-              onUploadClick={handleUploadClick}
-              onPasteUrlClick={handlePasteUrlClick}
-              disabled={isLoading}
-            />
+            <div className="flex items-center gap-1">
+              <AttachmentPopover
+                onUploadClick={handleUploadClick}
+                onPasteUrlClick={handlePasteUrlClick}
+                disabled={isLoading}
+              />
+              <FilterPopover
+                disabled={isLoading}
+                includeBrandGuide={includeBrandGuide}
+                onBrandGuideChange={setIncludeBrandGuide}
+              />
+            </div>
 
             {isLoading ? (
               <Button
