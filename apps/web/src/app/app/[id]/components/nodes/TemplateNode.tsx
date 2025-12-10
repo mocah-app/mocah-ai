@@ -47,7 +47,7 @@ export function TemplateNode({ data, id }: TemplateNodeProps) {
   const hasSmartEditorPendingChanges = state.allPendingChanges.size > 0;
 
   return (
-    <div className="bg-background rounded-lg shadow-lg border border-border w-[700px] relative">
+    <div className="bg-background rounded-lg shadow-lg border border-border w-[600px] relative">
       {/* Connection handles */}
       <Handle
         type="source"
