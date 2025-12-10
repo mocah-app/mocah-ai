@@ -33,7 +33,7 @@
     "@openrouter/ai-sdk-provider": "^1.2.5",
     "@trpc/client": "catalog:",
     "@trpc/server": "catalog:",
-    "ai": "^5.0.104",
+    "ai": "catalog:",
     "dotenv": "catalog:",
     "jsonrepair": "^3.13.1",
     "next": "catalog:",
