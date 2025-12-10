@@ -88,7 +88,10 @@ const CRITICAL_RULES = `⚠️ CRITICAL RULES - STRICTLY ENFORCED (code REJECTED
    ❌ BAD: export const X = () => ...
    ✅ GOOD: export default function ComponentName()
 
-6. NO 'as' prop on Heading: <Heading style={...}> only`;
+6. NO 'as' prop on <Heading> component - it handles semantic structure automatically
+   ❌ WRONG: <Heading as="h2" style={heading}>Title</Heading>
+   ✅ RIGHT: <Heading style={heading}>Title</Heading>
+   The Heading component manages its own semantic HTML internally`;
 
 // ============================================================================
 // TIER 2: COMPONENT REFERENCE - ~200 tokens
@@ -121,6 +124,26 @@ Examples:
 Usage: <Img src="https://cdn.mocah.ai/icons/twitter.png" alt="Twitter" width="24" height="24" />
 
 Center all the icons in the footer.
+
+`;
+
+// ============================================================================
+// IMAGE PLACEHOLDERS - ~80 tokens
+// ============================================================================
+
+const IMAGE_PLACEHOLDERS = `IMAGE PLACEHOLDERS:
+For placeholder images in templates, use: https://cdn.mocah.ai/placeholder/{dimension}.png
+
+Available dimensions:
+- landscape: https://cdn.mocah.ai/placeholder/landscape.png (16:9 ratio, ideal for hero images, banners)
+- portrait: https://cdn.mocah.ai/placeholder/portrait.png (9:16 ratio, ideal for mobile-first content)
+- square: https://cdn.mocah.ai/placeholder/square.png (1:1 ratio, ideal for profile, product, images, thumbnails)
+
+Usage examples:
+<Img src="https://cdn.mocah.ai/placeholder/landscape.png" alt="Placeholder" width="600" />
+<Img src="https://cdn.mocah.ai/placeholder/square.png" alt="Placeholder" width="200" height="200" />
+
+⚠️ ALWAYS use these placeholder URLs instead of random image URLs (unsplash, picsum, etc.)
 
 `;
 
@@ -177,7 +200,7 @@ const VALIDATION_CHECKLIST = `PRE-OUTPUT CHECKS:
 □ Inline tags (<b>, <strong>, <em>, <i>) only inside <Text> components
 □ No nested Text: pattern "Text>.*<Text" = 0 matches
 □ No display: property
-□ No Heading as= prop
+□ CRITICAL: No 'as' prop on <Heading> - search for 'as=' in all Heading components and remove it
 □ export default function exists
 □ All textAlign/verticalAlign have 'as const'
 □ <Text> count = </Text> count`;
@@ -372,6 +395,7 @@ IMPORTANT: Pay close attention to the user's language to understand their intent
     COMPONENT_REFERENCE,
     STYLE_GUIDELINES,
     SOCIAL_ICONS_CDN,
+    IMAGE_PLACEHOLDERS,
     CONTENT_GUIDELINES
   );
 
@@ -421,6 +445,8 @@ MODIFICATION RULES:
 ${CRITICAL_RULES}
 
 ${SOCIAL_ICONS_CDN}
+
+${IMAGE_PLACEHOLDERS}
 
 ${VALIDATION_CHECKLIST}
 
@@ -623,6 +649,7 @@ export const STATIC_PROMPT_SECTIONS = {
   componentReference: COMPONENT_REFERENCE,
   styleGuidelines: STYLE_GUIDELINES,
   socialIconsCdn: SOCIAL_ICONS_CDN,
+  imagePlaceholders: IMAGE_PLACEHOLDERS,
   contentGuidelines: CONTENT_GUIDELINES,
   validation: VALIDATION_CHECKLIST,
   designPhilosophy: DESIGN_PHILOSOPHY,

@@ -1,23 +1,47 @@
 "use client";
-import { useEffect, useRef, useCallback } from "react";
 import BrandKitSetupBanner from "@/components/brand-kit/BrandKitSetupBanner";
+import Loader from "@/components/loader";
+import { TemplatePreview } from "@/components/template/TemplatePreview";
 import { Button } from "@/components/ui/button";
 import {
   Card,
   CardContent,
   CardDescription,
+  CardFooter,
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useOrganization } from "@/contexts/organization-context";
-import { FileText, Plus, Send } from "lucide-react";
+import { trpc } from "@/utils/trpc";
+import { formatDistanceToNow } from "date-fns";
+import {
+  ChevronsUp,
+  CopyPlus,
+  FileText,
+  MoreHorizontal,
+  Plus,
+  Trash2,
+} from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { formatDistanceToNow } from "date-fns";
-import { trpc } from "@/utils/trpc";
-import { Textarea } from "@/components/ui/textarea";
-import Loader from "@/components/loader";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 
 interface TemplateCardProps {
@@ -26,25 +50,151 @@ interface TemplateCardProps {
     name: string;
     updatedAt: string | Date;
     isFavorite: boolean | null;
+    htmlCode: string | null;
     _count: {
       versions: number;
     };
   };
 }
 
+const TemplateCardMenu = ({
+  template,
+}: {
+  template: TemplateCardProps["template"];
+}) => {
+  const router = useRouter();
+  const utils = trpc.useUtils();
+  const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+
+  const duplicateMutation = trpc.template.duplicate.useMutation({
+    onSuccess: (data) => {
+      toast.success("Template duplicated successfully");
+      utils.template.list.invalidate();
+      router.push(`/app/${(data as { id: string }).id}`);
+    },
+    onError: (error) => {
+      toast.error(error.message || "Failed to duplicate template");
+    },
+  });
+
+  const deleteMutation = trpc.template.delete.useMutation({
+    onSuccess: () => {
+      utils.template.list.invalidate();
+      setShowDeleteDialog(false);
+    },
+    onError: (error: { message?: string }) => {
+      toast.error(error.message || "Failed to delete template", {
+        id: `delete-${template.id}`,
+      });
+    },
+  });
+
+  const handleRemix = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    toast.loading("Duplicating template...", {
+      id: `duplicate-${template.id}`,
+    });
+    duplicateMutation.mutate(
+      { id: template.id },
+      {
+        onSuccess: () => {
+          toast.success("Template duplicated successfully", {
+            id: `duplicate-${template.id}`,
+          });
+        },
+        onError: (error) => {
+          toast.error(error.message || "Failed to duplicate template", {
+            id: `duplicate-${template.id}`,
+          });
+        },
+      }
+    );
+  };
+
+  const handleDelete = () => {
+    const toastId = `delete-${template.id}`;
+    toast.loading("Deleting template...", { id: toastId });
+    deleteMutation.mutate(
+      { id: template.id },
+      {
+        onSuccess: () => {
+          toast.success("Template deleted successfully", { id: toastId });
+        },
+      }
+    );
+  };
+
+  const handleDeleteClick = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    setShowDeleteDialog(true);
+  };
+
+  return (
+    <>
+      <DropdownMenu>
+        <DropdownMenuTrigger asChild>
+          <Button variant="secondary" size="icon" className="">
+            <MoreHorizontal className="h-4 w-4" />
+          </Button>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent>
+          <DropdownMenuItem
+            onClick={handleRemix}
+            disabled={duplicateMutation.isPending}
+          >
+            <CopyPlus className="h-4 w-4" />
+            Remix
+          </DropdownMenuItem>
+          <DropdownMenuItem>
+            <ChevronsUp className="h-4 w-4" />
+            Export
+          </DropdownMenuItem>
+          <DropdownMenuItem variant="destructive" onClick={handleDeleteClick}>
+            <Trash2 className="h-4 w-4" />
+            Delete
+          </DropdownMenuItem>
+        </DropdownMenuContent>
+      </DropdownMenu>
+
+      <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
+        <AlertDialogContent className="sm:max-w-sm">
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete Template</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to delete{" "}
+              <span className="font-bold text-destructive">
+                {template.name}
+              </span>
+              ? This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleDelete}
+              disabled={deleteMutation.isPending}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              {deleteMutation.isPending ? "Deleting..." : "Delete"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </>
+  );
+};
+
 const TemplateCard = ({ template }: TemplateCardProps) => {
   return (
-    <Link href={`/app/${template.id}`}>
-      <Card className="gap-0 hover:shadow-md transition-all duration-300 group p-0 h-full overflow-hidden">
-        <CardHeader className="p-0">
+    <Card className="gap-0 hover:shadow-md transition-all duration-300 p-0 h-full overflow-hidden">
+      <Link href={`/app/${template.id}`}>
+        <CardHeader className="p-0 group">
           <div className="flex items-start justify-between">
             <div className="flex-1">
-              <div className="flex items-center gap-2 w-full h-28 bg-primary/10 bg-dot opacity-25">
-                <span className="text-muted-foreground w-full text-center">
-                  Preview
-                </span>
+              <div className="relative  group-hover:scale-105 group-focus:scale-105 transition-all duration-300">
+                <TemplatePreview htmlCode={template.htmlCode} />
               </div>
-              <CardTitle className="group-hover:text-primary transition-colors duration-300 p-4 text-lg lg:text-xl">
+              <CardTitle className="group-hover:text-primary truncate  w-[95%] transition-colors duration-300 p-4 text-lg">
                 {template.name}
               </CardTitle>
             </div>
@@ -52,20 +202,27 @@ const TemplateCard = ({ template }: TemplateCardProps) => {
               <span className="text-yellow-500 text-sm">★</span>
             )}
           </div>
-          <div className="flex items-center justify-between text-xs text-muted-foreground mt-2 p-2">
-            <div className="flex items-center gap-2">
-              <FileText className="h-3 w-3" />
-              <span>{template._count.versions} versions</span>
-            </div>
-            <span>
-              {formatDistanceToNow(new Date(template.updatedAt), {
-                addSuffix: true,
-              })}
+        </CardHeader>
+      </Link>
+      <CardFooter className="p-0 w-full border-t border-border">
+        <div className="flex items-center justify-between text-xs text-muted-foreground mt-2 p-4 w-full">
+          <div className="flex items-center gap-2">
+            <FileText className="h-3 w-3" />
+            <span className="truncate w-[95%]">
+              {template._count.versions} versions
             </span>
           </div>
-        </CardHeader>
-      </Card>
-    </Link>
+          <span className="truncate w-[95%]">
+            {formatDistanceToNow(new Date(template.updatedAt), {
+              addSuffix: true,
+            })}
+          </span>
+          <div className="flex items-center justify-end">
+            <TemplateCardMenu template={template} />
+          </div>
+        </div>
+      </CardFooter>
+    </Card>
   );
 };
 
@@ -82,7 +239,6 @@ const TemplateListSkeleton = () => (
     ))}
   </div>
 );
-
 
 const TEMPLATES_PER_PAGE = 6;
 
@@ -230,7 +386,11 @@ export default function Dashboard() {
               {templates.length} of {templateCount}
             </span>
           )}
-          <Button onClick={handleCreateTemplate} className="self-end ml-auto" disabled={orgLoading}>
+          <Button
+            onClick={handleCreateTemplate}
+            className="self-end ml-auto"
+            disabled={orgLoading}
+          >
             <Plus className="h-4 w-4" />
             Create
           </Button>

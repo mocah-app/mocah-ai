@@ -1,12 +1,12 @@
 import { NextRequest } from "next/server";
 import { auth } from "@mocah/auth";
 import {
-  invalidateBrandKitCache,
   getCachedMembership,
   cacheMembership,
-} from "../../template/generate/cache";
+} from "@mocah/shared/cache";
 import { logger } from "@mocah/shared";
 import prisma from "@mocah/db";
+import { invalidateBrandKitCache } from "../../template/generate/cache";
 
 /**
  * API endpoint to invalidate server-side caches

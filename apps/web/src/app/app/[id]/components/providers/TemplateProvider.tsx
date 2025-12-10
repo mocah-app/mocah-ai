@@ -157,12 +157,27 @@ export function TemplateProvider({
           styleDefinitions = styleDefs;
         }
 
+        // Generate HTML client-side for preview caching
+        let htmlCode: string | undefined;
+        if (template.reactEmailCode) {
+          try {
+            const { renderReactEmailClientSide } = await import("@/lib/react-email/client-renderer");
+            htmlCode = await renderReactEmailClientSide(template.reactEmailCode, { skipCache: false });
+          } catch (renderError) {
+            // Log but don't fail the save if HTML generation fails
+            logger.warn("[TemplateProvider] Failed to generate HTML for preview:", {
+              error: renderError instanceof Error ? renderError.message : String(renderError),
+            });
+          }
+        }
+
         // Log the data being saved for debugging
         const updatePayload = {
           id: templateId,
           name: template.subject || "AI Generated Template",
           subject: template.subject,
           reactEmailCode: template.reactEmailCode,
+          htmlCode: htmlCode,
           styleType: mappedStyleType,
           styleDefinitions,
           previewText: template.previewText,
@@ -176,6 +191,7 @@ export function TemplateProvider({
           previewText: updatePayload.previewText,
           styleType: updatePayload.styleType,
           reactEmailCodeLength: updatePayload.reactEmailCode?.length || 0,
+          htmlCodeLength: htmlCode?.length || 0,
           styleDefinitionsKeys: Object.keys(styleDefinitions),
         });
 
@@ -554,11 +570,26 @@ export function TemplateProvider({
     if (!state.currentTemplate) return;
 
     try {
+      // Generate HTML client-side for preview caching
+      let htmlCode: string | undefined;
+      if (state.reactEmailCode) {
+        try {
+          const { renderReactEmailClientSide } = await import("@/lib/react-email/client-renderer");
+          htmlCode = await renderReactEmailClientSide(state.reactEmailCode, { skipCache: false });
+        } catch (renderError) {
+          // Log but don't fail the save if HTML generation fails
+          logger.warn("[TemplateProvider] Failed to generate HTML for preview:", {
+            error: renderError instanceof Error ? renderError.message : String(renderError),
+          });
+        }
+      }
+
       await updateMutation.mutateAsync({
         id: state.currentTemplate.id,
         reactEmailCode: state.reactEmailCode || undefined,
+        htmlCode: htmlCode,
         styleDefinitions: state.styleDefinitions,
-      });
+      } as any); // Type assertion needed until tRPC types regenerate
       console.log("Template saved");
       setState((prev) => ({ ...prev, isDirty: false }));
     } catch (error) {
@@ -718,11 +749,24 @@ export function TemplateProvider({
     }
 
     try {
+      // Generate HTML client-side for preview caching
+      let htmlCode: string | undefined;
+      try {
+        const { renderReactEmailClientSide } = await import("@/lib/react-email/client-renderer");
+        htmlCode = await renderReactEmailClientSide(code, { skipCache: false });
+      } catch (renderError) {
+        // Log but don't fail the save if HTML generation fails
+        logger.warn("[TemplateProvider] Failed to generate HTML for preview:", {
+          error: renderError instanceof Error ? renderError.message : String(renderError),
+        });
+      }
+
       await updateMutation.mutateAsync({
         id: state.currentTemplate.id,
         reactEmailCode: code,
+        htmlCode: htmlCode,
         styleDefinitions: styleDefinitions,
-      });
+      } as any); // Type assertion needed until tRPC types regenerate
 
       // Update local state
       setState((prev) => ({

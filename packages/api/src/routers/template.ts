@@ -10,6 +10,7 @@ import {
 } from "../lib/prompts";
 import { repairHtmlTags } from "../lib/html-tag-repair";
 import { validateReactEmailCode, logger } from "@mocah/shared";
+import { checkMembership } from "../lib/membership-cache";
 
 // Valid style type values for templates
 const VALID_STYLE_TYPES = ["INLINE", "PREDEFINED_CLASSES", "STYLE_OBJECTS"] as const;
@@ -27,6 +28,7 @@ function validateStyleType(styleType: string): StyleType {
   logger.warn(`⚠️ Invalid styleType "${styleType}", defaulting to STYLE_OBJECTS`);
   return "STYLE_OBJECTS";
 }
+
 
 export const templateRouter = router({
   /**
@@ -139,6 +141,7 @@ export const templateRouter = router({
             name: true,
             updatedAt: true,
             isFavorite: true,
+            htmlCode: true, // Include cached HTML for preview
             _count: {
               select: {
                 versions: true,
@@ -430,6 +433,7 @@ export const templateRouter = router({
         category: z.string().optional(),
         isPublic: z.boolean().default(false),
         reactEmailCode: z.string(),
+        htmlCode: z.string().optional(), // Rendered HTML (generated client-side)
         styleType: z.enum(["INLINE", "PREDEFINED_CLASSES", "STYLE_OBJECTS"]).default("STYLE_OBJECTS"),
         styleDefinitions: z.record(z.string(), z.any()).optional(),
         previewText: z.string().optional(),
@@ -506,6 +510,7 @@ export const templateRouter = router({
         isPublic: z.boolean().optional(),
         isFavorite: z.boolean().optional(),
         reactEmailCode: z.string().optional(),
+        htmlCode: z.string().optional(), // Rendered HTML (generated client-side)
         styleType: z.enum(["INLINE", "PREDEFINED_CLASSES", "STYLE_OBJECTS"]).optional(),
         styleDefinitions: z.record(z.string(), z.any()).optional(),
         previewText: z.string().optional(),
@@ -526,14 +531,13 @@ export const templateRouter = router({
         });
       }
 
-      const membership = await ctx.db.member.findFirst({
-        where: {
-          userId: ctx.session.user.id,
-          organizationId: template.organizationId,
-        },
-      });
+      const isMember = await checkMembership(
+        ctx.db,
+        ctx.session.user.id,
+        template.organizationId
+      );
 
-      if (!membership) {
+      if (!isMember) {
         throw new TRPCError({
           code: "FORBIDDEN",
           message: "You do not have access to this template",
@@ -623,6 +627,97 @@ export const templateRouter = router({
     }),
 
   /**
+   * Duplicate a template (remix)
+   */
+  duplicate: protectedProcedure
+    .input(
+      z.object({
+        id: z.string(),
+      })
+    )
+    .mutation(async ({ ctx, input }) => {
+      // Verify access and get template
+      const template = await ctx.db.template.findUnique({
+        where: { id: input.id },
+        include: {
+          currentVersion: true,
+        },
+      });
+
+      if (!template) {
+        throw new TRPCError({
+          code: "NOT_FOUND",
+          message: "Template not found",
+        });
+      }
+
+      const isMember = await checkMembership(
+        ctx.db,
+        ctx.session.user.id,
+        template.organizationId
+      );
+
+      if (!isMember) {
+        throw new TRPCError({
+          code: "FORBIDDEN",
+          message: "You do not have access to this template",
+        });
+      }
+
+      // Create duplicated template
+      const duplicatedTemplate = await ctx.db.template.create({
+        data: {
+          organizationId: template.organizationId,
+          name: `${template.name} (Copy)`,
+          description: template.description,
+          subject: template.subject,
+          category: template.category,
+          status: template.status,
+          isPublic: false, // Duplicates are private by default
+          isFavorite: false, // Don't copy favorite status
+          reactEmailCode: template.reactEmailCode,
+          styleType: template.styleType,
+          styleDefinitions: template.styleDefinitions as any,
+          htmlCode: template.htmlCode,
+          tableHtmlCode: template.tableHtmlCode,
+          previewText: template.previewText,
+        },
+      });
+
+      // Create initial version from current version if it exists
+      if (template.currentVersion) {
+        const duplicatedVersion = await ctx.db.templateVersion.create({
+          data: {
+            templateId: duplicatedTemplate.id,
+            version: 1,
+            name: "V1",
+            subject: template.currentVersion.subject,
+            isCurrent: true,
+            createdBy: ctx.session.user.id,
+            reactEmailCode: template.currentVersion.reactEmailCode,
+            styleType: template.currentVersion.styleType,
+            styleDefinitions: template.currentVersion.styleDefinitions as any,
+            htmlCode: template.currentVersion.htmlCode,
+            tableHtmlCode: template.currentVersion.tableHtmlCode,
+            previewText: template.currentVersion.previewText,
+            metadata: {
+              duplicatedFrom: template.id,
+              duplicatedAt: new Date().toISOString(),
+            },
+          },
+        });
+
+        // Update template with current version
+        await ctx.db.template.update({
+          where: { id: duplicatedTemplate.id },
+          data: { currentVersionId: duplicatedVersion.id },
+        });
+      }
+
+      return duplicatedTemplate;
+    }),
+
+  /**
    * Delete a template (soft delete)
    */
   delete: protectedProcedure
@@ -644,14 +739,13 @@ export const templateRouter = router({
         });
       }
 
-      const membership = await ctx.db.member.findFirst({
-        where: {
-          userId: ctx.session.user.id,
-          organizationId: template.organizationId,
-        },
-      });
+      const isMember = await checkMembership(
+        ctx.db,
+        ctx.session.user.id,
+        template.organizationId
+      );
 
-      if (!membership) {
+      if (!isMember) {
         throw new TRPCError({
           code: "FORBIDDEN",
           message: "You do not have access to this template",
@@ -688,14 +782,13 @@ export const templateRouter = router({
         });
       }
 
-      const membership = await ctx.db.member.findFirst({
-        where: {
-          userId: ctx.session.user.id,
-          organizationId: template.organizationId,
-        },
-      });
+      const isMember = await checkMembership(
+        ctx.db,
+        ctx.session.user.id,
+        template.organizationId
+      );
 
-      if (!membership) {
+      if (!isMember) {
         throw new TRPCError({
           code: "FORBIDDEN",
           message: "You do not have access to this template",
