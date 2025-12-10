@@ -10,8 +10,11 @@ import { logger } from "@mocah/shared";
 import {
   getCachedMembership,
   cacheMembership,
+} from "@mocah/shared/cache";
+import {
   getCachedBrandKit,
   cacheBrandKit,
+  getCachedBrandGuidePreference,
 } from "./cache";
 
 // Schema metadata for AI reliability (also exported from prompts.ts after rebuild)
@@ -37,7 +40,7 @@ export async function POST(req: NextRequest) {
     }
 
     // 2. Parse request body
-    const { prompt, organizationId } = await req.json();
+    const { prompt, organizationId, imageUrls, includeBrandGuide } = await req.json();
 
     if (!prompt || !organizationId) {
       return new Response(JSON.stringify({ error: "Missing required fields" }), {
@@ -50,7 +53,13 @@ export async function POST(req: NextRequest) {
 
     // 3. Check cache first, then DB if needed
     let isMember = await getCachedMembership(userId, organizationId);
-    let brandKit = await getCachedBrandKit(organizationId);
+    
+    // Check brand guide preference (default to true if not provided for backward compatibility)
+    const shouldIncludeBrandGuide = includeBrandGuide !== undefined 
+      ? includeBrandGuide 
+      : (await getCachedBrandGuidePreference(userId, organizationId)) ?? true;
+    
+    let brandKit = shouldIncludeBrandGuide ? await getCachedBrandKit(organizationId) : null;
 
     // Collect promises for any cache misses
     const dbQueries: Promise<void>[] = [];
@@ -66,7 +75,7 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    if (brandKit === null) {
+    if (shouldIncludeBrandGuide && brandKit === null) {
       dbQueries.push(
         prisma.organization.findUnique({
           where: { id: organizationId },
@@ -90,7 +99,7 @@ export async function POST(req: NextRequest) {
       });
     }
 
-    // 4. Build React Email prompt
+    // 4. Build React Email prompt (without image URLs in text - they'll be sent as message parts)
     const promptText = buildReactEmailPrompt(prompt, brandKit as any);
 
     // 5. Start streaming with AI SDK (enhanced reliability)
@@ -103,12 +112,14 @@ export async function POST(req: NextRequest) {
         schemaDescription: TEMPLATE_SCHEMA_DESCRIPTION,
         temperature: 0.7,
         maxRetries: 3,
+        imageUrls: imageUrls as string[] | undefined, // Pass images as multi-modal content
         onError: (error: unknown) => {
           logger.error("Stream error in template generation", {
             error: String(error),
             userId: session.user.id,
             organizationId,
             promptPreview: prompt.substring(0, 100),
+            imageCount: (imageUrls as string[] | undefined)?.length || 0,
           });
         },
       }

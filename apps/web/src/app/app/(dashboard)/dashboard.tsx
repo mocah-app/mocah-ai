@@ -1,94 +1,24 @@
 "use client";
-import { useEffect, useRef, useCallback } from "react";
+
 import BrandKitSetupBanner from "@/components/brand-kit/BrandKitSetupBanner";
+import { EmptyState } from "@/components/dashboard/empty-state";
+import { NoBrandState } from "@/components/dashboard/no-brand-state";
+import { TemplateList } from "@/components/dashboard/template-list";
+import { TemplateListSkeleton } from "@/components/dashboard/template-list-skeleton";
 import { Button } from "@/components/ui/button";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
+import { DashboardProvider, useDashboard } from "@/contexts/dashboard-context";
 import { useOrganization } from "@/contexts/organization-context";
-import { FileText, Plus, Send } from "lucide-react";
-import Link from "next/link";
-import { useRouter } from "next/navigation";
-import { formatDistanceToNow } from "date-fns";
 import { trpc } from "@/utils/trpc";
-import { Textarea } from "@/components/ui/textarea";
-import Loader from "@/components/loader";
+import { Plus } from "lucide-react";
+import { useEffect, useRef } from "react";
 import { toast } from "sonner";
-
-interface TemplateCardProps {
-  template: {
-    id: string;
-    name: string;
-    updatedAt: string | Date;
-    isFavorite: boolean | null;
-    _count: {
-      versions: number;
-    };
-  };
-}
-
-const TemplateCard = ({ template }: TemplateCardProps) => {
-  return (
-    <Link href={`/app/${template.id}`}>
-      <Card className="gap-0 hover:shadow-md transition-all duration-300 group p-0 h-full overflow-hidden">
-        <CardHeader className="p-0">
-          <div className="flex items-start justify-between">
-            <div className="flex-1">
-              <div className="flex items-center gap-2 w-full h-28 bg-primary/10 bg-dot opacity-25">
-                <span className="text-muted-foreground w-full text-center">
-                  Preview
-                </span>
-              </div>
-              <CardTitle className="group-hover:text-primary transition-colors duration-300 p-4 text-lg lg:text-xl">
-                {template.name}
-              </CardTitle>
-            </div>
-            {template.isFavorite && (
-              <span className="text-yellow-500 text-sm">★</span>
-            )}
-          </div>
-          <div className="flex items-center justify-between text-xs text-muted-foreground mt-2 p-2">
-            <div className="flex items-center gap-2">
-              <FileText className="h-3 w-3" />
-              <span>{template._count.versions} versions</span>
-            </div>
-            <span>
-              {formatDistanceToNow(new Date(template.updatedAt), {
-                addSuffix: true,
-              })}
-            </span>
-          </div>
-        </CardHeader>
-      </Card>
-    </Link>
-  );
-};
-
-const TemplateListSkeleton = () => (
-  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-    {[1, 2, 3].map((i) => (
-      <Card key={i}>
-        <CardHeader>
-          <Skeleton className="h-28 w-full mb-2" />
-          <Skeleton className="h-6 w-3/4 mb-2" />
-          <Skeleton className="h-3 w-1/2 mt-2" />
-        </CardHeader>
-      </Card>
-    ))}
-  </div>
-);
-
 
 const TEMPLATES_PER_PAGE = 6;
 
-export default function Dashboard() {
-  const router = useRouter();
-  const utils = trpc.useUtils();
+function DashboardContent() {
+  const { router, utils } = useDashboard();
   const {
     activeOrganization,
     organizations,
@@ -132,92 +62,42 @@ export default function Dashboard() {
     templatesData?.pages.flatMap((page) => page.templates) ?? [];
   const templateCount = templatesData?.pages[0]?.totalCount ?? 0;
 
-  // Intersection observer for infinite scroll
-  const loadMoreRef = useRef<HTMLDivElement>(null);
-
-  const handleObserver = useCallback(
-    (entries: IntersectionObserverEntry[]) => {
-      const [target] = entries;
-      if (target.isIntersecting && hasNextPage && !isFetchingNextPage) {
-        fetchNextPage();
-      }
-    },
-    [fetchNextPage, hasNextPage, isFetchingNextPage]
-  );
-
-  useEffect(() => {
-    const element = loadMoreRef.current;
-    if (!element) return;
-
-    const observer = new IntersectionObserver(handleObserver, {
-      root: null,
-      rootMargin: "100px",
-      threshold: 0,
-    });
-
-    observer.observe(element);
-    return () => observer.disconnect();
-  }, [handleObserver]);
-
   const handleCreateTemplate = () => {
     if (!activeOrganization) {
       toast.error("Please select a workspace first");
       return;
     }
-
-    // Navigate to new template page with AI streaming
     router.push("/app/new");
   };
 
-  // Combined loading state - also loading if activeOrganization isn't set yet but we have orgs
+  // Combined loading state
   const isQueryPending = !activeOrganization?.id && organizations.length > 0;
   const isDataLoading = orgLoading || templatesLoading || isQueryPending;
 
   if (!displayOrg && !orgLoading) {
-    return (
-      <div className="flex items-center justify-center min-h-[400px]">
-        <Card className="max-w-md w-full">
-          <CardHeader>
-            <CardTitle>No Brand Selected</CardTitle>
-            <CardDescription>
-              Create your first brand to get started
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <Button
-              onClick={() => router.push("/brand-setup")}
-              className="w-full"
-            >
-              <Plus className="mr-2 h-4 w-4" />
-              Create Brand
-            </Button>
-          </CardContent>
-        </Card>
-      </div>
-    );
+    return <NoBrandState />;
   }
 
-  interface TopStats {
-    title: string;
-    value: number | string;
-    description: string | React.ReactNode;
-  }
-
-  // Check if brand kit is set up
-  const hasBrandKit = displayOrg?.metadata?.setupCompleted;
+  // Check if key brand data is present (main colors and logo)
+  const brandKit = displayOrg?.brandKit;
+  const hasKeyBrandData =
+    brandKit &&
+    brandKit.primaryColor &&
+    brandKit.accentColor &&
+    brandKit.logo;
 
   return (
     <div className="space-y-6 relative">
       <h1 className="sr-only">{displayOrg?.name}</h1>
 
-      {/* Brand Kit Setup Call-to-Action */}
-      {!orgLoading && !hasBrandKit && (
+      {/* Brand Kit Setup Banner */}
+      {!orgLoading && !hasKeyBrandData && (
         <div className="animate-in fade-in slide-in-from-top-4 duration-500">
           <BrandKitSetupBanner />
         </div>
       )}
 
-      {/* Your Templates */}
+      {/* Templates Header */}
       <Card className="relative z-10 p-2 px-6">
         <CardHeader className="flex flex-row items-center justify-between p-0">
           <CardTitle>
@@ -230,14 +110,18 @@ export default function Dashboard() {
               {templates.length} of {templateCount}
             </span>
           )}
-          <Button onClick={handleCreateTemplate} className="self-end ml-auto" disabled={isDataLoading}>
+          <Button
+            onClick={handleCreateTemplate}
+            className="self-end ml-auto"
+            disabled={orgLoading}
+          >
             <Plus className="h-4 w-4" />
             Create
           </Button>
         </CardHeader>
       </Card>
 
-      {/* Recent Templates */}
+      {/* Templates Content */}
       {isDataLoading ? (
         <Card className="relative z-10">
           <CardContent>
@@ -245,52 +129,24 @@ export default function Dashboard() {
           </CardContent>
         </Card>
       ) : templateCount > 0 ? (
-        <Card className="relative z-10">
-          <CardContent>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {templates.map((template) => (
-                <TemplateCard key={template.id} template={template} />
-              ))}
-            </div>
-
-            {/* Load more trigger */}
-            <div ref={loadMoreRef} className="mt-6 flex justify-center">
-              {isFetchingNextPage ? (
-                <div className="flex items-center gap-2 text-muted-foreground py-4">
-                  <Loader />
-                  <span className="sr-only">Loading more...</span>
-                </div>
-              ) : hasNextPage ? (
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => fetchNextPage()}
-                  className="text-muted-foreground"
-                >
-                  Load more templates
-                </Button>
-              ) : templates.length > TEMPLATES_PER_PAGE ? (
-                <p className="text-sm text-muted-foreground py-4">
-                  All templates loaded
-                </p>
-              ) : null}
-            </div>
-          </CardContent>
-        </Card>
+        <TemplateList
+          templates={templates}
+          hasNextPage={hasNextPage ?? false}
+          isFetchingNextPage={isFetchingNextPage}
+          fetchNextPage={fetchNextPage}
+          templatesPerPage={TEMPLATES_PER_PAGE}
+        />
       ) : (
-        <Card className="relative z-10">
-          <CardContent className="py-10 text-center space-y-4">
-            <div className="text-muted-foreground">
-              <p className="text-lg font-semibold mb-2">No templates yet</p>
-              <p>Create your first template</p>
-            </div>
-            <Button onClick={handleCreateTemplate} size={"lg"}>
-              <Plus className="h-4 w-4" />
-              Create
-            </Button>
-          </CardContent>
-        </Card>
+        <EmptyState onCreateTemplate={handleCreateTemplate} />
       )}
     </div>
+  );
+}
+
+export default function Dashboard() {
+  return (
+    <DashboardProvider>
+      <DashboardContent />
+    </DashboardProvider>
   );
 }

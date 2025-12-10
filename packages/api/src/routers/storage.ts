@@ -2,6 +2,7 @@ import { z } from "zod";
 import { PutObjectCommand, GetObjectCommand, DeleteObjectCommand } from "@aws-sdk/client-s3";
 import { protectedProcedure, router } from "../index";
 import { organizationProcedure } from "../middleware";
+import crypto from "crypto";
 import {
   s3Client,
   TIGRIS_BUCKET,
@@ -11,6 +12,7 @@ import {
   createPresignedUploadUrl,
   PRESIGNED_URL_EXPIRY,
   MAX_FILE_SIZE,
+  STORAGE_PREFIX_TEMPLATE_REFERENCES,
 } from "../lib/s3";
 import {
   processUploadedImage,
@@ -58,19 +60,25 @@ export const storageRouter = router({
   createUploadUrl: organizationProcedure
     .input(createUploadUrlSchema)
     .mutation(async ({ input, ctx }) => {
-      const { fileName, contentType, templateId, versionId } = input;
+      const { fileName, contentType, templateId, versionId, purpose } = input;
 
       logger.info("📤 Creating presigned upload URL", {
         fileName,
         contentType,
         templateId,
         versionId,
+        purpose,
         userId: ctx.session!.user.id,
         organizationId: ctx.organizationId,
       });
 
-      // Generate storage path
-      const storageKey = generateStoragePath(fileName, "images");
+      // Generate storage path based on purpose
+      const prefix = purpose === "template-reference" 
+        ? STORAGE_PREFIX_TEMPLATE_REFERENCES 
+        : purpose === "logo" 
+        ? "logos" 
+        : "images";
+      const storageKey = generateStoragePath(fileName, prefix);
 
       // Build metadata for S3
       const sanitizedName = encodeURIComponent(fileName);
@@ -159,8 +167,14 @@ export const storageRouter = router({
         let finalSize = fileSize;
         let blurDataUrl: string | undefined;
 
-        // Process image if optimization is enabled
-        if (!skipOptimization) {
+        // Extract prefix from original storage key to maintain folder structure
+        const originalPrefix = storageKey.split('/')[0] || "images";
+        
+        // Determine if this is a template reference (shouldn't be optimized or stored in DB)
+        const isTemplateReference = originalPrefix === STORAGE_PREFIX_TEMPLATE_REFERENCES;
+
+        // Process image if optimization is enabled AND not a template reference
+        if (!skipOptimization && !isTemplateReference) {
           // Download the uploaded image from S3
           const getCommand = new GetObjectCommand({
             Bucket: TIGRIS_BUCKET,
@@ -175,10 +189,10 @@ export const storageRouter = router({
           // Process the image (optimize + generate blur placeholder)
           const processed = await processUploadedImage(originalBuffer, contentType);
 
-          // Generate new storage key with correct extension
+          // Generate new storage key with correct extension, preserving the original prefix
           const extension = processed.format === "jpeg" ? "jpg" : processed.format;
           const baseName = fileName.replace(/\.[^.]+$/, "");
-          finalStorageKey = generateStoragePath(`${baseName}.${extension}`, "images");
+          finalStorageKey = generateStoragePath(`${baseName}.${extension}`, originalPrefix);
 
           // Upload optimized image
           const putCommand = new PutObjectCommand({
@@ -233,44 +247,65 @@ export const storageRouter = router({
 
         const url = getPublicUrl(finalStorageKey);
 
-        // Create ImageAsset record
-        const imageAsset = await ctx.db.imageAsset.create({
-          data: {
-            organizationId: ctx.organizationId,
-            userId: ctx.session!.user.id,
-            templateId,
-            versionId,
+        // Only create ImageAsset record for non-template-reference images
+        // Template references are for AI prompt context only, not for the library
+        if (!isTemplateReference) {
+          const imageAsset = await ctx.db.imageAsset.create({
+            data: {
+              organizationId: ctx.organizationId,
+              userId: ctx.session!.user.id,
+              templateId,
+              versionId,
+              url,
+              storageKey: finalStorageKey,
+              contentType: finalContentType,
+              width: finalWidth,
+              height: finalHeight,
+              aspectRatio:
+                finalWidth && finalHeight
+                  ? calculateAspectRatio(finalWidth, finalHeight)
+                  : null,
+              blurDataUrl,
+              prompt: "", // User-uploaded images have no prompt
+              model: "upload", // Mark as user upload
+              metadata: {
+                originalName: fileName,
+                originalSize: fileSize,
+                optimizedSize: finalSize,
+                uploadedAt: new Date().toISOString(),
+              },
+            },
+          });
+
+          return {
+            id: imageAsset.id,
+            url: imageAsset.url,
+            width: imageAsset.width,
+            height: imageAsset.height,
+            blurDataUrl: imageAsset.blurDataUrl,
+            filename: fileName,
+            size: finalSize,
+            type: finalContentType,
+          };
+        } else {
+          // For template references, return minimal data without DB record
+          logger.info("📎 Template reference uploaded (not added to library)", {
             url,
+            fileName,
             storageKey: finalStorageKey,
-            contentType: finalContentType,
+          });
+          
+          return {
+            id: crypto.randomUUID(), // Generate temp ID for client consistency
+            url,
             width: finalWidth,
             height: finalHeight,
-            aspectRatio:
-              finalWidth && finalHeight
-                ? calculateAspectRatio(finalWidth, finalHeight)
-                : null,
-            blurDataUrl,
-            prompt: "", // User-uploaded images have no prompt
-            model: "upload", // Mark as user upload
-            metadata: {
-              originalName: fileName,
-              originalSize: fileSize,
-              optimizedSize: finalSize,
-              uploadedAt: new Date().toISOString(),
-            },
-          },
-        });
-
-        return {
-          id: imageAsset.id,
-          url: imageAsset.url,
-          width: imageAsset.width,
-          height: imageAsset.height,
-          blurDataUrl: imageAsset.blurDataUrl,
-          filename: fileName,
-          size: finalSize,
-          type: finalContentType,
-        };
+            blurDataUrl: undefined,
+            filename: fileName,
+            size: finalSize,
+            type: finalContentType,
+          };
+        }
       } catch (error) {
         console.error("[storage.confirmUpload] Failed:", error);
         throw new Error(

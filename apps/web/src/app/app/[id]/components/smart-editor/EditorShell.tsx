@@ -28,6 +28,7 @@ interface EditorShellProps {
   onPreviewUpdate: (elementId: string, updates: ElementUpdates) => void;
   brandFont?: string | null;
   brandColors?: BrandColors;
+  onOpenChat?: (text: string) => void;
 }
 
 /**
@@ -44,6 +45,7 @@ export function EditorShell({
   onPreviewUpdate,
   brandFont,
   brandColors,
+  onOpenChat,
 }: EditorShellProps) {
   const { actions: editorActions, state: editorState } = useEditorMode();
   
@@ -171,6 +173,7 @@ export function EditorShell({
             onUpdate={handleUpdate}
             brandFont={brandFont}
             brandColors={brandColors}
+            onOpenChat={onOpenChat}
           />
         ) : (
           <EmptyState />
@@ -189,14 +192,16 @@ function ElementEditor({
   onUpdate,
   brandFont,
   brandColors,
+  onOpenChat,
 }: {
   elementData: ElementData;
   currentStyles: React.CSSProperties;
   onUpdate: (updates: ElementUpdates) => void;
   brandFont?: string | null;
   brandColors?: BrandColors;
+  onOpenChat?: (text: string) => void;
 }) {
-  const props = { elementData, currentStyles, onUpdate, brandFont, brandColors };
+  const props = { elementData, currentStyles, onUpdate, brandFont, brandColors, onOpenChat };
 
   switch (elementData.type) {
     case "Heading":

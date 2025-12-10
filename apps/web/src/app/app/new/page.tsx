@@ -1,16 +1,26 @@
 "use client";
 
+import { useImageUpload } from "@/app/app/[id]/components/image-studio/hooks/useImageUpload";
 import DashboardHeader from "@/components/dashboardHeader";
 import { Button } from "@/components/ui/button";
-import { Textarea } from "@/components/ui/textarea";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
 import { useOrganization } from "@/contexts/organization-context";
+import type { Attachment } from "@/types/images";
 import { useTemplateCreation } from "@/utils/store-prompt-in-session";
 import { trpc } from "@/utils/trpc";
-import { CircleChevronUp, Plus, Send } from "lucide-react";
+import { CircleChevronUp } from "lucide-react";
 import { useRouter } from "next/navigation";
-import React, { useState } from "react";
+import React, { useCallback, useRef, useState, useEffect } from "react";
 import { toast } from "sonner";
-import Loader from "@/components/loader";
+import PromptInput from "./components/PromptInput";
 
 export default function NewTemplatePage() {
   const router = useRouter();
@@ -18,6 +28,27 @@ export default function NewTemplatePage() {
   const { activeOrganization } = useOrganization();
   const { setPrompt: setCreationPrompt } = useTemplateCreation();
   const [prompt, setPrompt] = useState("");
+  const [attachments, setAttachments] = useState<Attachment[]>([]);
+  const [isUrlDialogOpen, setIsUrlDialogOpen] = useState(false);
+  const [urlInput, setUrlInput] = useState("");
+  const [includeBrandGuide, setIncludeBrandGuide] = useState(true);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // Fetch brand guide preference
+  const { data: brandGuidePreference } = trpc.brandGuide.getPreference.useQuery(
+    undefined,
+    {
+      enabled: !!activeOrganization?.id,
+      refetchOnWindowFocus: false,
+    }
+  );
+
+  // Update local state when preference is fetched
+  useEffect(() => {
+    if (brandGuidePreference !== undefined) {
+      setIncludeBrandGuide(brandGuidePreference);
+    }
+  }, [brandGuidePreference]);
 
   const createSkeletonMutation = trpc.template.create.useMutation({
     onSuccess: () => {
@@ -26,6 +57,161 @@ export default function NewTemplatePage() {
   });
 
   const [isCreating, setIsCreating] = useState(false);
+
+  // Image upload hook for eager uploads
+  const { uploadFile, isUploading } = useImageUpload({
+    organizationId: activeOrganization?.id,
+    templateId: undefined, // No template yet
+    purpose: "template-reference", // Store in template-references folder
+    onSuccess: (image) => {
+      // Update attachment status to ready
+      setAttachments((prev) =>
+        prev.map((att) =>
+          att.status === "uploading" && att.previewUrl.startsWith("blob:")
+            ? { ...att, status: "ready", url: image.url }
+            : att
+        )
+      );
+    },
+    onError: (error) => {
+      toast.error(`Upload failed: ${error.message}`);
+      // Mark attachment as error
+      setAttachments((prev) =>
+        prev.map((att) =>
+          att.status === "uploading" ? { ...att, status: "error" } : att
+        )
+      );
+    },
+  });
+
+  // Handle file upload from device
+  const handleUploadClick = useCallback(() => {
+    fileInputRef.current?.click();
+  }, []);
+
+  const handleFileSelect = useCallback(
+    async (e: React.ChangeEvent<HTMLInputElement>) => {
+      const files = e.target.files;
+      if (!files || files.length === 0) return;
+
+      const file = files[0];
+      
+      // Validate file type
+      if (!file.type.startsWith("image/")) {
+        toast.error("Please select an image file");
+        return;
+      }
+
+      // Create blob URL for immediate preview
+      const blobUrl = URL.createObjectURL(file);
+      const attachmentId = crypto.randomUUID();
+
+      // Add attachment in uploading state
+      const newAttachment: Attachment = {
+        id: attachmentId,
+        url: "", // Will be set after upload
+        type: "upload",
+        status: "uploading",
+        previewUrl: blobUrl,
+        fileName: file.name,
+      };
+
+      setAttachments((prev) => [...prev, newAttachment]);
+
+      // Start eager upload
+      await uploadFile(file);
+
+      // Clear input so same file can be selected again
+      e.target.value = "";
+    },
+    [uploadFile]
+  );
+
+  // Handle paste URL dialog
+  const handlePasteUrlClick = useCallback(() => {
+    setIsUrlDialogOpen(true);
+  }, []);
+
+  const handleUrlSubmit = useCallback(() => {
+    if (!urlInput.trim()) {
+      toast.error("Please enter a URL");
+      return;
+    }
+
+    // Basic URL validation
+    try {
+      new URL(urlInput);
+    } catch {
+      toast.error("Invalid URL format");
+      return;
+    }
+
+    const attachmentId = crypto.randomUUID();
+    const newAttachment: Attachment = {
+      id: attachmentId,
+      url: urlInput,
+      type: "url",
+      status: "ready",
+      previewUrl: urlInput,
+    };
+
+    setAttachments((prev) => [...prev, newAttachment]);
+    setUrlInput("");
+    setIsUrlDialogOpen(false);
+    toast.success("Image URL added");
+  }, [urlInput]);
+
+  // Handle clipboard paste
+  const handlePaste = useCallback(
+    async (e: React.ClipboardEvent<HTMLTextAreaElement>) => {
+      const items = e.clipboardData?.items;
+      if (!items) return;
+
+      // Check for image in clipboard
+      for (let i = 0; i < items.length; i++) {
+        const item = items[i];
+        
+        if (item.type.startsWith("image/")) {
+          e.preventDefault();
+          
+          const file = item.getAsFile();
+          if (!file) continue;
+
+          // Create blob URL for immediate preview
+          const blobUrl = URL.createObjectURL(file);
+          const attachmentId = crypto.randomUUID();
+
+          // Add attachment in uploading state
+          const newAttachment: Attachment = {
+            id: attachmentId,
+            url: "", // Will be set after upload
+            type: "upload",
+            status: "uploading",
+            previewUrl: blobUrl,
+            fileName: `pasted-${Date.now()}.png`,
+          };
+
+          setAttachments((prev) => [...prev, newAttachment]);
+
+          // Start eager upload
+          await uploadFile(file);
+          return;
+        }
+      }
+    },
+    [uploadFile]
+  );
+
+  const handleAttachmentRemove = useCallback((id: string) => {
+    setAttachments((prev) => {
+      const attachment = prev.find((att) => att.id === id);
+      // Clean up blob URL if it exists
+      if (attachment?.previewUrl.startsWith("blob:")) {
+        URL.revokeObjectURL(attachment.previewUrl);
+      }
+      return prev.filter((att) => att.id !== id);
+    });
+  }, []);
 
   const handleGenerate = async () => {
     if (!prompt.trim()) {
@@ -56,8 +242,12 @@ export default function NewTemplatePage() {
         isPublic: false,
       });
 
-      // Store prompt for the streaming process
-      setCreationPrompt(prompt.trim());
+      // Store prompt and image URLs for the streaming process
+      const imageUrls = attachments
+        .filter((att) => att.status === "ready")
+        .map((att) => att.url);
+      
+      setCreationPrompt(prompt.trim(), imageUrls);
 
       // Navigate after skeleton exists
       router.push(`/app/${templateId}`);
@@ -129,41 +319,57 @@ export default function NewTemplatePage() {
         </div>
 
         {/* Main Input Area */}
-        <div className="bg-card border border-border rounded-2xl shadow-2xl md:max-w-2xl lg:max-w-3xl w-full mx-auto has-focus-visible:border-blue-500/30 transition-colors">
-          <div className="relative">
-            <Textarea
-              value={prompt}
-              onChange={(e) => setPrompt(e.target.value)}
-              onKeyDown={handleKeyDown}
-              rows={4}
-              placeholder="Please create black friday email showing our trending products"
-              className="w-full border-0 dark:bg-transparent text-foreground placeholder:text-muted-foreground px-6 py-7 h-auto pr-16 min-h-[120px] max-h-[250px] resize-none scrollbar-thin scrollbar-thumb-border scrollbar-track-transparent focus:outline-none focus:ring-0 focus-visible:ring-0 focus-visible:ring-offset-0 leading-relaxed"
+        <PromptInput
+          value={prompt}
+          onChange={setPrompt}
+          onSubmit={handleGenerate}
+          onKeyDown={handleKeyDown}
+          isLoading={isCreating}
+          attachments={attachments}
+          onAttachmentRemove={handleAttachmentRemove}
+          onUploadClick={handleUploadClick}
+          onPasteUrlClick={handlePasteUrlClick}
+          onPaste={handlePaste}
+          includeBrandGuide={includeBrandGuide}
+          onBrandGuideChange={setIncludeBrandGuide}
+        />
+
+        {/* Hidden file input */}
+        <input
+          ref={fileInputRef}
+          type="file"
+          accept="image/*"
+          className="hidden"
+          onChange={handleFileSelect}
+        />
+
+        {/* URL paste dialog */}
+        <Dialog open={isUrlDialogOpen} onOpenChange={setIsUrlDialogOpen}>
+          <DialogContent className="sm:max-w-md">
+            <DialogHeader>
+              <DialogTitle>Paste Image URL</DialogTitle>
+              <DialogDescription className="sr-only">
+                Enter the URL of an image you want to use as reference
+              </DialogDescription>
+            </DialogHeader>
+            <Input
+              placeholder="https://example.com/image.jpg"
+              value={urlInput}
+              onChange={(e) => setUrlInput(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") {
+                  handleUrlSubmit();
+                }
+              }}
             />
-
-            {/* Action Buttons */}
-            <div className="flex items-center justify-between p-4">
-              <div className="flex items-center gap-2">
-                <Button variant="outline" size="icon" aria-label="attachment">
-                  <Plus className="w-4 h-4" />
-                </Button>
-              </div>
-
-              <Button
-                onClick={handleGenerate}
-                disabled={!prompt.trim() || isCreating}
-                size="icon"
-                aria-label="generate template"
-                className="h-10 w-10"
-              >
-                {isCreating ? (
-                  <Loader />
-                ) : (
-                  <Send className="size-5" />
-                )}
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setIsUrlDialogOpen(false)}>
+                Cancel
               </Button>
-            </div>
-          </div>
-        </div>
+              <Button onClick={handleUrlSubmit}>Add Image</Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
 
         {/* Suggested Prompts */}
         <div className="space-y-3 mx-auto max-w-2xl w-full">

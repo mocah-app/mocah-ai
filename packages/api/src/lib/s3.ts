@@ -74,6 +74,8 @@ export function generateStoragePath(
   return `${prefix}/${randomId}/${timestamp}-${sanitized}`;
 }
 
+export const STORAGE_PREFIX_TEMPLATE_REFERENCES = "template-references" as const;
+
 export function getPublicUrl(filePath: string): string {
   const customDomain = serverEnv.TIGRIS_PUBLIC_URL || "storage.mocah.ai";
   return `https://${customDomain}/${filePath}`;

@@ -34,6 +34,7 @@ interface GenerateParams {
   outputFormat?: string;
   imageUrls?: string[];
   numImages?: number;
+  includeBrandGuide?: boolean;
 }
 
 // ============================================================================
@@ -101,6 +102,7 @@ export function useImageGeneration({
             | "webp"
             | undefined,
           numImages: params.numImages ?? 1,
+          includeBrandGuide: params.includeBrandGuide,
         };
 
         // Only pass model if explicitly selected (not "auto")

@@ -10,8 +10,11 @@ import { logger } from "@mocah/shared";
 import {
   getCachedMembership,
   cacheMembership,
+} from "@mocah/shared/cache";
+import {
   getCachedBrandKit,
   cacheBrandKit,
+  getCachedBrandGuidePreference,
 } from "../generate/cache";
 
 // Schema metadata for AI reliability
@@ -37,7 +40,7 @@ export async function POST(req: NextRequest) {
     }
 
     // 2. Parse request body
-    const { prompt, templateId } = await req.json();
+    const { prompt, templateId, imageUrls, includeBrandGuide } = await req.json();
 
     if (!prompt || !templateId) {
       return new Response(JSON.stringify({ error: "Missing required fields" }), {
@@ -72,7 +75,13 @@ export async function POST(req: NextRequest) {
 
     // 4. Check cache first, then DB if needed
     let isMember = await getCachedMembership(userId, template.organizationId);
-    let brandKit = await getCachedBrandKit(template.organizationId);
+    
+    // Check brand guide preference (default to true if not provided for backward compatibility)
+    const shouldIncludeBrandGuide = includeBrandGuide !== undefined 
+      ? includeBrandGuide 
+      : (await getCachedBrandGuidePreference(userId, template.organizationId)) ?? true;
+    
+    let brandKit = shouldIncludeBrandGuide ? await getCachedBrandKit(template.organizationId) : null;
 
     // Collect promises for any cache misses
     const dbQueries: Promise<void>[] = [];
@@ -88,7 +97,7 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    if (brandKit === null && template.organization.brandKit) {
+    if (shouldIncludeBrandGuide && brandKit === null && template.organization.brandKit) {
       brandKit = template.organization.brandKit;
       dbQueries.push(
         cacheBrandKit(template.organizationId, brandKit)
@@ -120,6 +129,7 @@ export async function POST(req: NextRequest) {
       promptPreview: prompt.substring(0, 100),
       hasCurrentCode: !!template.reactEmailCode,
       currentCodeLength: template.reactEmailCode?.length || 0,
+      imageCount: (imageUrls as string[] | undefined)?.length || 0,
     });
 
     // 6. Start streaming with AI SDK (enhanced reliability)
@@ -132,12 +142,14 @@ export async function POST(req: NextRequest) {
         schemaDescription: TEMPLATE_SCHEMA_DESCRIPTION,
         temperature: 0.7,
         maxRetries: 3,
+        imageUrls: imageUrls as string[] | undefined, // Pass images as multi-modal content
         onError: (error: unknown) => {
           logger.error("Stream error in template regeneration", {
             error: String(error),
             userId: session.user.id,
             templateId,
             promptPreview: prompt.substring(0, 100),
+            imageCount: (imageUrls as string[] | undefined)?.length || 0,
           });
         },
       }

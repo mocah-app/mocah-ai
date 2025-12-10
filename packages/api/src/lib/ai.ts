@@ -1,5 +1,6 @@
 import { createOpenRouter } from "@openrouter/ai-sdk-provider";
 import { generateObject, generateText, streamObject, streamText } from "ai";
+import type { UserContent } from "ai";
 import { z } from "zod";
 import { logger } from "@mocah/shared/logger";
 import { serverEnv } from "@mocah/config/env";
@@ -32,6 +33,8 @@ export interface StructuredGenerationOptions {
   maxRetries?: number;
   /** Callback for stream errors */
   onError?: (error: unknown) => void;
+  /** Image URLs for multi-modal input */
+  imageUrls?: string[];
 }
 
 
@@ -130,13 +133,77 @@ export const aiClient = {
     options?: StructuredGenerationOptions
   ): ReturnType<typeof streamObject<T>> {
     const modelName = model || DEFAULT_MODEL;
+    const hasImages = options?.imageUrls && options.imageUrls.length > 0;
 
     logger.info("AI stream request initiated", {
       component: "ai",
       action: "streamStructured",
       model: modelName,
+      hasImages,
+      imageCount: options?.imageUrls?.length || 0,
     });
 
+    // Build messages for multi-modal input (images + text)
+    if (hasImages) {
+      const content: UserContent = [
+        { type: "text", text: prompt },
+      ];
+
+      // Add each image as a separate content part
+      for (const imageUrl of options.imageUrls!) {
+        content.push({
+          type: "image",
+          image: imageUrl,
+        });
+      }
+
+      return streamObject({
+        model: openrouter(modelName),
+        schema,
+        messages: [
+          {
+            role: "user",
+            content,
+          },
+        ],
+        // Reliability options
+        schemaName: options?.schemaName,
+        schemaDescription: options?.schemaDescription,
+        temperature: options?.temperature ?? 0.7,
+        maxRetries: options?.maxRetries ?? 3,
+        experimental_repairText: repairJsonOutput,
+        // Error handling
+        onError: (event) => {
+          logger.error("AI stream error", {
+            component: "ai",
+            action: "streamStructured",
+            model: modelName,
+            error: event.error,
+          });
+          options?.onError?.(event.error);
+        },
+        onFinish: ({ usage, object, error }) => {
+          if (error) {
+            logger.error("AI stream finished with error", {
+              component: "ai",
+              action: "streamStructured",
+              model: modelName,
+              error: String(error),
+            });
+          } else {
+            logger.info("AI stream completed", {
+              component: "ai",
+              action: "streamStructured",
+              model: modelName,
+              tokensUsed: usage.totalTokens,
+              hasValidObject: !!object,
+            });
+          }
+        },
+      });
+    }
+
+    // Standard text-only prompt
     return streamObject({
       model: openrouter(modelName),
       schema,

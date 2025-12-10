@@ -136,6 +136,7 @@ export const createUploadUrlSchema = z.object({
   fileSize: z.number().max(MAX_FILE_SIZE, "File too large. Maximum size is 5MB."),
   templateId: z.string().optional(),
   versionId: z.string().optional(),
+  purpose: z.enum(["image", "logo", "template-reference"]).optional(),
 });
 
 export const confirmUploadSchema = z.object({
@@ -188,6 +189,7 @@ export const imageGenerationInputSchema = z.object({
   guidanceScale: z.number().min(1).max(20).optional(),
   strength: z.number().min(0).max(1).optional(),
   model: z.string().optional(),
+  includeBrandGuide: z.boolean().optional(),
 });
 
 export type ImageGenerationInput = z.infer<typeof imageGenerationInputSchema>;

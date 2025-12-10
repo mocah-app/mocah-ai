@@ -47,20 +47,20 @@ export default function UserMenu() {
         </DropdownMenuLabel>
         <DropdownMenuSeparator />
         <DropdownMenuItem asChild>
-          <Link href="/app/settings" className="w-full justify-start">
+          <Link href="/app?settings=open" className="w-full justify-start">
             <Settings className="size-4" />
             Settings
           </Link>
         </DropdownMenuItem>
         <DropdownMenuItem asChild>
-          <Link href="/app/billing" className="w-full justify-start">
+          <Link href="/app?settings=open&tab=billing" className="w-full justify-start">
             <DollarSign className="size-4" />
             Billing
           </Link>
         </DropdownMenuItem>
         <DropdownMenuSeparator />
         <DropdownMenuItem asChild>
-          <Link href="/app/settings?tab=notifications" className="w-full justify-start">
+          <Link href="/app?settings=open&tab=notifications" className="w-full justify-start">
             <Bell className="size-4" />
             Notifications
           </Link>

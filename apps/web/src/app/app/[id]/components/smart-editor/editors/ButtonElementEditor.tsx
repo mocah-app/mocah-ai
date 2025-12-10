@@ -18,6 +18,7 @@ interface ButtonElementEditorProps {
   onUpdate: (updates: ElementUpdates) => void;
   brandFont?: string | null;
   brandColors?: BrandColors;
+  onOpenChat?: (text: string) => void;
 }
 
 /**
@@ -28,6 +29,7 @@ export function ButtonElementEditor({
   currentStyles,
   onUpdate,
   brandColors,
+  onOpenChat,
 }: ButtonElementEditorProps) {
   const handleStyleChange = (property: string, value: string) => {
     onUpdate({
@@ -52,6 +54,8 @@ export function ButtonElementEditor({
         content={elementData.content}
         onChange={handleContentChange}
         label="Button Text"
+        hasNestedFormatting={elementData.hasNestedFormatting}
+        onOpenChat={onOpenChat}
       />
 
       {/* Link URL */}
@@ -95,4 +99,3 @@ export function ButtonElementEditor({
     </div>
   );
 }
-

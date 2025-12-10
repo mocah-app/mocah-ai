@@ -73,6 +73,7 @@ export async function POST(req: NextRequest) {
       requestId: result.requestId,
       model: result.model,
       images: result.images?.length || 0,
+      includeBrandGuide: parsed.includeBrandGuide ?? true,
       elapsedMs: result.elapsedMs ?? Date.now() - started,
     });
 

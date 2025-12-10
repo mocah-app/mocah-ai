@@ -24,6 +24,7 @@ import {
   uploadFileSchema,
   type GeneratedImage,
 } from "./types";
+import { trpc } from "@/utils/trpc";
 
 // ============================================================================
 // Component
@@ -76,10 +77,21 @@ export function ImageStudioModal() {
   // Tab state
   const [activeTab, setActiveTab] = useState<string>("generate");
 
+  // Brand awareness state
+  const [includeBrandGuide, setIncludeBrandGuide] = useState(true);
+
   const organizationId =
     templateState.currentTemplate?.organizationId || activeOrganization?.id;
   const templateId = templateState.currentTemplate?.id;
   const versionId = templateState.currentTemplate?.currentVersionId;
+
+  // Fetch brand guide preference
+  const { data: brandGuidePreference } = trpc.brandGuide.getPreference.useQuery(
+    undefined,
+    {
+      enabled: isOpen,
+    }
+  );
 
   // Upload hook (presigned URL flow)
   const { uploadFile, isUploading } = useImageUpload({
@@ -169,6 +181,13 @@ export function ImageStudioModal() {
     }
   }, [isOpen, initialPrompt, initialReferenceImageUrl, initialImageUrl]);
 
+  // Update brand guide preference when fetched
+  useEffect(() => {
+    if (brandGuidePreference !== undefined) {
+      setIncludeBrandGuide(brandGuidePreference);
+    }
+  }, [brandGuidePreference]);
+
   // Auto-switch to png if model doesn't support webp
   useEffect(() => {
     if (isWebpUnsupported(model) && outputFormat === "webp") {
@@ -204,6 +223,7 @@ export function ImageStudioModal() {
       outputFormat,
       imageUrls: useReferenceImages && referenceImages.length > 0 ? referenceImages : undefined,
       numImages: 1,
+      includeBrandGuide,
     });
   }, [
     generate,
@@ -213,6 +233,7 @@ export function ImageStudioModal() {
     outputFormat,
     useReferenceImages,
     referenceImages,
+    includeBrandGuide,
   ]);
 
   const handleFileUpload = useCallback(
@@ -301,6 +322,8 @@ export function ImageStudioModal() {
       setReferenceImageUrls,
       referenceImages,
       setReferenceImages,
+      includeBrandGuide,
+      onBrandGuideChange: setIncludeBrandGuide,
       onGenerate: handleGenerate,
       onFileUpload: handleFileUpload,
       isGenerating,
@@ -316,6 +339,7 @@ export function ImageStudioModal() {
       useReferenceImages,
       referenceImageUrls,
       referenceImages,
+      includeBrandGuide,
       handleGenerate,
       handleFileUpload,
       isGenerating,

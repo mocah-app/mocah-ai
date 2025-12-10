@@ -17,6 +17,7 @@ interface TextElementEditorProps {
   onUpdate: (updates: ElementUpdates) => void;
   brandFont?: string | null;
   brandColors?: BrandColors;
+  onOpenChat?: (text: string) => void;
 }
 
 /**
@@ -28,6 +29,7 @@ export function TextElementEditor({
   onUpdate,
   brandFont,
   brandColors,
+  onOpenChat,
 }: TextElementEditorProps) {
   const handleStyleChange = (property: string, value: string) => {
     onUpdate({
@@ -45,6 +47,8 @@ export function TextElementEditor({
       <ContentSection
         content={elementData.content}
         onChange={handleContentChange}
+        hasNestedFormatting={elementData.hasNestedFormatting}
+        onOpenChat={onOpenChat}
       />
 
       {/* Typography Section */}
@@ -85,4 +89,3 @@ export function TextElementEditor({
     </div>
   );
 }
-

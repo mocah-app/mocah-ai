@@ -2,6 +2,7 @@ import { DashboardSidebar } from "@/components/dashboard/dashboard-sidebar";
 import { SidebarInset } from "@/components/ui/sidebar";
 import DashboardHeader from "@/components/dashboardHeader";
 import { BrandConfigurationModal } from "@/components/brand-kit/brand-configuration-modal";
+import { SettingsModal } from "@/components/settings/settings-modal";
 import { Suspense } from "react";
 
 export default function DashboardWithSidebarLayout({
@@ -21,6 +22,10 @@ export default function DashboardWithSidebarLayout({
       {/* Brand Configuration Modal - triggered by URL param */}
       <Suspense fallback={null}>
         <BrandConfigurationModal />
+      </Suspense>
+      {/* Settings Modal - triggered by URL param */}
+      <Suspense fallback={null}>
+        <SettingsModal />
       </Suspense>
     </div>
   );

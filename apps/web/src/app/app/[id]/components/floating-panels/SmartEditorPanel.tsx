@@ -11,11 +11,13 @@ import type { ElementData, ElementUpdates } from "@/lib/react-email";
 interface SmartEditorPanelProps {
   isOpen: boolean;
   onClose: () => void;
+  onOpenChat?: (text: string) => void;
 }
 
 export const SmartEditorPanel = ({
   isOpen,
   onClose,
+  onOpenChat,
 }: SmartEditorPanelProps) => {
   const { state: editorState } = useEditorMode();
   const { state: canvasState } = useCanvas();
@@ -113,6 +115,7 @@ export const SmartEditorPanel = ({
       onPreviewUpdate={handlePreviewUpdate}
       brandFont={brandFont}
       brandColors={brandColors}
+      onOpenChat={onOpenChat}
     />
   );
 };

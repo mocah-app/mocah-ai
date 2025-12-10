@@ -51,6 +51,8 @@ export const CACHE_KEYS = {
   membership: (userId: string, orgId: string) =>
     `membership:${userId}:${orgId}`,
   brandKit: (orgId: string) => `brandkit:${orgId}`,
+  brandGuidePreference: (userId: string, orgId: string) =>
+    `brandguide:${userId}:${orgId}`,
   quota: (orgId: string, userId: string | null, period: string) =>
     `quota:${orgId}:${userId || "org"}:${period}`,
   rateLimit: (identifier: string, window: string) =>

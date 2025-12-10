@@ -12,6 +12,7 @@ interface TextareaControlProps {
   placeholder?: string;
   rows?: number;
   className?: string;
+  disabled?: boolean;
 }
 
 export function TextareaControl({
@@ -21,6 +22,7 @@ export function TextareaControl({
   placeholder,
   rows = 3,
   className,
+  disabled = false,
 }: TextareaControlProps) {
   return (
     <div className={cn("space-y-1.5", className)}>
@@ -32,9 +34,12 @@ export function TextareaControl({
         onChange={(e) => onChange(e.target.value)}
         placeholder={placeholder}
         rows={rows}
-        className="resize-none bg-muted/50 border-border text-sm"
+        disabled={disabled}
+        className={cn(
+          "resize-none bg-muted/50 border-border text-sm",
+          disabled && "opacity-70 cursor-not-allowed"
+        )}
       />
     </div>
   );
 }
-

@@ -88,7 +88,10 @@ const CRITICAL_RULES = `⚠️ CRITICAL RULES - STRICTLY ENFORCED (code REJECTED
    ❌ BAD: export const X = () => ...
    ✅ GOOD: export default function ComponentName()
 
-6. NO 'as' prop on Heading: <Heading style={...}> only`;
+6. NO 'as' prop on <Heading> component - it handles semantic structure automatically
+   ❌ WRONG: <Heading as="h2" style={heading}>Title</Heading>
+   ✅ RIGHT: <Heading style={heading}>Title</Heading>
+   The Heading component manages its own semantic HTML internally`;
 
 // ============================================================================
 // TIER 2: COMPONENT REFERENCE - ~200 tokens
@@ -121,6 +124,26 @@ Examples:
 Usage: <Img src="https://cdn.mocah.ai/icons/twitter.png" alt="Twitter" width="24" height="24" />
 
 Center all the icons in the footer.
+
+`;
+
+// ============================================================================
+// IMAGE PLACEHOLDERS - ~80 tokens
+// ============================================================================
+
+const IMAGE_PLACEHOLDERS = `IMAGE PLACEHOLDERS:
+For placeholder images in templates, use: https://cdn.mocah.ai/placeholder/{dimension}.png
+
+Available dimensions:
+- landscape: https://cdn.mocah.ai/placeholder/landscape.png (16:9 ratio, ideal for hero images, banners)
+- portrait: https://cdn.mocah.ai/placeholder/portrait.png (9:16 ratio, ideal for mobile-first content)
+- square: https://cdn.mocah.ai/placeholder/square.png (1:1 ratio, ideal for profile, product, images, thumbnails)
+
+Usage examples:
+<Img src="https://cdn.mocah.ai/placeholder/landscape.png" alt="Placeholder" width="600" />
+<Img src="https://cdn.mocah.ai/placeholder/square.png" alt="Placeholder" width="200" height="200" />
+
+⚠️ ALWAYS use these placeholder URLs instead of random image URLs (unsplash, picsum, etc.)
 
 `;
 
@@ -177,7 +200,7 @@ const VALIDATION_CHECKLIST = `PRE-OUTPUT CHECKS:
 □ Inline tags (<b>, <strong>, <em>, <i>) only inside <Text> components
 □ No nested Text: pattern "Text>.*<Text" = 0 matches
 □ No display: property
-□ No Heading as= prop
+□ CRITICAL: No 'as' prop on <Heading> - search for 'as=' in all Heading components and remove it
 □ export default function exists
 □ All textAlign/verticalAlign have 'as const'
 □ <Text> count = </Text> count`;
@@ -348,13 +371,33 @@ export function buildReactEmailPrompt(
     `Create a unique, visually distinctive React Email template.
 
 Request: "${userPrompt}"
-${buildBrandSection(brandKit)}`,
+${buildBrandSection(brandKit)}
+
+📸 IMAGE REFERENCE INSTRUCTIONS:
+If reference images are provided by the user, analyze them carefully and use your judgment to determine how closely to follow them:
+
+- If the user's request suggests they want to REPLICATE the design (e.g., "like this", "similar to the attached", "based on this image", "recreate this"), then PRIORITIZE matching the image closely:
+  * Match layout structure, section arrangement, and visual hierarchy
+  * Follow the color scheme, typography, and spacing patterns.
+  * Use the same text and colors as the reference image.
+  * Replicate button styles, image placements, and design elements
+  * Maintain the overall aesthetic and visual style
+  
+- If the user wants INSPIRATION (e.g., "inspired by", "use as reference", "take ideas from"), create a unique design that incorporates the visual style and patterns from the reference.
+
+- If the user simply mentions having an image without specific intent, use it as a helpful visual guide while prioritizing their written requirements and brand guidelines.
+
+IMPORTANT: Pay close attention to the user's language to understand their intent. When they explicitly reference the attached image in their request, that's a strong signal to prioritize visual matching.`,
+  ];
+
+  sections.push(
     CRITICAL_RULES,
     COMPONENT_REFERENCE,
     STYLE_GUIDELINES,
     SOCIAL_ICONS_CDN,
-    CONTENT_GUIDELINES,
-  ];
+    IMAGE_PLACEHOLDERS,
+    CONTENT_GUIDELINES
+  );
 
   if (verbosity !== "minimal") {
     sections.push(DESIGN_PHILOSOPHY);
@@ -387,6 +430,12 @@ ${currentTemplateCode}
 REQUEST: "${userPrompt}"
 ${buildBrandSection(brandKit)}
 
+📸 IMAGE REFERENCE INSTRUCTIONS:
+If reference images are provided, use your judgment to determine how closely to follow them based on the user's language:
+- If they explicitly reference the image (e.g., "like this", "match the attached", "based on this design"), prioritize closely matching the visual design, layout, and styling from the image
+- If they want inspiration, incorporate visual elements while maintaining uniqueness
+- Always balance image references with the user's written requirements and brand guidelines
+
 MODIFICATION RULES:
 - Preserve structure unless explicitly asked to change
 - Only modify what user requested
@@ -396,6 +445,8 @@ MODIFICATION RULES:
 ${CRITICAL_RULES}
 
 ${SOCIAL_ICONS_CDN}
+
+${IMAGE_PLACEHOLDERS}
 
 ${VALIDATION_CHECKLIST}
 
@@ -464,23 +515,6 @@ export const reactEmailGenerationSchema = z.object({
     .enum(["inline", "predefined-classes", "style-objects"])
     .default("style-objects")
     .describe("Styling approach. Default: style-objects."),
-
-  styleDefinitionsJson: z
-    .string()
-    .optional()
-    .describe("Optional JSON of extracted style objects."),
-
-  metadata: z
-    .object({
-      generatedAt: z.string().describe("ISO 8601 timestamp"),
-      model: z.string().describe("Model identifier"),
-      tokensUsed: z.number().int().min(0).describe("Tokens consumed"),
-      emailType: z
-        .string()
-        .nullish()
-        .describe("Category: welcome, newsletter, promotional, transactional, notification"),
-    })
-    .describe("Generation metadata"),
 });
 
 export const TEMPLATE_SCHEMA_NAME = "ReactEmailTemplate";
@@ -523,6 +557,89 @@ export const promptSuggestions = {
 };
 
 // ============================================================================
+// IMAGE GENERATION PROMPTS
+// ============================================================================
+
+/**
+ * Build concise brand context for image generation
+ * Focuses on visual aspects most relevant to image creation
+ */
+export function buildImageBrandContext(brandKit?: BrandKit): string {
+  if (!brandKit) return "";
+
+  const sections: string[] = [];
+
+  // Company Identity (brief)
+  if (brandKit.companyName) {
+    let identity = `Brand: ${brandKit.companyName}`;
+    if (brandKit.industry) identity += ` (${brandKit.industry})`;
+    sections.push(identity);
+  }
+
+  // Brand Description (for context)
+  if (brandKit.companyDescription) {
+    const desc = brandKit.companyDescription.length > 200 
+      ? brandKit.companyDescription.substring(0, 200) + "..."
+      : brandKit.companyDescription;
+    sections.push(`About: ${desc}`);
+  }
+
+  // Visual Style & Personality
+  const styleElements: string[] = [];
+  
+  // Colors - most important for image generation
+  if (brandKit.primaryColor) styleElements.push(`Primary color: ${brandKit.primaryColor}`);
+  if (brandKit.accentColor) styleElements.push(`Accent color: ${brandKit.accentColor}`);
+  
+  // Brand personality - affects visual mood
+  if (brandKit.brandVoice) styleElements.push(`Voice: ${brandKit.brandVoice}`);
+  if (brandKit.brandTone) styleElements.push(`Tone: ${brandKit.brandTone}`);
+  if (brandKit.brandEnergy) styleElements.push(`Energy: ${brandKit.brandEnergy}`);
+  
+  if (styleElements.length > 0) {
+    sections.push(`Visual Style: ${styleElements.join(" | ")}`);
+  }
+
+  // Target Audience - helps with appropriate imagery
+  if (brandKit.targetAudience) {
+    sections.push(`Target Audience: ${brandKit.targetAudience}`);
+  }
+
+  // Brand Values - influences visual themes
+  if (brandKit.brandValues && brandKit.brandValues.length > 0) {
+    sections.push(`Brand Values: ${brandKit.brandValues.slice(0, 3).join(", ")}`);
+  }
+
+  // Industry context from website summary
+  if (brandKit.summary) {
+    const summary = brandKit.summary.length > 150 
+      ? brandKit.summary.substring(0, 150) + "..."
+      : brandKit.summary;
+    sections.push(`Context: ${summary}`);
+  }
+
+  if (sections.length === 0) return "";
+
+  return `\n--- BRAND CONTEXT ---\n${sections.join("\n")}\n--- END BRAND CONTEXT ---\n\nIMPORTANT: Generate an image that aligns with this brand's visual identity, personality, and target audience. Use the brand colors when appropriate, and match the brand's tone and energy level.`;
+}
+
+/**
+ * Enhance image generation prompt with brand context
+ */
+export function buildImageGenerationPrompt(
+  userPrompt: string,
+  brandKit?: BrandKit
+): string {
+  const brandContext = buildImageBrandContext(brandKit);
+  
+  if (!brandContext) {
+    return userPrompt;
+  }
+
+  return `${userPrompt}${brandContext}`;
+}
+
+// ============================================================================
 // UTILITY EXPORTS (for prompt caching strategies)
 // ============================================================================
 
@@ -532,6 +649,7 @@ export const STATIC_PROMPT_SECTIONS = {
   componentReference: COMPONENT_REFERENCE,
   styleGuidelines: STYLE_GUIDELINES,
   socialIconsCdn: SOCIAL_ICONS_CDN,
+  imagePlaceholders: IMAGE_PLACEHOLDERS,
   contentGuidelines: CONTENT_GUIDELINES,
   validation: VALIDATION_CHECKLIST,
   designPhilosophy: DESIGN_PHILOSOPHY,

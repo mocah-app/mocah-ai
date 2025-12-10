@@ -2,7 +2,6 @@
 
 import * as motion from "motion/react-client";
 import { Button } from "@/components/ui/button";
-import { ScrollArea } from "@/components/ui/scroll-area";
 import { cn } from "@/lib/utils";
 import {
   Building2,
@@ -15,6 +14,7 @@ import {
   Sparkles,
   Type,
 } from "lucide-react";
+import { useEffect, useRef } from "react";
 
 // ============================================================================
 // Types
@@ -112,20 +112,58 @@ export function BrandConfigNav({
   activeSection,
   onNavigate,
 }: BrandConfigNavProps) {
+  const scrollContainerRef = useRef<HTMLDivElement>(null);
+  const navItemRefs = useRef<Record<SectionId, HTMLDivElement | null>>(
+    {} as any
+  );
+
+  // Auto-scroll active item into view on mobile
+  useEffect(() => {
+    const activeItem = navItemRefs.current[activeSection];
+    const container = scrollContainerRef.current;
+
+    if (activeItem && container && window.innerWidth < 768) {
+      const containerRect = container.getBoundingClientRect();
+      const itemRect = activeItem.getBoundingClientRect();
+
+      // Check if item is outside visible area
+      const isOutOfView =
+        itemRect.left < containerRect.left ||
+        itemRect.right > containerRect.right;
+
+      if (isOutOfView) {
+        activeItem.scrollIntoView({
+          behavior: "smooth",
+          block: "nearest",
+          inline: "center",
+        });
+      }
+    }
+  }, [activeSection]);
+
   return (
-    <div className="w-56 border-r bg-secondary/50 flex flex-col shrink-0">
-      <ScrollArea className="flex-1 p-3">
-        <nav className="space-y-3 px-2 pt-2">
+    <div className="w-full md:w-56 border-r bg-secondary/50 flex flex-row md:flex-col shrink-0 overflow-hidden">
+      <div
+        ref={scrollContainerRef}
+        className="flex-1 overflow-x-auto md:overflow-x-visible md:overflow-y-auto p-3"
+      >
+        <nav className="flex md:flex-col gap-3 px-2 pt-2 md:space-y-3 md:space-x-0 md:gap-0 md:pb-2">
           {NAV_ITEMS.map((item) => (
-            <NavItem
+            <div
               key={item.id}
-              item={item}
-              isActive={activeSection === item.id}
-              onClick={() => onNavigate(item.id)}
-            />
+              ref={(el) => {
+                navItemRefs.current[item.id] = el;
+              }}
+            >
+              <NavItem
+                item={item}
+                isActive={activeSection === item.id}
+                onClick={() => onNavigate(item.id)}
+              />
+            </div>
           ))}
         </nav>
-      </ScrollArea>
+      </div>
     </div>
   );
 }
@@ -156,7 +194,7 @@ function NavItem({
         onClick={onClick}
         variant="ghost"
         className={cn(
-          "w-full flex items-center gap-3 h-auto rounded-sm text-left transition-colors relative",
+          "w-auto md:w-full flex items-center gap-3 h-auto rounded-sm text-left md:text-left transition-colors relative shrink-0 min-w-fit md:min-w-0",
           isActive && "bg-background shadow-sm"
         )}
       >
@@ -169,7 +207,7 @@ function NavItem({
         <div className="min-w-0 flex-1">
           <p
             className={cn(
-              "text-lg font-medium truncate transition-colors duration-200",
+              "text-sm md:text-lg font-medium truncate transition-colors duration-200 whitespace-nowrap",
               isActive ? "text-foreground" : "text-muted-foreground/90"
             )}
           >
@@ -180,7 +218,7 @@ function NavItem({
         {/* Active indicator with layoutId for smooth transitions */}
         {isActive && (
           <motion.div
-            className="absolute left-0 top-1/2 -translate-y-1/2 w-0.5 h-6 bg-primary rounded-full"
+            className="absolute left-0 md:left-0 top-auto md:top-1/2 md:-translate-y-1/2 bottom-0 md:bottom-auto w-full md:w-0.5 h-0.5 md:h-6 bg-primary rounded-full md:rounded-full"
             layoutId="brandNavActiveIndicator"
             transition={{
               type: "spring",

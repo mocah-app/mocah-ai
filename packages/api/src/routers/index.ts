@@ -3,6 +3,7 @@ import { storageRouter } from "./storage";
 import { organizationRouter } from "./organization";
 import { brandKitRouter } from "./brand-kit";
 import { brandBuilderRouter } from "./brandkit-builder";
+import { brandGuideRouter } from "./brand-guide";
 import { templateRouter } from "./template";
 import { chatRouter } from "./chat";
 import { imageAssetRouter } from "./image-asset";
@@ -23,6 +24,7 @@ export const appRouter = router({
   organization: organizationRouter,
   brandKit: brandKitRouter,
   brandBuilder: brandBuilderRouter,
+  brandGuide: brandGuideRouter,
   template: templateRouter,
   chat: chatRouter,
   imageAsset: imageAssetRouter,
