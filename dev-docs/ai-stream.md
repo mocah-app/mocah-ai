@@ -1,1043 +1,4 @@
 
-# `streamObject()`
-
-Streams a typed, structured object for a given prompt and schema using a language model.
-
-It can be used to force the language model to return structured data, e.g. for information extraction, synthetic data generation, or classification tasks.
-
-#### Example: stream an object using a schema
-
-```ts
-import { openai } from '@ai-sdk/openai';
-import { streamObject } from 'ai';
-import { z } from 'zod';
-
-const { partialObjectStream } = streamObject({
-  model: openai('gpt-4.1'),
-  schema: z.object({
-    recipe: z.object({
-      name: z.string(),
-      ingredients: z.array(z.string()),
-      steps: z.array(z.string()),
-    }),
-  }),
-  prompt: 'Generate a lasagna recipe.',
-});
-
-for await (const partialObject of partialObjectStream) {
-  console.clear();
-  console.log(partialObject);
-}
-```
-
-#### Example: stream an array using a schema
-
-For arrays, you specify the schema of the array items.
-You can use `elementStream` to get the stream of complete array elements.
-
-```ts highlight="7,18"
-import { openai } from '@ai-sdk/openai';
-import { streamObject } from 'ai';
-import { z } from 'zod';
-
-const { elementStream } = streamObject({
-  model: openai('gpt-4.1'),
-  output: 'array',
-  schema: z.object({
-    name: z.string(),
-    class: z
-      .string()
-      .describe('Character class, e.g. warrior, mage, or thief.'),
-    description: z.string(),
-  }),
-  prompt: 'Generate 3 hero descriptions for a fantasy role playing game.',
-});
-
-for await (const hero of elementStream) {
-  console.log(hero);
-}
-```
-
-#### Example: generate JSON without a schema
-
-```ts
-import { openai } from '@ai-sdk/openai';
-import { streamObject } from 'ai';
-
-const { partialObjectStream } = streamObject({
-  model: openai('gpt-4.1'),
-  output: 'no-schema',
-  prompt: 'Generate a lasagna recipe.',
-});
-
-for await (const partialObject of partialObjectStream) {
-  console.clear();
-  console.log(partialObject);
-}
-```
-
-#### Example: generate an enum
-
-When you want to generate a specific enum value, you can set the output strategy to `enum`
-and provide the list of possible values in the `enum` parameter.
-
-```ts highlight="5-6"
-import { streamObject } from 'ai';
-
-const { partialObjectStream } = streamObject({
-  model: 'openai/gpt-4.1',
-  output: 'enum',
-  enum: ['action', 'comedy', 'drama', 'horror', 'sci-fi'],
-  prompt:
-    'Classify the genre of this movie plot: ' +
-    '"A group of astronauts travel through a wormhole in search of a ' +
-    'new habitable planet for humanity."',
-});
-```
-
-To see `streamObject` in action, check out the [additional examples](#more-examples).
-
-## Import
-
-<Snippet text={`import { streamObject } from "ai"`} prompt={false} />
-
-## API Signature
-
-### Parameters
-
-<PropertiesTable
-  content={[
-    {
-      name: 'model',
-      type: 'LanguageModel',
-      description: "The language model to use. Example: openai('gpt-4.1')",
-    },
-    {
-      name: 'output',
-      type: "'object' | 'array' | 'enum' | 'no-schema' | undefined",
-      description: "The type of output to generate. Defaults to 'object'.",
-    },
-    {
-      name: 'mode',
-      type: "'auto' | 'json' | 'tool'",
-      description:
-        "The mode to use for object generation. Not every model supports all modes. \
-        Defaults to 'auto' for 'object' output and to 'json' for 'no-schema' output. \
-        Must be 'json' for 'no-schema' output.",
-    },
-    {
-      name: 'schema',
-      type: 'Zod Schema | JSON Schema',
-      description:
-        "The schema that describes the shape of the object to generate. \
-        It is sent to the model to generate the object and used to validate the output. \
-        You can either pass in a Zod schema or a JSON schema (using the `jsonSchema` function). \
-        In 'array' mode, the schema is used to describe an array element. \
-        Not available with 'no-schema' or 'enum' output.",
-    },
-    {
-      name: 'schemaName',
-      type: 'string | undefined',
-      description:
-        "Optional name of the output that should be generated. \
-        Used by some providers for additional LLM guidance, e.g. via tool or schema name. \
-        Not available with 'no-schema' or 'enum' output.",
-    },
-    {
-      name: 'schemaDescription',
-      type: 'string | undefined',
-      description:
-        "Optional description of the output that should be generated. \
-        Used by some providers for additional LLM guidance, e.g. via tool or schema name. \
-        Not available with 'no-schema' or 'enum' output.",
-    },
-    {
-      name: 'system',
-      type: 'string',
-      description:
-        'The system prompt to use that specifies the behavior of the model.',
-    },
-    {
-      name: 'prompt',
-      type: 'string | Array<SystemModelMessage | UserModelMessage | AssistantModelMessage | ToolModelMessage>',
-      description: 'The input prompt to generate the text from.',
-    },
-    {
-      name: 'messages',
-      type: 'Array<SystemModelMessage | UserModelMessage | AssistantModelMessage | ToolModelMessage>',
-      description:
-        'A list of messages that represent a conversation. Automatically converts UI messages from the useChat hook.',
-      properties: [
-        {
-          type: 'SystemModelMessage',
-          parameters: [
-            {
-              name: 'role',
-              type: "'system'",
-              description: 'The role for the system message.',
-            },
-            {
-              name: 'content',
-              type: 'string',
-              description: 'The content of the message.',
-            },
-          ],
-        },
-        {
-          type: 'UserModelMessage',
-          parameters: [
-            {
-              name: 'role',
-              type: "'user'",
-              description: 'The role for the user message.',
-            },
-            {
-              name: 'content',
-              type: 'string | Array<TextPart | ImagePart | FilePart>',
-              description: 'The content of the message.',
-              properties: [
-                {
-                  type: 'TextPart',
-                  parameters: [
-                    {
-                      name: 'type',
-                      type: "'text'",
-                      description: 'The type of the message part.',
-                    },
-                    {
-                      name: 'text',
-                      type: 'string',
-                      description: 'The text content of the message part.',
-                    },
-                  ],
-                },
-                {
-                  type: 'ImagePart',
-                  parameters: [
-                    {
-                      name: 'type',
-                      type: "'image'",
-                      description: 'The type of the message part.',
-                    },
-                    {
-                      name: 'image',
-                      type: 'string | Uint8Array | Buffer | ArrayBuffer | URL',
-                      description:
-                        'The image content of the message part. String are either base64 encoded content, base64 data URLs, or http(s) URLs.',
-                    },
-                    {
-                      name: 'mediaType',
-                      type: 'string',
-                      isOptional: true,
-                      description:
-                        'The IANA media type of the image. Optional.',
-                    },
-                  ],
-                },
-                {
-                  type: 'FilePart',
-                  parameters: [
-                    {
-                      name: 'type',
-                      type: "'file'",
-                      description: 'The type of the message part.',
-                    },
-                    {
-                      name: 'data',
-                      type: 'string | Uint8Array | Buffer | ArrayBuffer | URL',
-                      description:
-                        'The file content of the message part. String are either base64 encoded content, base64 data URLs, or http(s) URLs.',
-                    },
-                    {
-                      name: 'mediaType',
-                      type: 'string',
-                      description: 'The IANA media type of the file.',
-                    },
-                  ],
-                },
-              ],
-            },
-          ],
-        },
-        {
-          type: 'AssistantModelMessage',
-          parameters: [
-            {
-              name: 'role',
-              type: "'assistant'",
-              description: 'The role for the assistant message.',
-            },
-            {
-              name: 'content',
-              type: 'string | Array<TextPart | FilePart | ReasoningPart | ToolCallPart>',
-              description: 'The content of the message.',
-              properties: [
-                {
-                  type: 'TextPart',
-                  parameters: [
-                    {
-                      name: 'type',
-                      type: "'text'",
-                      description: 'The type of the message part.',
-                    },
-                    {
-                      name: 'text',
-                      type: 'string',
-                      description: 'The text content of the message part.',
-                    },
-                  ],
-                },
-                {
-                  type: 'ReasoningPart',
-                  parameters: [
-                    {
-                      name: 'type',
-                      type: "'reasoning'",
-                      description: 'The type of the message part.',
-                    },
-                    {
-                      name: 'text',
-                      type: 'string',
-                      description: 'The reasoning text.',
-                    },
-                  ],
-                },
-                {
-                  type: 'FilePart',
-                  parameters: [
-                    {
-                      name: 'type',
-                      type: "'file'",
-                      description: 'The type of the message part.',
-                    },
-                    {
-                      name: 'data',
-                      type: 'string | Uint8Array | Buffer | ArrayBuffer | URL',
-                      description:
-                        'The file content of the message part. String are either base64 encoded content, base64 data URLs, or http(s) URLs.',
-                    },
-                    {
-                      name: 'mediaType',
-                      type: 'string',
-                      description: 'The IANA media type of the file.',
-                    },
-                    {
-                      name: 'filename',
-                      type: 'string',
-                      description: 'The name of the file.',
-                      isOptional: true,
-                    },
-                  ],
-                },
-                {
-                  type: 'ToolCallPart',
-                  parameters: [
-                    {
-                      name: 'type',
-                      type: "'tool-call'",
-                      description: 'The type of the message part.',
-                    },
-                    {
-                      name: 'toolCallId',
-                      type: 'string',
-                      description: 'The id of the tool call.',
-                    },
-                    {
-                      name: 'toolName',
-                      type: 'string',
-                      description:
-                        'The name of the tool, which typically would be the name of the function.',
-                    },
-                    {
-                      name: 'args',
-                      type: 'object based on zod schema',
-                      description:
-                        'Parameters generated by the model to be used by the tool.',
-                    },
-                  ],
-                },
-              ],
-            },
-          ],
-        },
-        {
-          type: 'ToolModelMessage',
-          parameters: [
-            {
-              name: 'role',
-              type: "'tool'",
-              description: 'The role for the assistant message.',
-            },
-            {
-              name: 'content',
-              type: 'Array<ToolResultPart>',
-              description: 'The content of the message.',
-              properties: [
-                {
-                  type: 'ToolResultPart',
-                  parameters: [
-                    {
-                      name: 'type',
-                      type: "'tool-result'",
-                      description: 'The type of the message part.',
-                    },
-                    {
-                      name: 'toolCallId',
-                      type: 'string',
-                      description:
-                        'The id of the tool call the result corresponds to.',
-                    },
-                    {
-                      name: 'toolName',
-                      type: 'string',
-                      description:
-                        'The name of the tool the result corresponds to.',
-                    },
-                    {
-                      name: 'result',
-                      type: 'unknown',
-                      description:
-                        'The result returned by the tool after execution.',
-                    },
-                    {
-                      name: 'isError',
-                      type: 'boolean',
-                      isOptional: true,
-                      description:
-                        'Whether the result is an error or an error message.',
-                    },
-                  ],
-                },
-              ],
-            },
-          ],
-        },
-      ],
-    },
-    {
-      name: 'maxOutputTokens',
-      type: 'number',
-      isOptional: true,
-      description: 'Maximum number of tokens to generate.',
-    },
-    {
-      name: 'temperature',
-      type: 'number',
-      isOptional: true,
-      description:
-        'Temperature setting. The value is passed through to the provider. The range depends on the provider and model. It is recommended to set either `temperature` or `topP`, but not both.',
-    },
-    {
-      name: 'topP',
-      type: 'number',
-      isOptional: true,
-      description:
-        'Nucleus sampling. The value is passed through to the provider. The range depends on the provider and model. It is recommended to set either `temperature` or `topP`, but not both.',
-    },
-    {
-      name: 'topK',
-      type: 'number',
-      isOptional: true,
-      description:
-        'Only sample from the top K options for each subsequent token. Used to remove "long tail" low probability responses. Recommended for advanced use cases only. You usually only need to use temperature.',
-    },
-    {
-      name: 'presencePenalty',
-      type: 'number',
-      isOptional: true,
-      description:
-        'Presence penalty setting. It affects the likelihood of the model to repeat information that is already in the prompt. The value is passed through to the provider. The range depends on the provider and model.',
-    },
-    {
-      name: 'frequencyPenalty',
-      type: 'number',
-      isOptional: true,
-      description:
-        'Frequency penalty setting. It affects the likelihood of the model to repeatedly use the same words or phrases. The value is passed through to the provider. The range depends on the provider and model.',
-    },
-    {
-      name: 'seed',
-      type: 'number',
-      isOptional: true,
-      description:
-        'The seed (integer) to use for random sampling. If set and supported by the model, calls will generate deterministic results.',
-    },
-    {
-      name: 'maxRetries',
-      type: 'number',
-      isOptional: true,
-      description:
-        'Maximum number of retries. Set to 0 to disable retries. Default: 2.',
-    },
-    {
-      name: 'abortSignal',
-      type: 'AbortSignal',
-      isOptional: true,
-      description:
-        'An optional abort signal that can be used to cancel the call.',
-    },
-    {
-      name: 'headers',
-      type: 'Record<string, string>',
-      isOptional: true,
-      description:
-        'Additional HTTP headers to be sent with the request. Only applicable for HTTP-based providers.',
-    },
-    {
-      name: 'experimental_repairText',
-      type: '(options: RepairTextOptions) => Promise<string>',
-      isOptional: true,
-      description:
-        'A function that attempts to repair the raw output of the model to enable JSON parsing. Should return the repaired text or null if the text cannot be repaired.',
-      properties: [
-        {
-          type: 'RepairTextOptions',
-          parameters: [
-            {
-              name: 'text',
-              type: 'string',
-              description: 'The text that was generated by the model.',
-            },
-            {
-              name: 'error',
-              type: 'JSONParseError | TypeValidationError',
-              description: 'The error that occurred while parsing the text.',
-            },
-          ],
-        },
-      ],
-    },
-    {
-      name: 'experimental_download',
-      type: '(requestedDownloads: Array<{ url: URL; isUrlSupportedByModel: boolean }>) => Promise<Array<null | { data: Uint8Array; mediaType?: string }>>',
-      isOptional: true,
-      description:
-        'Custom download function to control how URLs are fetched when they appear in prompts. By default, files are downloaded if the model does not support the URL for the given media type. Experimental feature. Return null to pass the URL directly to the model (when supported), or return downloaded content with data and media type.',
-    },
-    {
-      name: 'experimental_telemetry',
-      type: 'TelemetrySettings',
-      isOptional: true,
-      description: 'Telemetry configuration. Experimental feature.',
-      properties: [
-        {
-          type: 'TelemetrySettings',
-          parameters: [
-            {
-              name: 'isEnabled',
-              type: 'boolean',
-              isOptional: true,
-              description:
-                'Enable or disable telemetry. Disabled by default while experimental.',
-            },
-            {
-              name: 'recordInputs',
-              type: 'boolean',
-              isOptional: true,
-              description:
-                'Enable or disable input recording. Enabled by default.',
-            },
-            {
-              name: 'recordOutputs',
-              type: 'boolean',
-              isOptional: true,
-              description:
-                'Enable or disable output recording. Enabled by default.',
-            },
-            {
-              name: 'functionId',
-              type: 'string',
-              isOptional: true,
-              description:
-                'Identifier for this function. Used to group telemetry data by function.',
-            },
-            {
-              name: 'metadata',
-              isOptional: true,
-              type: 'Record<string, string | number | boolean | Array<null | undefined | string> | Array<null | undefined | number> | Array<null | undefined | boolean>>',
-              description:
-                'Additional information to include in the telemetry data.',
-            },
-          ],
-        },
-      ],
-    },
-    {
-      name: 'providerOptions',
-      type: 'Record<string,Record<string,JSONValue>> | undefined',
-      isOptional: true,
-      description:
-        'Provider-specific options. The outer key is the provider name. The inner values are the metadata. Details depend on the provider.',
-    },
-    {
-      name: 'onError',
-      type: '(event: OnErrorResult) => Promise<void> |void',
-      isOptional: true,
-      description:
-        'Callback that is called when an error occurs during streaming. You can use it to log errors.',
-      properties: [
-        {
-          type: 'OnErrorResult',
-          parameters: [
-            {
-              name: 'error',
-              type: 'unknown',
-              description: 'The error that occurred.',
-            },
-          ],
-        },
-      ],
-    },
-    {
-      name: 'onFinish',
-      type: '(result: OnFinishResult) => void',
-      isOptional: true,
-      description:
-        'Callback that is called when the LLM response has finished.',
-      properties: [
-        {
-          type: 'OnFinishResult',
-          parameters: [
-            {
-              name: 'usage',
-              type: 'LanguageModelUsage',
-              description: 'The token usage of the generated text.',
-              properties: [
-                {
-                  type: 'LanguageModelUsage',
-                  parameters: [
-                    {
-                      name: 'inputTokens',
-                      type: 'number | undefined',
-                      description: 'The number of input (prompt) tokens used.',
-                    },
-                    {
-                      name: 'outputTokens',
-                      type: 'number | undefined',
-                      description:
-                        'The number of output (completion) tokens used.',
-                    },
-                    {
-                      name: 'totalTokens',
-                      type: 'number | undefined',
-                      description:
-                        'The total number of tokens as reported by the provider. This number might be different from the sum of inputTokens and outputTokens and e.g. include reasoning tokens or other overhead.',
-                    },
-                    {
-                      name: 'reasoningTokens',
-                      type: 'number | undefined',
-                      isOptional: true,
-                      description: 'The number of reasoning tokens used.',
-                    },
-                    {
-                      name: 'cachedInputTokens',
-                      type: 'number | undefined',
-                      isOptional: true,
-                      description: 'The number of cached input tokens.',
-                    },
-                  ],
-                },
-              ],
-            },
-            {
-              name: 'providerMetadata',
-              type: 'ProviderMetadata | undefined',
-              description:
-                'Optional metadata from the provider. The outer key is the provider name. The inner values are the metadata. Details depend on the provider.',
-            },
-            {
-              name: 'object',
-              type: 'T | undefined',
-              description:
-                'The generated object (typed according to the schema). Can be undefined if the final object does not match the schema.',
-            },
-            {
-              name: 'error',
-              type: 'unknown | undefined',
-              description:
-                'Optional error object. This is e.g. a TypeValidationError when the final object does not match the schema.',
-            },
-            {
-              name: 'warnings',
-              type: 'CallWarning[] | undefined',
-              description:
-                'Warnings from the model provider (e.g. unsupported settings).',
-            },
-            {
-              name: 'response',
-              type: 'Response',
-              isOptional: true,
-              description: 'Response metadata.',
-              properties: [
-                {
-                  type: 'Response',
-                  parameters: [
-                    {
-                      name: 'id',
-                      type: 'string',
-                      description:
-                        'The response identifier. The AI SDK uses the ID from the provider response when available, and generates an ID otherwise.',
-                    },
-                    {
-                      name: 'model',
-                      type: 'string',
-                      description:
-                        'The model that was used to generate the response. The AI SDK uses the response model from the provider response when available, and the model from the function call otherwise.',
-                    },
-                    {
-                      name: 'timestamp',
-                      type: 'Date',
-                      description:
-                        'The timestamp of the response. The AI SDK uses the response timestamp from the provider response when available, and creates a timestamp otherwise.',
-                    },
-                    {
-                      name: 'headers',
-                      isOptional: true,
-                      type: 'Record<string, string>',
-                      description: 'Optional response headers.',
-                    },
-                  ],
-                },
-              ],
-            },
-          ],
-        },
-      ],
-    },
-  ]}
-/>
-
-### Returns
-
-<PropertiesTable
-  content={[
-    {
-      name: 'usage',
-      type: 'Promise<LanguageModelUsage>',
-      description:
-        'The token usage of the generated text. Resolved when the response is finished.',
-      properties: [
-        {
-          type: 'LanguageModelUsage',
-          parameters: [
-            {
-              name: 'inputTokens',
-              type: 'number | undefined',
-              description: 'The number of input (prompt) tokens used.',
-            },
-            {
-              name: 'outputTokens',
-              type: 'number | undefined',
-              description: 'The number of output (completion) tokens used.',
-            },
-            {
-              name: 'totalTokens',
-              type: 'number | undefined',
-              description:
-                'The total number of tokens as reported by the provider. This number might be different from the sum of inputTokens and outputTokens and e.g. include reasoning tokens or other overhead.',
-            },
-            {
-              name: 'reasoningTokens',
-              type: 'number | undefined',
-              isOptional: true,
-              description: 'The number of reasoning tokens used.',
-            },
-            {
-              name: 'cachedInputTokens',
-              type: 'number | undefined',
-              isOptional: true,
-              description: 'The number of cached input tokens.',
-            },
-          ],
-        },
-      ],
-    },
-    {
-      name: 'providerMetadata',
-      type: 'Promise<Record<string,Record<string,JSONValue>> | undefined>',
-      description:
-        'Optional metadata from the provider. Resolved whe the response is finished. The outer key is the provider name. The inner values are the metadata. Details depend on the provider.',
-    },
-    {
-      name: 'object',
-      type: 'Promise<T>',
-      description:
-        'The generated object (typed according to the schema). Resolved when the response is finished.',
-    },
-    {
-      name: 'partialObjectStream',
-      type: 'AsyncIterableStream<DeepPartial<T>>',
-      description:
-        'Stream of partial objects. It gets more complete as the stream progresses. Note that the partial object is not validated. If you want to be certain that the actual content matches your schema, you need to implement your own validation for partial results.',
-    },
-    {
-      name: 'elementStream',
-      type: 'AsyncIterableStream<ELEMENT>',
-      description: 'Stream of array elements. Only available in "array" mode.',
-    },
-    {
-      name: 'textStream',
-      type: 'AsyncIterableStream<string>',
-      description:
-        'Text stream of the JSON representation of the generated object. It contains text chunks. When the stream is finished, the object is valid JSON that can be parsed.',
-    },
-    {
-      name: 'fullStream',
-      type: 'AsyncIterableStream<ObjectStreamPart<T>>',
-      description:
-        'Stream of different types of events, including partial objects, errors, and finish events. Only errors that stop the stream, such as network errors, are thrown.',
-      properties: [
-        {
-          type: 'ObjectPart',
-          parameters: [
-            {
-              name: 'type',
-              type: "'object'",
-            },
-            {
-              name: 'object',
-              type: 'DeepPartial<T>',
-              description: 'The partial object that was generated.',
-            },
-          ],
-        },
-        {
-          type: 'TextDeltaPart',
-          parameters: [
-            {
-              name: 'type',
-              type: "'text-delta'",
-            },
-            {
-              name: 'textDelta',
-              type: 'string',
-              description: 'The text delta for the underlying raw JSON text.',
-            },
-          ],
-        },
-        {
-          type: 'ErrorPart',
-          parameters: [
-            {
-              name: 'type',
-              type: "'error'",
-            },
-            {
-              name: 'error',
-              type: 'unknown',
-              description: 'The error that occurred.',
-            },
-          ],
-        },
-        {
-          type: 'FinishPart',
-          parameters: [
-            {
-              name: 'type',
-              type: "'finish'",
-            },
-            {
-              name: 'finishReason',
-              type: 'FinishReason',
-            },
-            {
-              name: 'logprobs',
-              type: 'Logprobs',
-              isOptional: true,
-            },
-            {
-              name: 'usage',
-              type: 'Usage',
-              description: 'Token usage.',
-            },
-            {
-              name: 'response',
-              type: 'Response',
-              isOptional: true,
-              description: 'Response metadata.',
-              properties: [
-                {
-                  type: 'Response',
-                  parameters: [
-                    {
-                      name: 'id',
-                      type: 'string',
-                      description:
-                        'The response identifier. The AI SDK uses the ID from the provider response when available, and generates an ID otherwise.',
-                    },
-                    {
-                      name: 'model',
-                      type: 'string',
-                      description:
-                        'The model that was used to generate the response. The AI SDK uses the response model from the provider response when available, and the model from the function call otherwise.',
-                    },
-                    {
-                      name: 'timestamp',
-                      type: 'Date',
-                      description:
-                        'The timestamp of the response. The AI SDK uses the response timestamp from the provider response when available, and creates a timestamp otherwise.',
-                    },
-                  ],
-                },
-              ],
-            },
-          ],
-        },
-      ],
-    },
-    {
-      name: 'request',
-      type: 'Promise<LanguageModelRequestMetadata>',
-      description: 'Request metadata.',
-      properties: [
-        {
-          type: 'LanguageModelRequestMetadata',
-          parameters: [
-            {
-              name: 'body',
-              type: 'string',
-              description:
-                'Raw request HTTP body that was sent to the provider API as a string (JSON should be stringified).',
-            },
-          ],
-        },
-      ],
-    },
-    {
-      name: 'response',
-      type: 'Promise<LanguageModelResponseMetadata>',
-      description: 'Response metadata. Resolved when the response is finished.',
-      properties: [
-        {
-          type: 'LanguageModelResponseMetadata',
-          parameters: [
-            {
-              name: 'id',
-              type: 'string',
-              description:
-                'The response identifier. The AI SDK uses the ID from the provider response when available, and generates an ID otherwise.',
-            },
-            {
-              name: 'model',
-              type: 'string',
-              description:
-                'The model that was used to generate the response. The AI SDK uses the response model from the provider response when available, and the model from the function call otherwise.',
-            },
-            {
-              name: 'timestamp',
-              type: 'Date',
-              description:
-                'The timestamp of the response. The AI SDK uses the response timestamp from the provider response when available, and creates a timestamp otherwise.',
-            },
-            {
-              name: 'headers',
-              isOptional: true,
-              type: 'Record<string, string>',
-              description: 'Optional response headers.',
-            },
-          ],
-        },
-      ],
-    },
-    {
-      name: 'warnings',
-      type: 'CallWarning[] | undefined',
-      description:
-        'Warnings from the model provider (e.g. unsupported settings).',
-    },
-    {
-      name: 'pipeTextStreamToResponse',
-      type: '(response: ServerResponse, init?: ResponseInit => void',
-      description:
-        'Writes text delta output to a Node.js response-like object. It sets a `Content-Type` header to `text/plain; charset=utf-8` and writes each text delta as a separate chunk.',
-      properties: [
-        {
-          type: 'ResponseInit',
-          parameters: [
-            {
-              name: 'status',
-              type: 'number',
-              isOptional: true,
-              description: 'The response status code.',
-            },
-            {
-              name: 'statusText',
-              type: 'string',
-              isOptional: true,
-              description: 'The response status text.',
-            },
-            {
-              name: 'headers',
-              type: 'Record<string, string>',
-              isOptional: true,
-              description: 'The response headers.',
-            },
-          ],
-        },
-      ],
-    },
-    {
-      name: 'toTextStreamResponse',
-      type: '(init?: ResponseInit) => Response',
-      description:
-        'Creates a simple text stream response. Each text delta is encoded as UTF-8 and sent as a separate chunk. Non-text-delta events are ignored.',
-      properties: [
-        {
-          type: 'ResponseInit',
-          parameters: [
-            {
-              name: 'status',
-              type: 'number',
-              isOptional: true,
-              description: 'The response status code.',
-            },
-            {
-              name: 'statusText',
-              type: 'string',
-              isOptional: true,
-              description: 'The response status text.',
-            },
-            {
-              name: 'headers',
-              type: 'Record<string, string>',
-              isOptional: true,
-              description: 'The response headers.',
-            },
-          ],
-        },
-      ],
-    },
-  ]}
-/>
-
-## More Examples
-
-<ExampleLinks
-  examples={[
-    {
-      title: 'Streaming Object Generation with RSC',
-      link: '/examples/next-app/basics/streaming-object-generation',
-    },
-    {
-      title: 'Streaming Object Generation with useObject',
-      link: '/examples/next-pages/basics/streaming-object-generation',
-    },
-    {
-      title: 'Streaming Partial Objects',
-      link: '/examples/node/streaming-structured-data/stream-object',
-    },
-    {
-      title: 'Recording Token Usage',
-      link: '/examples/node/streaming-structured-data/token-usage',
-    },
-    {
-      title: 'Recording Final Object',
-      link: '/examples/node/streaming-structured-data/object',
-    },
-  ]}
-/>
-
-
 
 # `streamText()`
 
@@ -3713,6 +2674,817 @@ To see `streamText` in action, check out [these examples](#examples).
       title:
         'Learn to stream chat completions generated by a language model in Node.js',
       link: '/examples/node/generating-text/stream-text-with-chat-prompt',
+    },
+  ]}
+/>
+
+
+
+
+# Tools
+
+While [large language models (LLMs)](/docs/foundations/overview#large-language-models) have incredible generation capabilities,
+they struggle with discrete tasks (e.g. mathematics) and interacting with the outside world (e.g. getting the weather).
+
+Tools are actions that an LLM can invoke.
+The results of these actions can be reported back to the LLM to be considered in the next response.
+
+For example, when you ask an LLM for the "weather in London", and there is a weather tool available, it could call a tool
+with London as the argument. The tool would then fetch the weather data and return it to the LLM. The LLM can then use this
+information in its response.
+
+## What is a tool?
+
+A tool is an object that can be called by the model to perform a specific task.
+You can use tools with [`generateText`](/docs/reference/ai-sdk-core/generate-text)
+and [`streamText`](/docs/reference/ai-sdk-core/stream-text) by passing one or more tools to the `tools` parameter.
+
+A tool consists of three properties:
+
+- **`description`**: An optional description of the tool that can influence when the tool is picked.
+- **`inputSchema`**: A [Zod schema](/docs/foundations/tools#schema-specification-and-validation-with-zod) or a [JSON schema](/docs/reference/ai-sdk-core/json-schema) that defines the input required for the tool to run. The schema is consumed by the LLM, and also used to validate the LLM tool calls.
+- **`execute`**: An optional async function that is called with the arguments from the tool call.
+
+<Note>
+  `streamUI` uses UI generator tools with a `generate` function that can return
+  React components.
+</Note>
+
+If the LLM decides to use a tool, it will generate a tool call.
+Tools with an `execute` function are run automatically when these calls are generated.
+The output of the tool calls are returned using tool result objects.
+
+You can automatically pass tool results back to the LLM
+using [multi-step calls](/docs/ai-sdk-core/tools-and-tool-calling#multi-step-calls) with `streamText` and `generateText`.
+
+## Schemas
+
+Schemas are used to define the parameters for tools and to validate the [tool calls](/docs/ai-sdk-core/tools-and-tool-calling).
+
+The AI SDK supports both raw JSON schemas (using the [`jsonSchema` function](/docs/reference/ai-sdk-core/json-schema))
+and [Zod](https://zod.dev/) schemas (either directly or using the [`zodSchema` function](/docs/reference/ai-sdk-core/zod-schema)).
+
+[Zod](https://zod.dev/) is a popular TypeScript schema validation library.
+You can install it with:
+
+<Tabs items={['pnpm', 'npm', 'yarn', 'bun']}>
+  <Tab>
+    <Snippet text="pnpm add zod" dark />
+  </Tab>
+  <Tab>
+    <Snippet text="npm install zod" dark />
+  </Tab>
+  <Tab>
+    <Snippet text="yarn add zod" dark />
+  </Tab>
+
+  <Tab>
+    <Snippet text="bun add zod" dark />
+  </Tab>
+</Tabs>
+
+You can then specify a Zod schema, for example:
+
+```ts
+import z from 'zod';
+
+const recipeSchema = z.object({
+  recipe: z.object({
+    name: z.string(),
+    ingredients: z.array(
+      z.object({
+        name: z.string(),
+        amount: z.string(),
+      }),
+    ),
+    steps: z.array(z.string()),
+  }),
+});
+```
+
+<Note>
+  You can also use schemas for structured output generation with
+  [`generateObject`](/docs/reference/ai-sdk-core/generate-object) and
+  [`streamObject`](/docs/reference/ai-sdk-core/stream-object).
+</Note>
+
+## Tool Packages
+
+Given tools are JavaScript objects, they can be packaged and distributed through npm like any other library. This makes it easy to share reusable tools across projects and with the community.
+
+### Using Ready-Made Tool Packages
+
+Install a tool package and import the tools you need:
+
+```bash
+pnpm add some-tool-package
+```
+
+Then pass them directly to `generateText`, `streamText`, or your agent definition:
+
+```ts highlight="2, 8"
+import { generateText, stepCountIs } from 'ai';
+import { searchTool } from 'some-tool-package';
+
+const { text } = await generateText({
+  model: 'anthropic/claude-haiku-4.5',
+  prompt: 'When was Vercel Ship AI?',
+  tools: {
+    webSearch: searchTool,
+  },
+  stopWhen: stepCountIs(10),
+});
+```
+
+### Publishing Your Own Tools
+
+You can publish your own tool packages to npm for others to use. Simply export your tool objects from your package:
+
+```ts
+// my-tools/index.ts
+export const myTool = {
+  description: 'A helpful tool',
+  inputSchema: z.object({
+    query: z.string(),
+  }),
+  execute: async ({ query }) => {
+    // your tool logic
+    return result;
+  },
+};
+```
+
+Anyone can then install and use your tools by importing them.
+
+To get started, you can use the [AI SDK Tool Package Template](https://github.com/vercel-labs/ai-sdk-tool-as-package-template) which provides a ready-to-use starting point for publishing your own tools.
+
+## Toolsets
+
+When you work with tools, you typically need a mix of application-specific tools and general-purpose tools. The community has created various toolsets and resources to help you build and use tools.
+
+### Ready-to-Use Tool Packages
+
+These packages provide pre-built tools you can install and use immediately:
+
+- **[@exalabs/ai-sdk](https://www.npmjs.com/package/@exalabs/ai-sdk)** - Web search tool that lets AI search the web and get real-time information.
+- **[@parallel-web/ai-sdk-tools](https://www.npmjs.com/package/@parallel-web/ai-sdk-tools)** - Web search and extract tools powered by Parallel Web API for real-time information and content extraction.
+- **[@perplexity-ai/ai-sdk](https://www.npmjs.com/package/@perplexity-ai/ai-sdk)** - Search the web with real-time results and advanced filtering powered by Perplexity's Search API.
+- **[@tavily/ai-sdk](https://www.npmjs.com/package/@tavily/ai-sdk)** - Search, extract, crawl, and map tools for enterprise-grade agents to explore the web in real-time.
+- **[Stripe agent tools](https://docs.stripe.com/agents?framework=vercel)** - Tools for interacting with Stripe.
+- **[StackOne ToolSet](https://docs.stackone.com/agents/typescript/frameworks/vercel-ai-sdk)** - Agentic integrations for hundreds of [enterprise SaaS](https://www.stackone.com/integrations) platforms.
+- **[agentic](https://docs.agentic.so/marketplace/ts-sdks/ai-sdk)** - A collection of 20+ tools that connect to external APIs such as [Exa](https://exa.ai/) or [E2B](https://e2b.dev/).
+- **[Amazon Bedrock AgentCore](https://github.com/aws/bedrock-agentcore-sdk-typescript)** - Fully managed AI agent services including [**Browser**](https://docs.aws.amazon.com/bedrock-agentcore/latest/devguide/built-in-tools.html) (a fast and secure cloud-based browser runtime to enable agents to interact with web applications, fill forms, navigate websites, and extract information) and [**Code Interpreter**](https://docs.aws.amazon.com/bedrock-agentcore/latest/devguide/built-in-tools.html) (an isolated sandbox environment for agents to execute code in Python, JavaScript, and TypeScript, enhancing accuracy and expanding ability to solve complex end-to-end tasks).
+- **[Composio](https://docs.composio.dev/providers/vercel)** - 250+ tools like GitHub, Gmail, Salesforce and [more](https://composio.dev/tools).
+- **[JigsawStack](http://www.jigsawstack.com/docs/integration/vercel)** - Over 30+ small custom fine-tuned models available for specific uses.
+- **[AI Tools Registry](https://ai-tools-registry.vercel.app)** - A Shadcn-compatible tool definitions and components registry for the AI SDK.
+- **[Toolhouse](https://docs.toolhouse.ai/toolhouse/toolhouse-sdk/using-vercel-ai)** - AI function-calling in 3 lines of code for over 25 different actions.
+
+### MCP Tools
+
+These are pre-built tools available as MCP servers:
+
+- **[Smithery](https://smithery.ai/docs/integrations/vercel_ai_sdk)** - An open marketplace of 6,000+ MCPs, including [Browserbase](https://browserbase.com/) and [Exa](https://exa.ai/).
+- **[Pipedream](https://pipedream.com/docs/connect/mcp/ai-frameworks/vercel-ai-sdk)** - Developer toolkit that lets you easily add 3,000+ integrations to your app or AI agent.
+- **[Apify](https://docs.apify.com/platform/integrations/vercel-ai-sdk)** - Apify provides a [marketplace](https://apify.com/store) of thousands of tools for web scraping, data extraction, and browser automation.
+
+### Tool Building Tutorials
+
+These tutorials and guides help you build your own tools that integrate with specific services:
+
+- **[browserbase](https://docs.browserbase.com/integrations/vercel/introduction#vercel-ai-integration)** - Tutorial for building browser tools that run a headless browser.
+- **[browserless](https://docs.browserless.io/ai-integrations/vercel-ai-sdk)** - Guide for integrating browser automation (self-hosted or cloud-based).
+- **[AI Tool Maker](https://github.com/nihaocami/ai-tool-maker)** - A CLI utility to generate AI SDK tools from OpenAPI specs.
+- **[Interlify](https://www.interlify.com/docs/integrate-with-vercel-ai)** - Guide for converting APIs into tools.
+- **[DeepAgent](https://deepagent.amardeep.space/docs/vercel-ai-sdk)** - A suite of 50+ AI tools and integrations, seamlessly connecting with APIs like Tavily, E2B, Airtable and [more](https://deepagent.amardeep.space/docs).
+
+<Note>
+  Do you have open source tools or tool libraries that are compatible with the
+  AI SDK? Please [file a pull request](https://github.com/vercel/ai/pulls) to
+  add them to this list.
+</Note>
+
+## Learn more
+
+The AI SDK Core [Tool Calling](/docs/ai-sdk-core/tools-and-tool-calling)
+and [Agents](/docs/foundations/agents) documentation has more information about tools and tool calling.
+
+
+
+# `useChat()`
+
+Allows you to easily create a conversational user interface for your chatbot application. It enables the streaming of chat messages from your AI provider, manages the chat state, and updates the UI automatically as new messages are received.
+
+<Note>
+  The `useChat` API has been significantly updated in AI SDK 5.0. It now uses a
+  transport-based architecture and no longer manages input state internally. See
+  the [migration
+  guide](/docs/migration-guides/migration-guide-5-0#usechat-changes) for
+  details.
+</Note>
+
+## Import
+
+<Tabs items={['React', 'Svelte', 'Vue']}>
+  <Tab>
+    <Snippet
+      text="import { useChat } from '@ai-sdk/react'"
+      dark
+      prompt={false}
+    />
+  </Tab>
+  <Tab>
+    <Snippet text="import { Chat } from '@ai-sdk/svelte'" dark prompt={false} />
+  </Tab>
+  <Tab>
+    <Snippet text="import { Chat } from '@ai-sdk/vue'" dark prompt={false} />
+  </Tab>
+</Tabs>
+
+## API Signature
+
+### Parameters
+
+<PropertiesTable
+  content={[
+    {
+      name: 'chat',
+      type: 'Chat<UIMessage>',
+      isOptional: true,
+      description:
+        'An existing Chat instance to use. If provided, other parameters are ignored.',
+    },
+    {
+      name: 'transport',
+      type: 'ChatTransport',
+      isOptional: true,
+      description:
+        'The transport to use for sending messages. Defaults to DefaultChatTransport with `/api/chat` endpoint.',
+      properties: [
+        {
+          type: 'DefaultChatTransport',
+          parameters: [
+            {
+              name: 'api',
+              type: "string = '/api/chat'",
+              isOptional: true,
+              description: 'The API endpoint for chat requests.',
+            },
+            {
+              name: 'credentials',
+              type: 'RequestCredentials',
+              isOptional: true,
+              description: 'The credentials mode for fetch requests.',
+            },
+            {
+              name: 'headers',
+              type: 'Record<string, string> | Headers',
+              isOptional: true,
+              description: 'HTTP headers to send with requests.',
+            },
+            {
+              name: 'body',
+              type: 'object',
+              isOptional: true,
+              description: 'Extra body object to send with requests.',
+            },
+            {
+              name: 'prepareSendMessagesRequest',
+              type: 'PrepareSendMessagesRequest',
+              isOptional: true,
+              description:
+                'A function to customize the request before chat API calls.',
+              properties: [
+                {
+                  type: 'PrepareSendMessagesRequest',
+                  parameters: [
+                    {
+                      name: 'options',
+                      type: 'PrepareSendMessageRequestOptions',
+                      description: 'Options for preparing the request',
+                      properties: [
+                        {
+                          type: 'PrepareSendMessageRequestOptions',
+                          parameters: [
+                            {
+                              name: 'id',
+                              type: 'string',
+                              description: 'The chat ID',
+                            },
+                            {
+                              name: 'messages',
+                              type: 'UIMessage[]',
+                              description: 'Current messages in the chat',
+                            },
+                            {
+                              name: 'requestMetadata',
+                              type: 'unknown',
+                              description: 'The request metadata',
+                            },
+                            {
+                              name: 'body',
+                              type: 'Record<string, any> | undefined',
+                              description: 'The request body',
+                            },
+                            {
+                              name: 'credentials',
+                              type: 'RequestCredentials | undefined',
+                              description: 'The request credentials',
+                            },
+                            {
+                              name: 'headers',
+                              type: 'HeadersInit | undefined',
+                              description: 'The request headers',
+                            },
+                            {
+                              name: 'api',
+                              type: 'string',
+                              description: `The API endpoint to use for the request. If not specified, it defaults to the transport’s API endpoint: /api/chat.`,
+                            },
+                            {
+                              name: 'trigger',
+                              type: "'submit-message' | 'regenerate-message'",
+                              description: 'The trigger for the request',
+                            },
+                            {
+                              name: 'messageId',
+                              type: 'string | undefined',
+                              description: 'The message ID if applicable',
+                            },
+                          ],
+                        },
+                      ],
+                    },
+                  ],
+                },
+              ],
+            },
+            {
+              name: 'prepareReconnectToStreamRequest',
+              type: 'PrepareReconnectToStreamRequest',
+              isOptional: true,
+              description:
+                'A function to customize the request before reconnect API call.',
+              properties: [
+                {
+                  type: 'PrepareReconnectToStreamRequest',
+                  parameters: [
+                    {
+                      name: 'options',
+                      type: 'PrepareReconnectToStreamRequestOptions',
+                      description:
+                        'Options for preparing the reconnect request',
+                      properties: [
+                        {
+                          type: 'PrepareReconnectToStreamRequestOptions',
+                          parameters: [
+                            {
+                              name: 'id',
+                              type: 'string',
+                              description: 'The chat ID',
+                            },
+                            {
+                              name: 'requestMetadata',
+                              type: 'unknown',
+                              description: 'The request metadata',
+                            },
+                            {
+                              name: 'body',
+                              type: 'Record<string, any> | undefined',
+                              description: 'The request body',
+                            },
+                            {
+                              name: 'credentials',
+                              type: 'RequestCredentials | undefined',
+                              description: 'The request credentials',
+                            },
+                            {
+                              name: 'headers',
+                              type: 'HeadersInit | undefined',
+                              description: 'The request headers',
+                            },
+                            {
+                              name: 'api',
+                              type: 'string',
+                              description: `The API endpoint to use for the request. If not specified, it defaults to the transport’s API endpoint combined with the chat ID: /api/chat/{chatId}/stream.`,
+                            },
+                          ],
+                        },
+                      ],
+                    },
+                  ],
+                },
+              ],
+            },
+          ],
+        },
+      ],
+    },
+    {
+      name: 'id',
+      type: 'string',
+      isOptional: true,
+      description:
+        'A unique identifier for the chat. If not provided, a random one will be generated.',
+    },
+    {
+      name: 'messages',
+      type: 'UIMessage[]',
+      isOptional: true,
+      description: 'Initial chat messages to populate the conversation with.',
+    },
+    {
+      name: 'onToolCall',
+      type: '({toolCall: ToolCall}) => void | Promise<void>',
+      isOptional: true,
+      description:
+        'Optional callback function that is invoked when a tool call is received. You must call addToolOutput to provide the tool result.',
+    },
+    {
+      name: 'sendAutomaticallyWhen',
+      type: '(options: { messages: UIMessage[] }) => boolean | PromiseLike<boolean>',
+      isOptional: true,
+      description:
+        'When provided, this function will be called when the stream is finished or a tool call is added to determine if the current messages should be resubmitted. You can use the lastAssistantMessageIsCompleteWithToolCalls helper for common scenarios.',
+    },
+    {
+      name: 'onFinish',
+      type: '(options: OnFinishOptions) => void',
+      isOptional: true,
+      description: 'Called when the assistant response has finished streaming.',
+      properties: [
+        {
+          type: 'OnFinishOptions',
+          parameters: [
+            {
+              name: 'message',
+              type: 'UIMessage',
+              description: 'The response message.',
+            },
+            {
+              name: 'messages',
+              type: 'UIMessage[]',
+              description: 'All messages including the response message',
+            },
+            {
+              name: 'isAbort',
+              type: 'boolean',
+              description:
+                'True when the request has been aborted by the client.',
+            },
+            {
+              name: 'isDisconnect',
+              type: 'boolean',
+              description:
+                'True if the server has been disconnected, e.g. because of a network error.',
+            },
+            {
+              name: 'isError',
+              type: 'boolean',
+              description: `True if errors during streaming caused the response to stop early.`,
+            },
+            {
+              name: 'finishReason',
+              type: "'stop' | 'length' | 'content-filter' | 'tool-calls' | 'error' | 'other' | 'unknown'",
+              isOptional: true,
+              description:
+                'The reason why the model finished generating the response. Undefined if the finish reason was not provided by the model.',
+            },
+          ],
+        },
+      ],
+    },
+    {
+      name: 'onError',
+      type: '(error: Error) => void',
+      isOptional: true,
+      description:
+        'Callback function to be called when an error is encountered.',
+    },
+    {
+      name: 'onData',
+      type: '(dataPart: DataUIPart) => void',
+      isOptional: true,
+      description:
+        'Optional callback function that is called when a data part is received.',
+    },
+    {
+      name: 'experimental_throttle',
+      type: 'number',
+      isOptional: true,
+      description:
+        'Custom throttle wait in ms for the chat messages and data updates. Default is undefined, which disables throttling.',
+    },
+    {
+      name: 'resume',
+      type: 'boolean',
+      isOptional: true,
+      description:
+        'Whether to resume an ongoing chat generation stream. Defaults to false.',
+    },
+  ]}
+/>
+
+### Returns
+
+<PropertiesTable
+  content={[
+    {
+      name: 'id',
+      type: 'string',
+      description: 'The id of the chat.',
+    },
+    {
+      name: 'messages',
+      type: 'UIMessage[]',
+      description: 'The current array of chat messages.',
+      properties: [
+        {
+          type: 'UIMessage',
+          parameters: [
+            {
+              name: 'id',
+              type: 'string',
+              description: 'A unique identifier for the message.',
+            },
+            {
+              name: 'role',
+              type: "'system' | 'user' | 'assistant'",
+              description: 'The role of the message.',
+            },
+            {
+              name: 'parts',
+              type: 'UIMessagePart[]',
+              description:
+                'The parts of the message. Use this for rendering the message in the UI.',
+            },
+            {
+              name: 'metadata',
+              type: 'unknown',
+              isOptional: true,
+              description: 'The metadata of the message.',
+            },
+          ],
+        },
+      ],
+    },
+    {
+      name: 'status',
+      type: "'submitted' | 'streaming' | 'ready' | 'error'",
+      description:
+        'The current status of the chat: "ready" (idle), "submitted" (request sent), "streaming" (receiving response), or "error" (request failed).',
+    },
+    {
+      name: 'error',
+      type: 'Error | undefined',
+      description: 'The error object if an error occurred.',
+    },
+    {
+      name: 'sendMessage',
+      type: '(message: CreateUIMessage | string, options?: ChatRequestOptions) => void',
+      description:
+        'Function to send a new message to the chat. This will trigger an API call to generate the assistant response.',
+      properties: [
+        {
+          type: 'ChatRequestOptions',
+          parameters: [
+            {
+              name: 'headers',
+              type: 'Record<string, string> | Headers',
+              description:
+                'Additional headers that should be to be passed to the API endpoint.',
+            },
+            {
+              name: 'body',
+              type: 'object',
+              description:
+                'Additional body JSON properties that should be sent to the API endpoint.',
+            },
+            {
+              name: 'metadata',
+              type: 'JSONValue',
+              description: 'Additional data to be sent to the API endpoint.',
+            },
+          ],
+        },
+      ],
+    },
+    {
+      name: 'regenerate',
+      type: '(options?: { messageId?: string }) => void',
+      description:
+        'Function to regenerate the last assistant message or a specific message. If no messageId is provided, regenerates the last assistant message.',
+    },
+    {
+      name: 'stop',
+      type: '() => void',
+      description:
+        'Function to abort the current streaming response from the assistant.',
+    },
+    {
+      name: 'clearError',
+      type: '() => void',
+      description: 'Clears the error state.',
+    },
+    {
+      name: 'resumeStream',
+      type: '() => void',
+      description:
+        'Function to resume an interrupted streaming response. Useful when a network error occurs during streaming.',
+    },
+    {
+      name: 'addToolOutput',
+      type: '(options: { tool: string; toolCallId: string; output: unknown } | { tool: string; toolCallId: string; state: "output-error", errorText: string }) => void',
+      description:
+        'Function to add a tool result to the chat. This will update the chat messages with the tool result. If sendAutomaticallyWhen is configured, it may trigger an automatic submission.',
+    },
+    {
+      name: 'setMessages',
+      type: '(messages: UIMessage[] | ((messages: UIMessage[]) => UIMessage[])) => void',
+      description:
+        'Function to update the messages state locally without triggering an API call. Useful for optimistic updates.',
+    },
+  ]}
+/>
+
+## Learn more
+
+- [Chatbot](/docs/ai-sdk-ui/chatbot)
+- [Chatbot with Tools](/docs/ai-sdk-ui/chatbot-with-tool-calling)
+- [UIMessage](/docs/reference/ai-sdk-core/ui-message)
+
+
+
+# `useCompletion()`
+
+Allows you to create text completion based capabilities for your application. It enables the streaming of text completions from your AI provider, manages the state for chat input, and updates the UI automatically as new messages are received.
+
+## Import
+
+<Tabs items={['React', 'Svelte', 'Vue']}>
+  <Tab>
+    <Snippet
+      text="import { useCompletion } from '@ai-sdk/react'"
+      dark
+      prompt={false}
+    />
+  </Tab>
+  <Tab>
+    <Snippet
+      text="import { Completion } from '@ai-sdk/svelte'"
+      dark
+      prompt={false}
+    />
+  </Tab>
+  <Tab>
+    <Snippet
+      text="import { useCompletion } from '@ai-sdk/vue'"
+      dark
+      prompt={false}
+    />
+  </Tab>
+
+</Tabs>
+
+## API Signature
+
+### Parameters
+
+<PropertiesTable
+  content={[
+    {
+      name: 'api',
+      type: "string = '/api/completion'",
+      description:
+        'The API endpoint that is called to generate text. It can be a relative path (starting with `/`) or an absolute URL.',
+    },
+    {
+      name: 'id',
+      type: 'string',
+      description:
+        'An unique identifier for the completion. If not provided, a random one will be generated. When provided, the `useCompletion` hook with the same `id` will have shared states across components. This is useful when you have multiple components showing the same chat stream',
+    },
+    {
+      name: 'initialInput',
+      type: 'string',
+      description: 'An optional string for the initial prompt input.',
+    },
+    {
+      name: 'initialCompletion',
+      type: 'string',
+      description: 'An optional string for the initial completion result.',
+    },
+    {
+      name: 'onFinish',
+      type: '(prompt: string, completion: string) => void',
+      description:
+        'An optional callback function that is called when the completion stream ends.',
+    },
+    {
+      name: 'onError',
+      type: '(error: Error) => void',
+      description:
+        'An optional callback that will be called when the chat stream encounters an error.',
+    },
+    {
+      name: 'headers',
+      type: 'Record<string, string> | Headers',
+      description:
+        'An optional object of headers to be passed to the API endpoint.',
+    },
+    {
+      name: 'body',
+      type: 'any',
+      description:
+        'An optional, additional body object to be passed to the API endpoint.',
+    },
+    {
+      name: 'credentials',
+      type: "'omit' | 'same-origin' | 'include'",
+      description:
+        'An optional literal that sets the mode of credentials to be used on the request. Defaults to same-origin.',
+    },
+    {
+      name: 'streamProtocol',
+      type: "'text' | 'data'",
+      isOptional: true,
+      description:
+        'An optional literal that sets the type of stream to be used. Defaults to `data`. If set to `text`, the stream will be treated as a text stream.',
+    },
+    {
+      name: 'fetch',
+      type: 'FetchFunction',
+      isOptional: true,
+      description:
+        'Optional. A custom fetch function to be used for the API call. Defaults to the global fetch function.',
+    },
+    {
+      name: 'experimental_throttle',
+      type: 'number',
+      isOptional: true,
+      description:
+        'React only. Custom throttle wait time in milliseconds for the completion and data updates. When specified, throttles how often the UI updates during streaming. Default is undefined, which disables throttling.',
+    },
+
+]}
+/>
+
+### Returns
+
+<PropertiesTable
+  content={[
+    {
+      name: 'completion',
+      type: 'string',
+      description: 'The current text completion.',
+    },
+    {
+      name: 'complete',
+      type: '(prompt: string, options: { headers, body }) => void',
+      description:
+        'Function to execute text completion based on the provided prompt.',
+    },
+    {
+      name: 'error',
+      type: 'undefined | Error',
+      description: 'The error thrown during the completion process, if any.',
+    },
+    {
+      name: 'setCompletion',
+      type: '(completion: string) => void',
+      description: 'Function to update the `completion` state.',
+    },
+    {
+      name: 'stop',
+      type: '() => void',
+      description: 'Function to abort the current API request.',
+    },
+    {
+      name: 'input',
+      type: 'string',
+      description: 'The current value of the input field.',
+    },
+    {
+      name: 'setInput',
+      type: 'React.Dispatch<React.SetStateAction<string>>',
+      description: 'The current value of the input field.',
+    },
+    {
+      name: 'handleInputChange',
+      type: '(event: any) => void',
+      description:
+        "Handler for the `onChange` event of the input field to control the input's value.",
+    },
+    {
+      name: 'handleSubmit',
+      type: '(event?: { preventDefault?: () => void }) => void',
+      description:
+        'Form submission handler that automatically resets the input field and appends a user message.',
+    },
+    {
+      name: 'isLoading',
+      type: 'boolean',
+      description:
+        'Boolean flag indicating whether a fetch operation is currently in progress.',
     },
   ]}
 />

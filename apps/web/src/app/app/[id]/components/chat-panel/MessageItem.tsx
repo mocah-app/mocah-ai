@@ -2,12 +2,24 @@ import { cn } from "@/lib/utils";
 import Loader from "@/components/loader";
 import { useTemplate } from "../providers/TemplateProvider";
 import { StreamingProgress } from "./StreamingProgress";
+import { StreamingReasoningPanel } from "./StreamingReasoningPanel";
 import Image from "next/image";
 
 export interface GenerationResult {
   subject?: string;
   previewText?: string;
   codePreview?: string; // First ~500 chars
+}
+
+export interface ReasoningData {
+  text: string;
+  timestamp: number;
+}
+
+export interface ToolCallData {
+  toolName: string;
+  timestamp: number;
+  args?: any;
 }
 
 export interface Message {
@@ -19,6 +31,11 @@ export interface Message {
   persistenceError?: boolean; // Indicates message failed to save to DB
   generationResult?: GenerationResult; // Store the generated content with this message
   imageUrls?: string[]; // Reference images attached to the message
+  reasoning?: ReasoningData[]; // AI reasoning steps (V2 only) - persisted
+  toolCalls?: ToolCallData[]; // Tool calls made (V2 only) - persisted
+  // Live V2 streaming data (only during streaming)
+  v2Reasoning?: string;
+  v2ToolCalls?: Array<{ name: string; status: "pending" | "complete" }>;
 }
 
 interface MessageItemProps {
@@ -68,13 +85,49 @@ export const MessageItem = ({
           )}
         >
           {message.isStreaming ? (
-            <div className="flex items-center gap-2">
+            <div className="flex items-end gap-2">
               <Loader />
               <span>{message.content}</span>
             </div>
           ) : (
             <>
               {message.content}
+
+              {/* Show reasoning if available (V2 feature) */}
+              {message.reasoning && message.reasoning.length > 0 && (
+                <details className="mt-3 text-xs">
+                  <summary className="cursor-pointer text-muted-foreground hover:text-foreground transition-colors">
+                    🧠 Show AI Reasoning ({message.reasoning.length} steps)
+                  </summary>
+                  <div className="mt-2 space-y-2 pl-4 border-l-2 border-muted">
+                    {message.reasoning.map((step, idx) => (
+                      <div key={idx} className="text-muted-foreground">
+                        <div className="font-mono text-[10px] text-muted-foreground/60">
+                          Step {idx + 1}
+                        </div>
+                        <div className="mt-1">{step.text}</div>
+                      </div>
+                    ))}
+                  </div>
+                </details>
+              )}
+
+              {/* Show tool calls if available (V2 feature) */}
+              {message.toolCalls && message.toolCalls.length > 0 && (
+                <details className="mt-3 text-xs">
+                  <summary className="cursor-pointer text-muted-foreground hover:text-foreground transition-colors">
+                    🔧 Tool Calls ({message.toolCalls.length})
+                  </summary>
+                  <div className="mt-2 space-y-1.5 pl-4 border-l-2 border-muted">
+                    {message.toolCalls.map((call, idx) => (
+                      <div key={idx} className="flex items-center gap-2 text-muted-foreground">
+                        <span className="text-green-500">✓</span>
+                        <span className="font-mono text-[11px]">{call.toolName}</span>
+                      </div>
+                    ))}
+                  </div>
+                </details>
+              )}
 
               {message.persistenceError && (
                 <div className="mt-2 text-xs text-amber-600 dark:text-amber-500 flex items-center gap-1">
@@ -86,6 +139,16 @@ export const MessageItem = ({
           )}
         </div>
       </div>
+
+      {/* V2 Reasoning Panel - show when we have streaming V2 data */}
+      {message.role === "assistant" &&
+        (message.v2Reasoning || (message.v2ToolCalls && message.v2ToolCalls.length > 0)) && (
+          <StreamingReasoningPanel
+            reasoning={message.v2Reasoning || ""}
+            toolCalls={message.v2ToolCalls || []}
+            isStreaming={message.isStreaming || false}
+          />
+        )}
 
       {/* Generation result - show live progress while streaming, or saved result after completion */}
       {message.role === "assistant" && (

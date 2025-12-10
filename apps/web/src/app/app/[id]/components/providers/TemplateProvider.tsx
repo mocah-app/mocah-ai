@@ -8,9 +8,13 @@ import React, {
   useContext,
   useState,
   useEffect,
+  useRef,
 } from "react";
 import { convertDates, logger } from "@mocah/shared";
 import { useStreamTemplate } from "@/hooks/use-stream-template";
+import { useChat } from "@ai-sdk/react";
+import { DefaultChatTransport } from "ai";
+import type { TemplateUiMessage } from "@mocah/api/lib/ai-v2-streaming";
 import { useOrganization } from "@/contexts/organization-context";
 import {
   type GenerationPhase,
@@ -48,6 +52,10 @@ interface TemplateState {
   // React Email specific state
   reactEmailCode: string | null;
   styleDefinitions: Record<string, React.CSSProperties>;
+  
+  // V2 AI features
+  reasoning: Array<{ text: string; timestamp: number }> | null; // AI reasoning steps (V2 only)
+  toolCalls: Array<{ toolName: string; timestamp: number; args?: any }> | null; // Tool calls (V2 only)
 }
 
 interface TemplateActions {
@@ -76,6 +84,12 @@ interface TemplateActions {
 interface TemplateContextValue {
   state: TemplateState;
   actions: TemplateActions;
+  // V2 stream data for UI consumption
+  v2: {
+    messages: TemplateUiMessage[];
+    status: "submitted" | "streaming" | "ready" | "error" | "idle";
+    isStreaming: boolean;
+  };
 }
 
 const TemplateContext = createContext<TemplateContextValue | undefined>(
@@ -113,18 +127,18 @@ export function TemplateProvider({
     error: null,
     reactEmailCode: null,
     styleDefinitions: {},
+    reasoning: null,
+    toolCalls: null,
   });
 
-  // Streaming hook for initial generation
-  const {
-    partialTemplate,
-    generate: generateStream,
-    cancel: cancelStream,
-    isGenerating,
-    error: streamError,
-  } = useStreamTemplate({
+  // Toggle between V1 and V2 (default to V2 for rollout)
+  const [useV2Mode, setUseV2Mode] = useState(true);
+
+  // Streaming hook for initial generation (V1)
+  const streamV1 = useStreamTemplate({
     organizationId: activeOrganization?.id || "",
     apiEndpoint: "/api/template/generate",
+    mode: 'v1', // Default to V1
     onComplete: async (template) => {
       // When streaming completes, update the existing template in database
       try {
@@ -258,16 +272,28 @@ export function TemplateProvider({
     },
   });
 
-  // Streaming hook for regeneration
+  // V2 chat hook (UI message stream) – uses /api/template/generate
   const {
-    partialTemplate: regenerationPartialTemplate,
-    generate: regenerateStream,
-    cancel: cancelRegenerationStream,
-    isGenerating: isRegenerating,
-    error: regenerationError,
-  } = useStreamTemplate({
+    messages: v2Messages,
+    sendMessage: sendV2Message,
+    status: v2Status,
+  } = useChat<TemplateUiMessage>({
+    transport: new DefaultChatTransport({
+      api: "/api/template/generate",
+      body: {
+        organizationId: activeOrganization?.id || "",
+        templateId,
+        enableReasoning: true,
+        enableTools: true,
+      },
+    }),
+  });
+
+  // Streaming hook for regeneration (V1)
+  const streamRegenerationV1 = useStreamTemplate({
     templateId: templateId,
     apiEndpoint: "/api/template/regenerate",
+    mode: 'v1', // Default to V1
     onComplete: async (template) => {
       // When regeneration streaming completes, update the template in database
       try {
@@ -394,6 +420,75 @@ export function TemplateProvider({
     },
   });
 
+  // Ref to resolve the V2 generation promise when stream completes
+  const v2ResolveRef = useRef<(() => void) | null>(null);
+  // Track if we're actively waiting for a V2 stream
+  const v2StreamActiveRef = useRef(false);
+
+  // V2 generate entrypoint: send a single chat message with the prompt
+  // Returns a promise that resolves when the stream is fully complete
+  const generateStreamV2 = useCallback(
+    async (prompt: string, _imageUrls?: string[]) => {
+      // Mark stream as active
+      v2StreamActiveRef.current = true;
+
+      // Create a promise that will resolve when v2Status becomes 'ready'
+      const completionPromise = new Promise<void>((resolve) => {
+        v2ResolveRef.current = resolve;
+      });
+
+      // Fire the message
+      sendV2Message({
+        text: prompt,
+        metadata: {
+          organizationId: activeOrganization?.id,
+          templateId,
+        },
+      });
+
+      // Wait for completion
+      await completionPromise;
+
+      // Mark stream as no longer active
+      v2StreamActiveRef.current = false;
+    },
+    [sendV2Message, activeOrganization?.id, templateId]
+  );
+
+  // Resolve the V2 promise when stream becomes ready (only if we were waiting)
+  useEffect(() => {
+    if (v2Status === "ready" && v2ResolveRef.current && v2StreamActiveRef.current) {
+      logger.info("🏁 [TemplateProvider] V2 stream complete, resolving promise");
+      v2ResolveRef.current();
+      v2ResolveRef.current = null;
+    }
+  }, [v2Status]);
+
+  // For now, keep regeneration on V1 only to avoid over-complicating flows
+  const generateStream = useV2Mode ? generateStreamV2 : streamV1.generate;
+  const regenerateStream = streamRegenerationV1.generate;
+
+  const cancelStream = useCallback(() => {
+    if (useV2Mode) {
+      // TODO: wire up proper abort for v2Chat if needed
+      logger.info("🔴 [TemplateProvider] V2 cancel is a no-op for now");
+    } else {
+      streamV1.cancel();
+    }
+  }, [useV2Mode, streamV1]);
+
+  const cancelRegenerationStream = useCallback(() => {
+    streamRegenerationV1.cancel();
+  }, [streamRegenerationV1]);
+
+  const isGeneratingV2 = v2Status === "submitted" || v2Status === "streaming";
+  const isGenerating = useV2Mode ? isGeneratingV2 : streamV1.isGenerating;
+  const isRegenerating = streamRegenerationV1.isGenerating;
+
+  // Only V1 provides structured streaming progress at the moment
+  const partialTemplate = useV2Mode ? null : streamV1.partialTemplate;
+  const regenerationPartialTemplate = streamRegenerationV1.partialTemplate;
+
   // Combine streaming progress from both hooks
   const currentStreamingProgress = partialTemplate || regenerationPartialTemplate;
   const isCurrentlyStreaming = isGenerating || isRegenerating;
@@ -462,6 +557,171 @@ export function TemplateProvider({
       }
     },
   });
+
+  // Track whether we've already processed a submitTemplate for the current v2 session
+  const v2TemplateProcessedRef = useRef<string | null>(null);
+  // Store updateMutation in a ref to avoid dependency issues
+  const updateMutationRef = useRef(updateMutation);
+  updateMutationRef.current = updateMutation;
+
+  // V2: Process template ONLY when stream is fully complete (status === 'ready')
+  // This prevents premature processing when the model is still thinking (buffered stream)
+  useEffect(() => {
+    // Only process if we were actively waiting for a stream
+    if (!useV2Mode || !templateId || !v2StreamActiveRef.current) return;
+    
+    // CRITICAL: Only process when stream is fully complete
+    // The stream can appear "stuck" for 30-60s while model thinks, then deliver all at once
+    if (v2Status !== "ready") {
+      // Don't log on every render - only log status changes would be excessive
+      return;
+    }
+
+    logger.info("🔍 [TemplateProvider] V2 stream READY - processing messages", {
+      messageCount: v2Messages.length,
+      v2Status,
+    });
+
+    let latestTemplate:
+      | {
+          subject: string;
+          previewText: string;
+          reactEmailCode: string;
+          tone?: string;
+          keyPoints?: string[];
+        }
+      | null = null;
+
+    for (const message of v2Messages) {
+      // Log all part types for debugging
+      const partTypes = message.parts?.map((p) => p.type) ?? [];
+      logger.info("🔍 [TemplateProvider] V2 message", {
+        role: message.role,
+        partsCount: message.parts?.length ?? 0,
+        partTypes,
+      });
+
+      for (const part of message.parts ?? []) {
+        // Check for data-submitTemplate part (custom tool data)
+        if (part.type === "data-submitTemplate") {
+          logger.info("✅ [TemplateProvider] Found data-submitTemplate part", {
+            subject: (part as any).data?.subject,
+            codeLength: (part as any).data?.reactEmailCode?.length ?? 0,
+          });
+          latestTemplate = {
+            subject: (part as any).data.subject,
+            previewText: (part as any).data.previewText,
+            reactEmailCode: (part as any).data.reactEmailCode,
+            tone: (part as any).data.tone,
+            keyPoints: (part as any).data.keyPoints,
+          };
+        }
+
+        // Check tool-call for submitTemplate args (this contains the actual template!)
+        if (part.type === "tool-call") {
+          const anyPart = part as any;
+          
+          if (anyPart.toolName === "submitTemplate" && anyPart.args) {
+            logger.info("✅ [TemplateProvider] Found submitTemplate tool-call with args!", {
+              subject: anyPart.args.subject,
+              codeLength: anyPart.args.reactEmailCode?.length ?? 0,
+            });
+            latestTemplate = {
+              subject: anyPart.args.subject,
+              previewText: anyPart.args.previewText,
+              reactEmailCode: anyPart.args.reactEmailCode,
+              tone: anyPart.args.tone,
+              keyPoints: anyPart.args.keyPoints,
+            };
+          }
+        }
+      }
+    }
+
+    // When the submitTemplate tool fires, persist the generated template
+    if (!latestTemplate) {
+      logger.info("🔍 [TemplateProvider] Stream complete but no submitTemplate found");
+      return;
+    }
+
+    // Avoid re-processing the same template multiple times
+    const templateKey = `${templateId}-${latestTemplate.subject}-${latestTemplate.reactEmailCode?.length}`;
+    if (v2TemplateProcessedRef.current === templateKey) {
+      logger.info("🔍 [TemplateProvider] Template already processed, skipping");
+      return;
+    }
+    v2TemplateProcessedRef.current = templateKey;
+
+    logger.info("📝 [TemplateProvider] Processing V2 submitTemplate", {
+      subject: latestTemplate.subject,
+      codeLength: latestTemplate.reactEmailCode?.length ?? 0,
+    });
+
+    // Capture for async closure
+    const templateToSave = latestTemplate;
+    const currentTemplateId = templateId;
+
+    (async () => {
+      try {
+        const updatePayload = {
+          id: currentTemplateId,
+          name: templateToSave.subject || "AI Generated Template",
+          subject: templateToSave.subject,
+          reactEmailCode: templateToSave.reactEmailCode,
+          styleType: "STYLE_OBJECTS" as const,
+          styleDefinitions: {},
+          previewText: templateToSave.previewText,
+          status: "ACTIVE" as const,
+        };
+
+        setState((prev) => ({ ...prev, generationPhase: "finalizing" }));
+        const result = await updateMutationRef.current.mutateAsync(updatePayload);
+
+        if ("validationFailed" in result && result.validationFailed) {
+          logger.warn("⚠️ [TemplateProvider] V2 validation failed", {
+            errors: result.validationErrors,
+          });
+          setState((prev) => ({
+            ...prev,
+            isStreaming: false,
+            streamingProgress: null,
+            isLoading: false,
+            generationPhase: "idle",
+            validationError: {
+              errors: result.validationErrors,
+              warnings: result.validationWarnings,
+              attemptedCode: result.attemptedCode,
+            },
+          }));
+          return;
+        }
+
+        logger.info("✅ [TemplateProvider] V2 template saved successfully");
+        const processedResult = convertDates(result);
+        setState((prev) => ({
+          ...prev,
+          currentTemplate: processedResult,
+          reactEmailCode: processedResult.reactEmailCode,
+          isStreaming: false,
+          streamingProgress: null,
+          isLoading: false,
+          isDirty: false,
+          generationPhase: "complete",
+          waitingForRender: true,
+        }));
+      } catch (error) {
+        logger.error("❌ [TemplateProvider] Failed to complete V2 generation:", error as Error);
+        setState((prev) => ({
+          ...prev,
+          isStreaming: false,
+          streamingProgress: null,
+          isLoading: false,
+          generationPhase: "idle",
+        }));
+      }
+    })();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [useV2Mode, v2Status, templateId]); // Removed v2Messages and updateMutation - use refs instead
 
   // tRPC queries - fetch template data
   // Note: No retry needed for NOT_FOUND since skeleton is created before navigation
@@ -627,6 +887,8 @@ export function TemplateProvider({
         isLoading: true,
         streamingProgress: null,
         generationPhase: 'starting',
+        reasoning: null,
+        toolCalls: null,
       }));
 
       try {
@@ -757,6 +1019,8 @@ export function TemplateProvider({
         isLoading: true,
         streamingProgress: null,
         generationPhase: 'starting',
+        reasoning: null,
+        toolCalls: null,
       }));
 
       try {
@@ -833,8 +1097,15 @@ export function TemplateProvider({
     refetchTemplate,
   };
 
+  // V2 stream data for UI
+  const v2Data = {
+    messages: v2Messages,
+    status: v2Status,
+    isStreaming: isGeneratingV2,
+  };
+
   return (
-    <TemplateContext.Provider value={{ state, actions }}>
+    <TemplateContext.Provider value={{ state, actions, v2: v2Data }}>
       {children}
     </TemplateContext.Provider>
   );

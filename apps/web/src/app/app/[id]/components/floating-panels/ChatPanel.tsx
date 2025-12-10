@@ -4,7 +4,7 @@ import { cn } from "@/lib/utils";
 import { isSafari } from "@/lib/browser-detect";
 import { MessageCircle, Send, Square, X, Plus } from "lucide-react";
 import { useParams } from "next/navigation";
-import React, { useCallback, useEffect, useRef, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   useTemplate,
   GENERATION_PHASE_MESSAGES,
@@ -58,7 +58,7 @@ export const ChatPanel = ({
   initialInput?: string;
   onInputConsumed?: () => void;
 }) => {
-  const { state: templateState, actions: templateActions } = useTemplate();
+  const { state: templateState, actions: templateActions, v2 } = useTemplate();
   const { activeOrganization } = useOrganization();
   const params = useParams();
   const templateId = params.id as string;
@@ -161,6 +161,9 @@ export const ChatPanel = ({
             msg.role === "user" && metadata?.imageUrls
               ? metadata.imageUrls
               : undefined,
+          // V2 data
+          reasoning: metadata?.reasoning,
+          toolCalls: metadata?.toolCalls,
         };
       });
 
@@ -188,8 +191,12 @@ export const ChatPanel = ({
   ]);
 
   // ==================== STREAMING PHASE UPDATES ====================
-  // Update the streaming message content based on generation phase
+  // Update the streaming message content based on generation phase (V1)
+  // For V2, we derive content from the stream messages
   useEffect(() => {
+    // Skip if V2 is streaming - we'll handle that separately
+    if (v2.isStreaming) return;
+
     if (
       templateState.isStreaming &&
       templateState.generationPhase !== "idle" &&
@@ -205,7 +212,107 @@ export const ChatPanel = ({
         )
       );
     }
-  }, [templateState.generationPhase, templateState.isStreaming]);
+  }, [templateState.generationPhase, templateState.isStreaming, v2.isStreaming]);
+
+  // ==================== V2 STREAMING DATA ====================
+  // Extract V2 streaming content and update the message directly
+  const v2StreamingData = useMemo(() => {
+    let reasoning = "";
+    let responseText = "";
+    const toolCalls: Array<{ name: string; status: "pending" | "complete" }> = [];
+    const seenTools = new Set<string>();
+
+    for (const message of v2.messages) {
+      if (message.role !== "assistant") continue;
+
+      for (const part of message.parts ?? []) {
+        if (part.type === "reasoning") {
+          const anyPart = part as any;
+          if (anyPart.text) {
+            reasoning += anyPart.text;
+          }
+        }
+        if (part.type === "text") {
+          const anyPart = part as any;
+          if (anyPart.text) {
+            responseText += anyPart.text;
+          }
+        }
+        if (part.type === "tool-call") {
+          const anyPart = part as any;
+          if (anyPart.toolName && !seenTools.has(anyPart.toolName)) {
+            seenTools.add(anyPart.toolName);
+            toolCalls.push({
+              name: anyPart.toolName,
+              status: "pending",
+            });
+          }
+        }
+        if (part.type === "tool-result") {
+          const anyPart = part as any;
+          // Mark the tool as complete
+          const tool = toolCalls.find((t) => t.name === anyPart.toolName);
+          if (tool) {
+            tool.status = "complete";
+          }
+        }
+      }
+    }
+
+    return { reasoning, responseText, toolCalls };
+  }, [v2.messages]);
+
+  // Update assistant message with V2 stream data (content + reasoning panel data)
+  useEffect(() => {
+    if (!v2.isStreaming && v2.status !== "ready") return;
+    if (!currentStreamingIdRef.current) return;
+
+    const { reasoning, responseText, toolCalls } = v2StreamingData;
+    const hasV2Data = reasoning || toolCalls.length > 0;
+
+    // Build simple status message for the chat bubble
+    let displayContent = "";
+    
+    if (responseText) {
+      displayContent = responseText;
+    } else if (toolCalls.length > 0) {
+      const lastTool = toolCalls[toolCalls.length - 1];
+      if (lastTool.name === "submitTemplate") {
+        displayContent = "📝 Generated your template!";
+      } else {
+        displayContent = `🔧 Using ${lastTool.name}...`;
+      }
+    } else if (reasoning) {
+      displayContent = "💭 Thinking...";
+    } else if (v2.isStreaming) {
+      displayContent = GENERATION_PHASE_MESSAGES[templateState.generationPhase] || "Generating...";
+    }
+
+    // Update the message with content AND V2 streaming data
+    // When streaming stops, clear v2 fields so persisted data shows instead
+    setMessages((prev) =>
+      prev.map((msg) =>
+        msg.id === currentStreamingIdRef.current
+          ? {
+              ...msg,
+              content: displayContent || msg.content,
+              isStreaming: v2.isStreaming,
+              // Only add V2 data during streaming (so the panel shows during streaming)
+              // When streaming stops, clear v2 fields so persisted reasoning/toolCalls show
+              ...(v2.isStreaming && hasV2Data
+                ? {
+                    v2Reasoning: reasoning,
+                    v2ToolCalls: toolCalls,
+                  }
+                : {
+                    v2Reasoning: undefined,
+                    v2ToolCalls: undefined,
+                  }),
+            }
+          : msg
+      )
+    );
+  }, [v2StreamingData, v2.isStreaming, v2.status, templateState.generationPhase]);
 
   // Track latest streaming progress in ref (to avoid stale closure issues)
   useEffect(() => {
@@ -490,10 +597,54 @@ export const ChatPanel = ({
         // Clear the ref for next generation
         latestStreamingProgressRef.current = null;
 
-        // 8. Update local message to completion with generation result
-        const finalContent = isNewTemplate
+        // 8. Extract V2 reasoning and tool calls from stream messages
+        let reasoningText = "";
+        const toolCalls: Array<{ toolName: string; timestamp: number; args?: any }> = [];
+        const seenToolNames = new Set<string>();
+        let v2ResponseText = "";
+        
+        for (const message of v2.messages) {
+          if (message.role !== "assistant") continue;
+          
+          for (const part of message.parts ?? []) {
+            // Extract reasoning text (accumulate all reasoning parts)
+            if (part.type === "reasoning") {
+              const anyPart = part as any;
+              if (anyPart.text) {
+                reasoningText += anyPart.text;
+              }
+            }
+            
+            // Extract text response
+            if (part.type === "text" && (part as any).text) {
+              v2ResponseText += (part as any).text;
+            }
+            
+            // Extract tool calls (only add each tool once)
+            if (part.type === "tool-call") {
+              const anyPart = part as any;
+              if (anyPart.toolName && !seenToolNames.has(anyPart.toolName)) {
+                seenToolNames.add(anyPart.toolName);
+                toolCalls.push({
+                  toolName: anyPart.toolName,
+                  timestamp: Date.now(),
+                  args: anyPart.args,
+                });
+              }
+            }
+          }
+        }
+        
+        // Convert reasoning text to persisted format (array with single entry if text exists)
+        const reasoning: Array<{ text: string; timestamp: number }> = 
+          reasoningText.trim() 
+            ? [{ text: reasoningText.trim(), timestamp: Date.now() }]
+            : [];
+
+        // 10. Update local message to completion with generation result and V2 data
+        const finalContent = v2ResponseText || (isNewTemplate
           ? "I've created a new template based on your request. You can now edit it in the canvas!"
-          : "I've updated the template based on your request.";
+          : "I've updated the template based on your request.");
 
         setMessages((prev) =>
           prev.map((msg) =>
@@ -504,19 +655,29 @@ export const ChatPanel = ({
                   content: finalContent,
                   isStreaming: false,
                   generationResult,
+                  // Set persisted reasoning and toolCalls, remove temporary v2 fields
+                  reasoning: reasoning.length > 0 ? reasoning : undefined,
+                  toolCalls: toolCalls.length > 0 ? toolCalls : undefined,
+                  v2Reasoning: undefined, // Clear streaming data
+                  v2ToolCalls: undefined, // Clear streaming data
                 }
               : msg
           )
         );
 
-        // 9. Update DB with final content and metadata
+        // 10. Update DB with final content and metadata (including V2 data)
         if (dbAssistantId) {
           try {
             await updateMessageMutation.mutateAsync({
               id: dbAssistantId,
               content: finalContent,
               isStreaming: false,
-              metadata: generationResult,
+              metadata: {
+                ...generationResult,
+                // Only include reasoning and toolCalls if they have data
+                ...(reasoning.length > 0 && { reasoning }),
+                ...(toolCalls.length > 0 && { toolCalls }),
+              } as any, // Cast to any to allow V2 fields in metadata JSONB
             });
           } catch (error) {
             console.error(

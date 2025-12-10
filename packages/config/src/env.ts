@@ -60,6 +60,11 @@ export const serverEnv = createEnv({
     FAL_IMAGE_RATE_PER_DAY: z.coerce.number().optional(),
     FAL_IMAGE_ENABLED: z.coerce.boolean().optional(),
 
+    // AI V2 Feature Flags & Rollout
+    AI_V2_ENABLED: z.coerce.boolean().optional().default(false), // Master kill switch
+    AI_V2_ROLLOUT_PERCENTAGE: z.coerce.number().min(0).max(100).optional().default(0), // 0-100
+    AI_V2_FALLBACK_ON_ERROR: z.coerce.boolean().optional().default(true), // Auto-fallback to V1 on errors
+
     // Node Environment
     NODE_ENV: z.enum(["development", "test", "production"]).optional(),
   },

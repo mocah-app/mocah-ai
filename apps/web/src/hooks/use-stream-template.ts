@@ -16,11 +16,23 @@ interface UseStreamTemplateOptions {
   maxRetries?: number;
   /** API endpoint (default: /api/template/generate) */
   apiEndpoint?: string;
+  
+  // V2 AI Enhancement Options
+  /** Generation mode: v1 (streamObject) or v2 (streamText + tools) - default: v1 */
+  mode?: 'v1' | 'v2';
+  /** Enable AI reasoning (v2 only) - default: true */
+  enableReasoning?: boolean;
+  /** Enable tool calling for brand context, validation (v2 only) - default: true */
+  enableTools?: boolean;
 }
 
 /**
  * Hook for streaming template generation from AI
  * Uses AI SDK's useObject hook with enhanced reliability
+ * 
+ * @param mode - 'v1' for streamObject (default), 'v2' for streamText + tools
+ * @param enableReasoning - Enable AI reasoning in v2 mode (default: true)
+ * @param enableTools - Enable tool calling in v2 mode (default: true)
  */
 export function useStreamTemplate({
   organizationId,
@@ -29,6 +41,9 @@ export function useStreamTemplate({
   onError,
   maxRetries = 2,
   apiEndpoint = "/api/template/generate",
+  mode = 'v1',
+  enableReasoning = true,
+  enableTools = true,
 }: UseStreamTemplateOptions) {
   const [isGenerating, setIsGenerating] = useState(false);
   const [retryCount, setRetryCount] = useState(0);
@@ -93,7 +108,10 @@ export function useStreamTemplate({
       lastPromptRef.current = prompt;
 
       // Build request body based on whether it's generation or regeneration
-      const body: Record<string, any> = { prompt };
+      const body: Record<string, any> = { 
+        prompt,
+        mode, // v1 or v2
+      };
       
       if (templateId) {
         // Regeneration: needs templateId
@@ -107,12 +125,18 @@ export function useStreamTemplate({
       if (imageUrls && imageUrls.length > 0) {
         body.imageUrls = imageUrls;
       }
+
+      // V2 enhancement options (only honored in v2 mode)
+      if (mode === 'v2') {
+        body.enableReasoning = enableReasoning;
+        body.enableTools = enableTools;
+      }
       
       lastBodyRef.current = body;
 
       await submit(body);
     },
-    [submit, organizationId, templateId]
+    [submit, organizationId, templateId, mode, enableReasoning, enableTools]
   );
 
   const cancel = useCallback(() => {
