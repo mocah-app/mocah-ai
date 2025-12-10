@@ -1,15 +1,16 @@
 'use client';
 
-import React from 'react';
+import React, { useMemo } from 'react';
 import type { ElementData, ElementUpdates } from '@/lib/react-email';
 import type { BrandColors } from '../EditorShell';
 import {
   ContentSection,
   TypographySection,
   ColorSection,
-  BackgroundSection,
   LayoutSection,
 } from '../sections';
+import { PropertySection, ColorControl } from '../controls';
+import { BACKGROUND_COLOR_PRESETS } from '../constants/editor-constants';
 
 interface TextElementEditorProps {
   elementData: ElementData;
@@ -40,6 +41,21 @@ export function TextElementEditor({
   const handleContentChange = (content: string) => {
     onUpdate({ content });
   };
+
+  // Build background color presets with brand colors
+  const bgPresets = useMemo(() => {
+    const brandColorList = [...new Set(
+      [brandColors?.primary, brandColors?.accent].filter((c): c is string => !!c)
+    )];
+    
+    if (brandColorList.length > 0) {
+      const [transparent, ...rest] = BACKGROUND_COLOR_PRESETS;
+      const filteredRest = rest.filter(c => !brandColorList.includes(c));
+      return [transparent, ...brandColorList, ...filteredRest];
+    }
+    
+    return [...BACKGROUND_COLOR_PRESETS];
+  }, [brandColors]);
 
   return (
     <div className="space-y-0">
@@ -72,12 +88,15 @@ export function TextElementEditor({
         brandColors={brandColors}
       />
 
-      {/* Background Section */}
-      <BackgroundSection
-        value={currentStyles.backgroundColor as string}
-        onChange={(v) => handleStyleChange('backgroundColor', v)}
-        brandColors={brandColors}
-      />
+      {/* Background Color */}
+      <PropertySection label="Background">
+        <ColorControl
+          value={currentStyles.backgroundColor as string}
+          onChange={(v) => handleStyleChange('backgroundColor', v)}
+          showPresets={true}
+          presets={bgPresets}
+        />
+      </PropertySection>
 
       {/* Layout Section */}
       <LayoutSection

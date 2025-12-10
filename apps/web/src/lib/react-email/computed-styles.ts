@@ -22,6 +22,10 @@ const EXTRACTED_PROPERTIES = [
   'textTransform',
   // Background
   'backgroundColor',
+  'backgroundImage',
+  'backgroundSize',
+  'backgroundPosition',
+  'backgroundRepeat',
   // Layout / Spacing
   'padding',
   'paddingTop',
@@ -56,7 +60,13 @@ export function extractComputedStyles(element: Element): React.CSSProperties {
 
   for (const prop of EXTRACTED_PROPERTIES) {
     const value = computed.getPropertyValue(camelToKebab(prop));
-    if (value && value !== 'none' && value !== 'normal' && value !== 'auto') {
+    
+    // Special handling for backgroundImage - include even if 'none'
+    if (prop === 'backgroundImage') {
+      if (value && value !== 'initial' && value !== 'inherit') {
+        styles[prop] = value;
+      }
+    } else if (value && value !== 'none' && value !== 'normal' && value !== 'auto') {
       styles[prop] = value;
     }
   }
@@ -114,6 +124,12 @@ const VALUE_NORMALIZERS: Record<string, (value: string) => string> = {
 
   // Text decoration - normalize multi-value to simple
   textDecoration: normalizeTextDecoration,
+
+  // Background image properties
+  backgroundImage: (v) => v, // Keep as-is
+  backgroundSize: (v) => v, // Keep as-is
+  backgroundPosition: (v) => v, // Keep as-is
+  backgroundRepeat: (v) => v, // Keep as-is
 
   // Spacing - normalize to px shorthand
   padding: normalizeSpacing,

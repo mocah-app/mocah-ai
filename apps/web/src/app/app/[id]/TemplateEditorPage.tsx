@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useEffect, useCallback, useState } from "react";
+import { useSearchParams, useRouter } from "next/navigation";
 import { CanvasProvider } from "./components/providers/CanvasProvider";
 import {
   TemplateProvider,
@@ -56,6 +57,8 @@ const ImageStudioModal = dynamic(
 );
 
 function EditorContent({ templateId }: { templateId: string }) {
+  const router = useRouter();
+  const searchParams = useSearchParams();
   const { state: templateState, actions: templateActions } = useTemplate();
   const { state: canvasState, actions: canvasActions } = useCanvas();
   const { state: editorState, actions: editorActions } = useEditorMode();
@@ -232,6 +235,18 @@ function EditorContent({ templateId }: { templateId: string }) {
     // Note: Don't auto-close editor when element is deselected
     // User should be able to keep editor open to see instructions
   }, [editorState.selectedElement]);
+
+  // Auto-open library panel when library URL param is set
+  useEffect(() => {
+    const libraryParam = searchParams.get('library');
+    if (libraryParam === 'open') {
+      setActivePanel('library');
+      // Remove the param from URL
+      const params = new URLSearchParams(searchParams.toString());
+      params.delete('library');
+      router.replace(`/app/${templateId}?${params.toString()}`, { scroll: false });
+    }
+  }, [searchParams, router, templateId]);
 
   // Handle panel toggle with mutual exclusivity
   const handlePanelToggle = (panel: string) => {

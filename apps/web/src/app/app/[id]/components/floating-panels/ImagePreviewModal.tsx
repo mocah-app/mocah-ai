@@ -25,6 +25,7 @@ import {
 import "@xyflow/react/dist/style.css";
 import {
   Calendar,
+  Check,
   ChevronDown,
   Copy,
   Download,
@@ -364,6 +365,7 @@ export function ImagePreviewModal({
   const router = useRouter();
   const searchParams = useSearchParams();
   const { state: templateState } = useTemplate();
+  const { onImageSelect } = useImageStudio();
   const { setInitialPrompt, setInitialReferenceImageUrl, setInitialImageUrl } =
     useImageStudio();
   const [currentIndex, setCurrentIndex] = useState(0);
@@ -404,6 +406,17 @@ export function ImagePreviewModal({
     toast.success("URL copied to clipboard");
     onCopyUrl?.(currentImage.url);
   }, [currentImage, onCopyUrl]);
+
+  const handleInsertImage = useCallback(() => {
+    if (!currentImage || !onImageSelect) return;
+    onImageSelect(
+      currentImage.url,
+      currentImage.width ?? undefined,
+      currentImage.height ?? undefined
+    );
+    toast.success("Image inserted");
+    onOpenChange(false);
+  }, [currentImage, onImageSelect, onOpenChange]);
 
   const handleDownload = useCallback(async () => {
     if (!currentImage) return;
@@ -587,7 +600,7 @@ export function ImagePreviewModal({
             <div className="p-4 space-y-5">
               {/* Prompt */}
               {currentImage.prompt && (
-                <div>
+                <div className="space-y-2">
                   <p className="text-xs font-medium text-muted-foreground mb-1.5 flex items-center gap-1.5">
                     <Sparkles className="size-3" />
                     Prompt
@@ -607,6 +620,17 @@ export function ImagePreviewModal({
                     <Sparkles className="size-3.5 mr-2" />
                     Use as Reference
                   </Button>
+                  {onImageSelect && (
+                    <Button
+                      variant="secondary"
+                      className="w-full"
+                      size="sm"
+                      onClick={handleInsertImage}
+                    >
+                      <Check className="size-3.5 mr-2" />
+                      Insert Image
+                    </Button>
+                  )}
                 </div>
               )}
 
@@ -679,14 +703,27 @@ export function ImagePreviewModal({
               </div>
 
               {!currentImage.prompt && (
-                <Button
-                  size="sm"
-                  className="w-full"
-                  onClick={handleUseInStudio}
-                >
-                  <Sparkles className="size-3.5 mr-2" />
-                  Use as Reference
-                </Button>
+                <div className="space-y-2">
+                  <Button
+                    size="sm"
+                    className="w-full"
+                    onClick={handleUseInStudio}
+                  >
+                    <Sparkles className="size-3.5 mr-2" />
+                    Use as Reference
+                  </Button>
+                  {onImageSelect && (
+                    <Button
+                      variant="secondary"
+                      className="w-full"
+                      size="sm"
+                      onClick={handleInsertImage}
+                    >
+                      <Check className="size-3.5 mr-2" />
+                      Insert Image
+                    </Button>
+                  )}
+                </div>
               )}
             </div>
           </ScrollArea>

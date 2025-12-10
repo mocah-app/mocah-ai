@@ -41,18 +41,7 @@ export function LayoutElementEditor({
 
   return (
     <div className="space-y-0">
-      {/* Info about layout element */}
-      <PropertySection label="Element">
-        <div className="rounded-md bg-muted/50 p-3 text-xs text-muted-foreground">
-          <p>
-            <strong className="text-foreground">{elementData.type}</strong> is a
-            structural element used for layout.
-          </p>
-          <p className="mt-1">
-            You can adjust spacing and background properties.
-          </p>
-        </div>
-      </PropertySection>
+     
 
       {/* Width for all layout elements */}
       <PropertySection label="Size">
@@ -77,8 +66,9 @@ export function LayoutElementEditor({
       {/* Background */}
       <BackgroundSection
         value={currentStyles.backgroundColor as string}
-        onChange={(v) => handleStyleChange('backgroundColor', v)}
+        onChange={handleStyleChange}
         brandColors={brandColors}
+        currentStyles={currentStyles}
       />
 
       {/* Layout (padding, margin) */}
