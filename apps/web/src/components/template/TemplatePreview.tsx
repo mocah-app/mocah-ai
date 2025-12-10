@@ -113,13 +113,13 @@ export function TemplatePreview({
         </div>
       )}
       {isVisible && (
-        <div className="w-full h-full overflow-hidden" tabIndex={-1} aria-hidden="true">
+        <div className="w-full h-full relative overflow-hidden bg-card" tabIndex={-1} aria-hidden="true">
           <iframe
             ref={iframeRef}
-            className="border-0 pointer-events-none"
+            className="border pointer-events-none"
             style={{
-              transform: "scale(1.1)",
-              // transformOrigin: "top top",
+              transform: "scale(1.2)",
+              transformOrigin: "top top",
               width: "100%",
               height: "100%",
               border: "none",

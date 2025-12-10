@@ -14,7 +14,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Loader2, Sparkles, Upload, Trash2, Plus, ImageIcon, X } from "lucide-react";
+import { Loader2, Sparkles, Upload, Trash2, Plus, ImageIcon, X, Palette } from "lucide-react";
 import { cn } from "@/lib/utils";
 import Loader from "@/components/loader";
 import {
@@ -29,6 +29,8 @@ import {
   generateFormSchema,
   type GenerateFormErrors,
 } from "./types";
+import { trpc } from "@/utils/trpc";
+import { toast } from "sonner";
 
 // ============================================================================
 // Types
@@ -50,6 +52,8 @@ interface ImageStudioControlsProps {
   setReferenceImageUrls: (value: string) => void;
   referenceImages: string[];
   setReferenceImages: React.Dispatch<React.SetStateAction<string[]>>;
+  includeBrandGuide: boolean;
+  onBrandGuideChange: (include: boolean) => void;
   // Actions
   onGenerate: () => void;
   onFileUpload: (file: File) => void;
@@ -79,6 +83,8 @@ export const ImageStudioControls = memo(function ImageStudioControls({
   setReferenceImageUrls,
   referenceImages,
   setReferenceImages,
+  includeBrandGuide,
+  onBrandGuideChange,
   onGenerate,
   onFileUpload,
   isGenerating,
@@ -95,6 +101,14 @@ export const ImageStudioControls = memo(function ImageStudioControls({
   const availableModels = useReferenceImages
     ? AI_MODELS.filter((m) => isEditModel(m.value))
     : AI_MODELS;
+
+  // Brand guide preference mutation
+  const utils = trpc.useUtils();
+  const updatePreferenceMutation = trpc.brandGuide.setPreference.useMutation({
+    onSuccess: () => {
+      utils.brandGuide.getPreference.invalidate();
+    },
+  });
 
   // ============================================================================
   // Handlers
@@ -267,6 +281,26 @@ export const ImageStudioControls = memo(function ImageStudioControls({
     [setPrompt, formErrors.prompt]
   );
 
+  const handleBrandGuideToggle = useCallback(
+    (checked: boolean) => {
+      // Optimistically update UI
+      onBrandGuideChange(checked);
+
+      // Save preference to backend
+      const promise = updatePreferenceMutation.mutateAsync({
+        includeBrandGuide: checked,
+      });
+
+      toast.promise(promise, {
+        loading: checked ? "Enabling brand guide..." : "Disabling brand guide...",
+        success: checked ? "Brand guide enabled" : "Brand guide disabled",
+        error: (error) =>
+          `Failed to update preference: ${error.message || "Unknown error"}`,
+      });
+    },
+    [onBrandGuideChange, updatePreferenceMutation]
+  );
+
   const handleGenerateClick = useCallback(() => {
     // Validate form with Zod before submitting
     const result = generateFormSchema.safeParse({
@@ -399,6 +433,24 @@ export const ImageStudioControls = memo(function ImageStudioControls({
                 </Button>
               ))}
             </div>
+          </div>
+
+          {/* Brand Awareness */}
+          <div className="space-y-2">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <Palette className="w-3.5 h-3.5 text-muted-foreground" />
+                <Label className="text-xs font-medium">Include Brand Guide</Label>
+              </div>
+              <Switch
+                checked={includeBrandGuide}
+                onCheckedChange={handleBrandGuideToggle}
+                disabled={updatePreferenceMutation.isPending}
+              />
+            </div>
+            <p className="text-[10px] text-muted-foreground">
+              Use your brand colors, fonts, and style in generated images
+            </p>
           </div>
 
           {/* Reference Images */}

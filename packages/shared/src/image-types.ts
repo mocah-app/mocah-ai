@@ -189,6 +189,7 @@ export const imageGenerationInputSchema = z.object({
   guidanceScale: z.number().min(1).max(20).optional(),
   strength: z.number().min(0).max(1).optional(),
   model: z.string().optional(),
+  includeBrandGuide: z.boolean().optional(),
 });
 
 export type ImageGenerationInput = z.infer<typeof imageGenerationInputSchema>;
