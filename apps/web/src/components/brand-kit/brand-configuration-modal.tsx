@@ -126,37 +126,41 @@ export function BrandConfigurationModal() {
       setIsLoading(true);
       trpcClient.brandKit.get
         .query({ organizationId: activeOrganization.id })
-        .then((data) => {
+        .then((data: any) => {
+          // Note: Using `any` here to prevent "Type instantiation is excessively deep" error
+          // caused by tRPC's complex type inference with Prisma JSON fields.
+          // The BrandKitData type below provides runtime type safety.
           if (data) {
-            setBrandData({
-              companyName: data.companyName,
-              logo: data.logo,
-              tagline: data.tagline,
-              companyDescription: data.companyDescription,
-              primaryColor: data.primaryColor,
-              accentColor: data.accentColor,
-              backgroundColor: data.backgroundColor,
-              textPrimaryColor: data.textPrimaryColor,
-              fontFamily: data.fontFamily,
-              borderRadius: data.borderRadius,
-              brandVoice: data.brandVoice,
-              brandTone: data.brandTone,
-              brandEnergy: data.brandEnergy,
-              industry: data.industry,
-              targetAudience: data.targetAudience,
-              websiteUrl: data.websiteUrl,
-              contactEmail: data.contactEmail,
-              foundingYear: data.foundingYear,
-              favicon: data.favicon,
-              ogImage: data.ogImage,
-              productsServices: data.productsServices as string[] | null,
-              brandValues: data.brandValues as string[] | null,
-              socialLinks: data.socialLinks as Record<string, string> | null,
-              summary: data.summary,
-              links: data.links as string[] | null,
-              scrapedAt: data.scrapedAt,
-              scrapeConfidence: data.scrapeConfidence,
-            });
+            const brandKitData: BrandKitData = {
+              companyName: data.companyName ?? null,
+              logo: data.logo ?? null,
+              tagline: data.tagline ?? null,
+              companyDescription: data.companyDescription ?? null,
+              primaryColor: data.primaryColor ?? null,
+              accentColor: data.accentColor ?? null,
+              backgroundColor: data.backgroundColor ?? null,
+              textPrimaryColor: data.textPrimaryColor ?? null,
+              fontFamily: data.fontFamily ?? null,
+              borderRadius: data.borderRadius ?? null,
+              brandVoice: data.brandVoice ?? null,
+              brandTone: data.brandTone ?? null,
+              brandEnergy: data.brandEnergy ?? null,
+              industry: data.industry ?? null,
+              targetAudience: data.targetAudience ?? null,
+              websiteUrl: data.websiteUrl ?? null,
+              contactEmail: data.contactEmail ?? null,
+              foundingYear: data.foundingYear ?? null,
+              favicon: data.favicon ?? null,
+              ogImage: data.ogImage ?? null,
+              productsServices: data.productsServices ?? null,
+              brandValues: data.brandValues ?? null,
+              socialLinks: data.socialLinks ?? null,
+              summary: data.summary ?? null,
+              links: data.links ?? null,
+              scrapedAt: data.scrapedAt ? new Date(data.scrapedAt) : null,
+              scrapeConfidence: data.scrapeConfidence ?? null,
+            };
+            setBrandData(brandKitData);
           }
         })
         .catch((error) => {

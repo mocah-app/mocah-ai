@@ -66,6 +66,7 @@ export function TemplateCardMenu({
     trpc.template.canPublishToLibrary.useQuery();
 
   // Publish mutation
+  // Note: Using `any` for callback parameters to prevent "Type instantiation is excessively deep" error
   const publishMutation = trpc.template.publishToLibrary.useMutation({
     onSuccess: () => {
       setPublishStage("success");
@@ -76,7 +77,7 @@ export function TemplateCardMenu({
         toast.success("Template published to library");
       }, 2000);
     },
-    onError: (error) => {
+    onError: (error: any) => {
       setPublishStage("error");
       setErrorMessage(error.message || "Failed to publish template");
     },

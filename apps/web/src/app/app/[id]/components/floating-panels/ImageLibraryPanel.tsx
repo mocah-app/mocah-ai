@@ -82,12 +82,13 @@ export function ImageLibraryPanel({ isOpen, onClose }: ImageLibraryPanelProps) {
   }, [router, searchParams, templateId]);
 
   // Fetch brand kit data
+  // Note: Type assertion to prevent "Type instantiation is excessively deep" error
   const { data: brandKitData, isLoading: isBrandKitLoading } = trpc.brandKit.getActive.useQuery(
     undefined,
     {
       enabled: isOpen && scope === "brandKit" && !!organizationId,
     }
-  );
+  ) as { data: any; isLoading: boolean };
 
   // Fetch images with server-side search (only when panel is open and not brandKit scope)
   const {

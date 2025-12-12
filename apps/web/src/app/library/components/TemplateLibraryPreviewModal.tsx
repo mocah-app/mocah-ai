@@ -44,22 +44,42 @@ export function TemplateLibraryPreviewModal({
   const { activeOrganization } = useOrganization();
   const utils = trpc.useUtils();
 
-  // Fetch template detail
-  const { data: template, isLoading } =
+  // Fetch template detail - explicitly type to break inference chain
+  const { data: templateData, isLoading } =
     trpc.template.getLibraryTemplateDetail.useQuery(
       { id: templateId! },
       { enabled: !!templateId && open }
     );
+  
+  // Cast to simplified type structure
+  const template = templateData as {
+    id: string;
+    name: string | null;
+    subject: string | null;
+    previewText: string | null;
+    htmlCode: string | null;
+    category: string | null;
+    isPremium: boolean | null;
+    sourceTemplate?: {
+      id: string;
+      messages: Array<{
+        id: string;
+        role: string;
+        content: string;
+        metadata: unknown;
+      }>;
+    } | null;
+  } | undefined;
 
   // Remix mutation
   const remixMutation = trpc.template.duplicate.useMutation({
-    onSuccess: (data) => {
+    onSuccess: (data: { id: string }) => {
       toast.success("Template remixed successfully");
       utils.template.list.invalidate();
       onOpenChange(false);
-      router.push(`/app/${(data as { id: string }).id}`);
+      router.push(`/app/${data.id}`);
     },
-    onError: (error) => {
+    onError: (error: { message?: string }) => {
       toast.error(error.message || "Failed to remix template");
     },
   });
@@ -100,7 +120,9 @@ export function TemplateLibraryPreviewModal({
 
   if (!templateId) return null;
 
-  const messages = (template?.sourceTemplate?.messages || []) as TemplateMessage[];
+  // Break type inference chain for messages
+  const rawMessages = template?.sourceTemplate?.messages || [];
+  const messages = rawMessages as TemplateMessage[];
   const userMessage = messages.find((m) => m.role === "user");
   const assistantMessage = messages.find((m) => m.role === "assistant");
   

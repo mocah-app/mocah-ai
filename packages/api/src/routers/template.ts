@@ -653,6 +653,12 @@ export const templateRouter = router({
               versionId: null, // Get template-level images (not version-specific)
             },
           },
+          libraryTemplates: {
+            select: {
+              id: true,
+            },
+            take: 1, // Just check if it exists
+          },
         },
       });
 
@@ -663,23 +669,40 @@ export const templateRouter = router({
         });
       }
 
-      const isMember = await checkMembership(
-        ctx.db,
-        ctx.session.user.id,
-        template.organizationId
-      );
+      // Check if template is public or has been published to library
+      // If so, allow duplication into user's active org
+      const isPublicOrInLibrary = template.isPublic || template.libraryTemplates.length > 0;
+      let targetOrganizationId = template.organizationId;
+      
+      if (isPublicOrInLibrary) {
+        // For public/library templates, duplicate into user's active organization
+        if (!ctx.activeOrganization) {
+          throw new TRPCError({
+            code: "BAD_REQUEST",
+            message: "No active organization. Please select or create an organization first.",
+          });
+        }
+        targetOrganizationId = ctx.activeOrganization.id;
+      } else {
+        // For private templates, require membership in the source organization
+        const isMember = await checkMembership(
+          ctx.db,
+          ctx.session.user.id,
+          template.organizationId
+        );
 
-      if (!isMember) {
-        throw new TRPCError({
-          code: "FORBIDDEN",
-          message: "You do not have access to this template",
-        });
+        if (!isMember) {
+          throw new TRPCError({
+            code: "FORBIDDEN",
+            message: "You do not have access to this template",
+          });
+        }
       }
 
       // Create duplicated template
       const duplicatedTemplate = await ctx.db.template.create({
         data: {
-          organizationId: template.organizationId,
+          organizationId: targetOrganizationId,
           name: `${template.name} (Copy)`,
           description: template.description,
           subject: template.subject,
@@ -744,7 +767,7 @@ export const templateRouter = router({
       // Copy image assets with source metadata
       if (template.imageAssets && template.imageAssets.length > 0) {
         const imagesToCreate = template.imageAssets.map((img) => ({
-          organizationId: template.organizationId, // Keep same org for now (remix uses same org)
+          organizationId: targetOrganizationId, // Use target org (user's org for public templates)
           userId: ctx.session.user.id, // New owner is the current user
           templateId: duplicatedTemplate.id,
           versionId: null, // Template-level images

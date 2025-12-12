@@ -163,21 +163,32 @@ export const ChatPanel = ({
   // Load messages from DB on mount (only once when data arrives)
   useEffect(() => {
     if (!isInitialized && persistedMessages && !isLoadingMessages) {
-      const dbMessages: Message[] = persistedMessages.map((msg) => {
-        const metadata = msg.metadata as any;
+      // Break type inference chain by explicitly casting source array
+      const messages = persistedMessages as Array<{
+        id: string;
+        role: string;
+        content: string;
+        isStreaming: boolean;
+        metadata: unknown;
+      }>;
+      
+      const dbMessages: Message[] = messages.map((msg): Message => {
+        const metadata = msg.metadata as Record<string, any> | null | undefined;
+        const msgRole = msg.role as "user" | "assistant";
+        
         return {
           id: msg.id,
-          role: msg.role as "user" | "assistant",
+          role: msgRole,
           content: msg.content,
           isStreaming: msg.isStreaming,
           isPersisted: true,
           generationResult:
-            msg.role === "assistant"
-              ? ((metadata as GenerationResult | null) ?? undefined)
+            msgRole === "assistant" && metadata
+              ? (metadata as GenerationResult)
               : undefined,
           imageUrls:
-            msg.role === "user" && metadata?.imageUrls
-              ? metadata.imageUrls
+            msgRole === "user" && metadata?.imageUrls
+              ? (metadata.imageUrls as string[])
               : undefined,
         };
       });
