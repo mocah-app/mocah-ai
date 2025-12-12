@@ -121,9 +121,15 @@ Examples:
 - Instagram: https://cdn.mocah.ai/icons/instagram.png
 - LinkedIn: https://cdn.mocah.ai/icons/linkedin.png
 
-Usage: <Img src="https://cdn.mocah.ai/icons/twitter.png" alt="Twitter" width="24" height="24" />
+FORMATTING: Wrap each icon in a Link, place inside Row/Column with align="center", use style with width: '24px', height: '24px', margin: '0 5px', display: 'inline-block'.
 
-Center all the icons in the footer.
+Example:
+<Row>
+  <Column align="center">
+    <Link href="url"><Img src="https://cdn.mocah.ai/icons/instagram.png" alt="Instagram" style={{width: '24px', height: '24px', margin: '0 5px', display: 'inline-block'}} /></Link>
+    <Link href="url"><Img src="https://cdn.mocah.ai/icons/facebook.png" alt="Facebook" style={{width: '24px', height: '24px', margin: '0 5px', display: 'inline-block'}} /></Link>
+  </Column>
+</Row>
 
 `;
 
@@ -153,8 +159,8 @@ Usage examples:
 
 const STYLE_GUIDELINES = `STYLE RULES:
 - Use 'as const' for literals: textAlign: 'center' as const
-- Width/height: pixels ('600px') or percentages ('50%') only. NO fit-content/max-content
-- Container max-width: 600px
+- Width/height: pixels ('px') or percentages ('%') only. NO fit-content/max-content
+- Container maxWidth: 600px - Keep it responsive for mobile devices
 - Vertical centering: lineHeight = height (e.g., height: '32px', lineHeight: '32px')
 
 EMAIL-SAFE CSS:

@@ -1,8 +1,9 @@
 "use client";
 
-import React, { useState, useCallback, useEffect, useRef } from "react";
-import Image from "next/image";
+import Loader from "@/components/loader";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { ScrollArea } from "@/components/ui/scroll-area";
 import {
   Select,
   SelectContent,
@@ -10,28 +11,33 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Input } from "@/components/ui/input";
-import { ScrollArea } from "@/components/ui/scroll-area";
-import { trpc } from "@/utils/trpc";
-import { toast } from "sonner";
-import {
-  Loader2,
-  Search,
-  Image as ImageIcon,
-  X,
-  Copy,
-  Maximize2,
-  FolderOpen,
-  Sparkles,
-} from "lucide-react";
-import { cn } from "@/lib/utils";
-import { useTemplate } from "../providers/TemplateProvider";
-import { useOrganization } from "@/contexts/organization-context";
-import { ImagePreviewModal, type PreviewImageAsset } from "./ImagePreviewModal";
-import { useRouter, useSearchParams } from "next/navigation";
 import { Skeleton } from "@/components/ui/skeleton";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
+import { useOrganization } from "@/contexts/organization-context";
 import { useDebouncedValue } from "@/hooks/use-debounced-value";
-import Loader from "@/components/loader";
+import { cn } from "@/lib/utils";
+import { trpc } from "@/utils/trpc";
+import {
+  Copy,
+  FolderOpen,
+  Image as ImageIcon,
+  Maximize2,
+  Plus,
+  Search,
+  Sparkles,
+  X
+} from "lucide-react";
+import Image from "next/image";
+import { useRouter, useSearchParams } from "next/navigation";
+import React, { useCallback, useEffect, useRef, useState } from "react";
+import { toast } from "sonner";
+import { useImageStudio } from "../image-studio/ImageStudioContext";
+import { useTemplate } from "../providers/TemplateProvider";
+import { ImagePreviewModal, type PreviewImageAsset } from "./ImagePreviewModal";
 
 // ============================================================================
 // Types
@@ -51,6 +57,7 @@ export function ImageLibraryPanel({ isOpen, onClose }: ImageLibraryPanelProps) {
   const searchParams = useSearchParams();
   const { state: templateState } = useTemplate();
   const { activeOrganization } = useOrganization();
+  const { onImageSelect } = useImageStudio();
   const templateId = templateState.currentTemplate?.id;
   const organizationId =
     templateState.currentTemplate?.organizationId || activeOrganization?.id;
@@ -198,6 +205,24 @@ export function ImageLibraryPanel({ isOpen, onClose }: ImageLibraryPanelProps) {
     []
   );
 
+  const handleInsertImage = useCallback(
+    (e: React.MouseEvent, image: PreviewImageAsset) => {
+      e.stopPropagation();
+      if (onImageSelect) {
+        onImageSelect(
+          image.url,
+          image.width ?? undefined,
+          image.height ?? undefined
+        );
+        toast.success("Image inserted");
+      } else {
+        // Fallback to opening preview modal if onImageSelect is not available
+        handleOpenPreview(e, image.id);
+      }
+    },
+    [onImageSelect, handleOpenPreview]
+  );
+
   // ============================================================================
   // Render
   // ============================================================================
@@ -339,20 +364,51 @@ export function ImageLibraryPanel({ isOpen, onClose }: ImageLibraryPanelProps) {
 
                       {/* Hover/Focus Actions */}
                       <div className="absolute inset-0 flex items-center justify-center gap-2 opacity-0 group-hover:opacity-100 group-focus-within:opacity-100 transition-opacity">
-                        <button
-                          onClick={(e) => handleCopyUrl(e, image.url)}
-                          className="p-2 rounded-full bg-white/90 hover:bg-white text-gray-800 shadow-lg transition-all hover:scale-110 focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2"
-                          title="Copy URL"
-                        >
-                          <Copy className="size-4" />
-                        </button>
-                        <button
-                          onClick={(e) => handleOpenPreview(e, image.id)}
-                          className="p-2 rounded-full bg-white/90 hover:bg-white text-gray-800 shadow-lg transition-all hover:scale-110 focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2"
-                          title="Expand"
-                        >
-                          <Maximize2 className="size-4" />
-                        </button>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <Button
+                              onClick={(e) => handleCopyUrl(e, image.url)}
+                              variant="secondary"
+                              size="icon"
+                            >
+                              <Copy className="size-4" />
+                            </Button>
+                          </TooltipTrigger>
+                          <TooltipContent>
+                            <p>Copy URL</p>
+                          </TooltipContent>
+                        </Tooltip>
+                        {onImageSelect ? (
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <Button
+                                onClick={(e) => handleInsertImage(e, image)}
+                                variant="secondary"
+                                size="icon"
+                              >
+                                <Plus className="size-4" />
+                              </Button>
+                            </TooltipTrigger>
+                            <TooltipContent>
+                              <p>Insert</p>
+                            </TooltipContent>
+                          </Tooltip>
+                        ) : (
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <Button
+                                onClick={(e) => handleOpenPreview(e, image.id)}
+                                variant="secondary"
+                                size="icon"
+                              >
+                                <Maximize2 className="size-4" />
+                              </Button>
+                            </TooltipTrigger>
+                            <TooltipContent>
+                              <p>Expand</p>
+                            </TooltipContent>
+                          </Tooltip>
+                        )}
                       </div>
 
                         {/* Prompt hint at bottom */}

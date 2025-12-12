@@ -34,6 +34,7 @@ model Template {
   categoryRelations TemplateCategoryRelation[]
   messages          ChatMessage[]
   imageAssets       ImageAsset[]
+  libraryTemplates  TemplateLibrary[] @relation("LibrarySource")
 
   @@index([organizationId])
   @@index([category])
@@ -118,6 +119,7 @@ model TemplateCategoryRelation {
 
 model TemplateLibrary {
   id               String    @id @default(uuid())
+  templateId       String?   // Link to source template for chat messages
   name             String
   description      String?
   subject          String?
@@ -131,16 +133,20 @@ model TemplateLibrary {
   
   // React Email Architecture
   reactEmailCode   String?   @db.Text
+  htmlCode         String?   @db.Text  // Rendered HTML (cache)
   styleType        StyleType @default(STYLE_OBJECTS)
   styleDefinitions Json?
   previewText      String?
 
   // Relations
+  sourceTemplate Template? @relation("LibrarySource", fields: [templateId], references: [id], onDelete: SetNull)
   customizations WorkspaceTemplateLibrary[]
 
   @@index([category])
   @@index([isPremium])
   @@index([deletedAt])
+  @@index([templateId])
+  @@index([name])
   @@map("template_library")
 }
 
