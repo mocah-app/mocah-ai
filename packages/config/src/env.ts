@@ -60,6 +60,10 @@ export const serverEnv = createEnv({
     FAL_IMAGE_RATE_PER_DAY: z.coerce.number().optional(),
     FAL_IMAGE_ENABLED: z.coerce.boolean().optional(),
 
+    // Template Library Publishing
+    TEMPLATE_PUBLISHER_EMAILS: z.string().optional(), // Comma-separated emails allowed to publish
+    APIFLASH_API_KEY: z.string().optional(), // ApiFlash screenshot API key
+
     // Node Environment
     NODE_ENV: z.enum(["development", "test", "production"]).optional(),
   },

@@ -16,12 +16,11 @@
     "db:studio": "turbo -F @mocah/db db:studio",
     "db:generate": "turbo -F @mocah/db db:generate",
     "db:migrate": "turbo -F @mocah/db db:migrate",
-    "db:migrate:deploy": "turbo -F @mocah/db db:migrate:deploy"
+    "db:migrate:deploy": "turbo -F @mocah/db db:migrate:deploy",
+    "db:seed": "turbo -F @mocah/db db:seed"
   },
   "dependencies": {
-    "@types/parse5": "^7.0.0",
     "dotenv": "^17.2.2",
-    "parse5": "^8.0.0",
     "zod": "^4.1.11"
   },
   "devDependencies": {

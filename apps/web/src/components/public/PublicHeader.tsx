@@ -172,7 +172,7 @@ export default function PublicHeader() {
   }, []);
 
   return (
-    <header className="w-full p-4">
+    <header className="w-full p-4 py-2">
       <div className="flex items-center justify-between max-w-7xl mx-auto">
         {/* Logo */}
         <Link href="/" className="flex items-center z-50">
@@ -200,7 +200,7 @@ export default function PublicHeader() {
         {/* Mobile Menu Button - visible on mobile via CSS */}
         {mounted && (
           <motion.button
-            className="md:hidden z-80 outline-none border-none select-none cursor-pointer w-[50px] h-[50px] rounded-full bg-accent flex items-center justify-center"
+            className="md:hidden z-40 outline-none border-none select-none cursor-pointer w-[50px] h-[50px] rounded-full bg-accent flex items-center justify-center"
             onClick={toggleMenu}
             whileTap={{ scale: 0.95 }}
             aria-label="Toggle menu"
@@ -244,7 +244,7 @@ export default function PublicHeader() {
             animate={isMenuOpen ? "open" : "closed"}
             custom={height}
             ref={containerRef}
-            className="md:hidden fixed top-0 right-0 bottom-0 w-80 z-50 pointer-events-none"
+            className="md:hidden fixed top-0 right-0 bottom-0 w-80 z-20 pointer-events-none"
             style={{ pointerEvents: isMenuOpen ? "auto" : "none" }}
           >
             <motion.div

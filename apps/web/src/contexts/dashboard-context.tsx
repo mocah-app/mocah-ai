@@ -20,14 +20,16 @@ export function DashboardProvider({ children }: { children: ReactNode }) {
   const router = useRouter();
   const utils = trpc.useUtils();
 
+  // Note: Using `any` for mutation callback parameters to prevent "Type instantiation is excessively deep"
+  // error caused by tRPC's complex generic type inference. The actual runtime types are safe.
   const duplicateMutation = trpc.template.duplicate.useMutation({
-    onSuccess: (data, variables) => {
+    onSuccess: (data: any, variables: any) => {
       const toastId = `duplicate-${variables.id}`;
       toast.success("Template duplicated successfully", { id: toastId });
       utils.template.list.invalidate();
-      router.push(`/app/${(data as { id: string }).id}`);
+      router.push(`/app/${data.id}`);
     },
-    onError: (error, variables) => {
+    onError: (error: any, variables: any) => {
       const toastId = `duplicate-${variables.id}`;
       toast.error(error.message || "Failed to duplicate template", {
         id: toastId,
@@ -36,12 +38,12 @@ export function DashboardProvider({ children }: { children: ReactNode }) {
   });
 
   const deleteMutation = trpc.template.delete.useMutation({
-    onSuccess: (_, variables) => {
+    onSuccess: (_: any, variables: any) => {
       const toastId = `delete-${variables.id}`;
       toast.success("Template deleted successfully", { id: toastId });
       utils.template.list.invalidate();
     },
-    onError: (error, variables) => {
+    onError: (error: any, variables: any) => {
       const toastId = `delete-${variables.id}`;
       toast.error(error.message || "Failed to delete template", {
         id: toastId,

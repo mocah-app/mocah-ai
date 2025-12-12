@@ -47,7 +47,7 @@ export function TemplateNode({ data, id }: TemplateNodeProps) {
   const hasSmartEditorPendingChanges = state.allPendingChanges.size > 0;
 
   return (
-    <div className="bg-background rounded-lg shadow-lg border border-border w-[600px] relative">
+    <div className="bg-background rounded-lg shadow-lg border border-border w-full max-w-[600px] sm:w-[600px] relative">
       {/* Connection handles */}
       <Handle
         type="source"
@@ -76,7 +76,7 @@ export function TemplateNode({ data, id }: TemplateNodeProps) {
       {data.isLoading && templateState.generationPhase !== 'complete' ? (
         <LoadingState />
       ) : (
-        <div className="h-[600px] overflow-hidden relative pt-2">
+        <div className="h-[400px] sm:h-[500px] lg:h-[600px] overflow-hidden relative pt-2">
           {/* Show loading overlay if still loading but in complete phase (waiting for render) */}
           {data.isLoading && templateState.generationPhase === 'complete' && (
             <div className="absolute inset-0 bg-background/80 backdrop-blur-sm z-10 flex flex-col items-center justify-center">
@@ -103,7 +103,7 @@ export function TemplateNode({ data, id }: TemplateNodeProps) {
         </div>
       )}
       {/* Node Footer */}
-      <div className="p-1.5 border-border flex items-center justify-between"></div>
+      <div className="border-border flex items-center justify-between"></div>
     </div>
   );
 }
@@ -115,7 +115,7 @@ function LoadingState() {
   return (
     <div className="bg-background w-full relative">
       {/* Loading Content */}
-      <div className="min-h-[500px] flex flex-col items-center justify-center p-12">
+      <div className="min-h-[300px] sm:min-h-[400px] lg:min-h-[500px] flex flex-col items-center justify-center p-6 sm:p-12">
         <div className="relative mb-4">
           <MocahLoadingIcon isLoading={true} size="sm" />
         </div>

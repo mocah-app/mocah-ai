@@ -1,11 +1,12 @@
+@import url('https://fonts.googleapis.com/css2?family=Google+Sans+Flex:opsz,wght@6..144,1..1000&display=swap');
+
 @import "tailwindcss";
 @import "tw-animate-css";
 
 @custom-variant dark (&:where(.dark, .dark *));
 
 @theme {
-  --font-sans: "Inter", "Geist", ui-sans-serif, system-ui, sans-serif,
-    "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol", "Noto Color Emoji";
+  --font-sans: "Google Sans Flex", sans-serif;
 }
 
 html,
@@ -50,7 +51,7 @@ body {
   --sidebar-accent-foreground: #30384f;
   --sidebar-border: #dee0e8;
   --sidebar-ring: #1e4ed8;
-  --font-sans: Geist, sans-serif;
+  --font-sans: "Google Sans Flex", sans-serif;
   --font-serif: "Lora", Georgia, serif;
   --font-mono: "Fira Code", "Courier New", monospace;
   --radius: 0.925rem;
@@ -105,7 +106,7 @@ body {
   --sidebar-accent-foreground: #cbd6f6;
   --sidebar-border: #292e3d;
   --sidebar-ring: #1e4ed8;
-  --font-sans: Geist, sans-serif;
+  --font-sans: "Google Sans Flex", sans-serif;
   --font-serif: "Lora", Georgia, serif;
   --font-mono: "Fira Code", "Courier New", monospace;
   --radius: 0.925rem;

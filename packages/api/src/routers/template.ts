@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { TRPCError } from "@trpc/server";
-import { protectedProcedure, router } from "../index";
+import { protectedProcedure, publicProcedure, router } from "../index";
 import { organizationProcedure } from "../middleware";
 import { aiClient, TEMPLATE_GENERATION_MODEL } from "../lib/ai";
 import {
@@ -11,6 +11,8 @@ import {
 import { repairHtmlTags } from "../lib/html-tag-repair";
 import { validateReactEmailCode, logger } from "@mocah/shared";
 import { checkMembership } from "../lib/membership-cache";
+import { serverEnv } from "@mocah/config/env";
+import { generateTemplateScreenshot } from "../lib/screenshot";
 
 // Valid style type values for templates
 const VALID_STYLE_TYPES = ["INLINE", "PREDEFINED_CLASSES", "STYLE_OBJECTS"] as const;
@@ -636,11 +638,27 @@ export const templateRouter = router({
       })
     )
     .mutation(async ({ ctx, input }) => {
-      // Verify access and get template
+      // Verify access and get template with messages and images
       const template = await ctx.db.template.findUnique({
         where: { id: input.id },
         include: {
           currentVersion: true,
+          messages: {
+            orderBy: {
+              createdAt: "asc",
+            },
+          },
+          imageAssets: {
+            where: {
+              versionId: null, // Get template-level images (not version-specific)
+            },
+          },
+          libraryTemplates: {
+            select: {
+              id: true,
+            },
+            take: 1, // Just check if it exists
+          },
         },
       });
 
@@ -651,23 +669,40 @@ export const templateRouter = router({
         });
       }
 
-      const isMember = await checkMembership(
-        ctx.db,
-        ctx.session.user.id,
-        template.organizationId
-      );
+      // Check if template is public or has been published to library
+      // If so, allow duplication into user's active org
+      const isPublicOrInLibrary = template.isPublic || template.libraryTemplates.length > 0;
+      let targetOrganizationId = template.organizationId;
+      
+      if (isPublicOrInLibrary) {
+        // For public/library templates, duplicate into user's active organization
+        if (!ctx.activeOrganization) {
+          throw new TRPCError({
+            code: "BAD_REQUEST",
+            message: "No active organization. Please select or create an organization first.",
+          });
+        }
+        targetOrganizationId = ctx.activeOrganization.id;
+      } else {
+        // For private templates, require membership in the source organization
+        const isMember = await checkMembership(
+          ctx.db,
+          ctx.session.user.id,
+          template.organizationId
+        );
 
-      if (!isMember) {
-        throw new TRPCError({
-          code: "FORBIDDEN",
-          message: "You do not have access to this template",
-        });
+        if (!isMember) {
+          throw new TRPCError({
+            code: "FORBIDDEN",
+            message: "You do not have access to this template",
+          });
+        }
       }
 
       // Create duplicated template
       const duplicatedTemplate = await ctx.db.template.create({
         data: {
-          organizationId: template.organizationId,
+          organizationId: targetOrganizationId,
           name: `${template.name} (Copy)`,
           description: template.description,
           subject: template.subject,
@@ -711,6 +746,52 @@ export const templateRouter = router({
         await ctx.db.template.update({
           where: { id: duplicatedTemplate.id },
           data: { currentVersionId: duplicatedVersion.id },
+        });
+      }
+
+      // Copy chat messages
+      if (template.messages && template.messages.length > 0) {
+        const messagesToCreate = template.messages.map((msg) => ({
+          templateId: duplicatedTemplate.id,
+          role: msg.role,
+          content: msg.content,
+          isStreaming: false, // Messages are never streaming on duplication
+          metadata: msg.metadata as any,
+        }));
+
+        await ctx.db.chatMessage.createMany({
+          data: messagesToCreate,
+        });
+      }
+
+      // Copy image assets with source metadata
+      if (template.imageAssets && template.imageAssets.length > 0) {
+        const imagesToCreate = template.imageAssets.map((img) => ({
+          organizationId: targetOrganizationId, // Use target org (user's org for public templates)
+          userId: ctx.session.user.id, // New owner is the current user
+          templateId: duplicatedTemplate.id,
+          versionId: null, // Template-level images
+          prompt: img.prompt,
+          model: img.model,
+          requestId: img.requestId,
+          url: img.url, // Same storage URL (not copying the blob)
+          storageKey: img.storageKey, // Same storage key
+          contentType: img.contentType,
+          aspectRatio: img.aspectRatio,
+          width: img.width,
+          height: img.height,
+          nsfw: img.nsfw,
+          blurDataUrl: img.blurDataUrl,
+          metadata: {
+            ...(img.metadata as any),
+            sourceImageAssetId: img.id, // Track the original image
+            remixedFrom: template.id,
+            remixedAt: new Date().toISOString(),
+          },
+        }));
+
+        await ctx.db.imageAsset.createMany({
+          data: imagesToCreate,
         });
       }
 
@@ -801,5 +882,229 @@ export const templateRouter = router({
       });
 
       return versions;
+    }),
+
+  /**
+   * Check if current user can publish templates to library
+   */
+  canPublishToLibrary: protectedProcedure.query(async ({ ctx }) => {
+    const publisherEmails = serverEnv.TEMPLATE_PUBLISHER_EMAILS || "";
+    const allowedEmails = publisherEmails
+      .split(",")
+      .map((email) => email.trim().toLowerCase())
+      .filter(Boolean);
+
+    const userEmail = ctx.session.user.email.toLowerCase();
+    return allowedEmails.includes(userEmail);
+  }),
+
+  /**
+   * Get library categories
+   */
+  getLibraryCategories: publicProcedure.query(async ({ ctx }) => {
+    const categories = await ctx.db.templateCategory.findMany({
+      where: {
+        deletedAt: null,
+      },
+      orderBy: {
+        name: "asc",
+      },
+    });
+
+    return categories;
+  }),
+
+  /**
+   * Get library templates with search and filter
+   */
+  getLibraryTemplates: publicProcedure
+    .input(
+      z.object({
+        search: z.string().optional(),
+        categorySlug: z.string().optional(),
+        tags: z.array(z.string()).optional(),
+        limit: z.number().min(1).max(100).optional().default(20),
+        cursor: z.string().optional(),
+      })
+    )
+    .query(async ({ ctx, input }) => {
+      const where: any = {
+        deletedAt: null,
+      };
+
+      // Search filter
+      if (input.search) {
+        where.OR = [
+          { name: { contains: input.search, mode: "insensitive" } },
+          { description: { contains: input.search, mode: "insensitive" } },
+        ];
+      }
+
+      // Category filter
+      if (input.categorySlug) {
+        where.category = input.categorySlug;
+      }
+
+      // Tags filter
+      if (input.tags && input.tags.length > 0) {
+        where.tags = {
+          hasSome: input.tags,
+        };
+      }
+
+      const templates = await ctx.db.templateLibrary.findMany({
+        where,
+        take: input.limit + 1,
+        cursor: input.cursor ? { id: input.cursor } : undefined,
+        orderBy: {
+          createdAt: "desc",
+        },
+        select: {
+          id: true,
+          templateId: true,
+          name: true,
+          description: true,
+          subject: true,
+          category: true,
+          thumbnail: true,
+          htmlCode: true,
+          isPremium: true,
+          tags: true,
+          previewText: true,
+          createdAt: true,
+        },
+      });
+
+      let nextCursor: string | undefined = undefined;
+      if (templates.length > input.limit) {
+        const nextItem = templates.pop();
+        nextCursor = nextItem?.id;
+      }
+
+      return {
+        items: templates,
+        nextCursor,
+      };
+    }),
+
+  /**
+   * Get library template detail with messages
+   */
+  getLibraryTemplateDetail: publicProcedure
+    .input(
+      z.object({
+        id: z.string(),
+      })
+    )
+    .query(async ({ ctx, input }) => {
+      const libraryTemplate = await ctx.db.templateLibrary.findUnique({
+        where: { id: input.id },
+        include: {
+          sourceTemplate: {
+            select: {
+              id: true,
+              messages: {
+                take: 2, // Get first 2 messages (user prompt + AI response)
+                orderBy: {
+                  createdAt: "asc",
+                },
+              },
+            },
+          },
+        },
+      });
+
+      if (!libraryTemplate) {
+        throw new TRPCError({
+          code: "NOT_FOUND",
+          message: "Library template not found",
+        });
+      }
+
+      return libraryTemplate;
+    }),
+
+  /**
+   * Publish a template to the library
+   */
+  publishToLibrary: protectedProcedure
+    .input(
+      z.object({
+        id: z.string(),
+        category: z.string().optional(),
+        tags: z.array(z.string()).optional(),
+        isPremium: z.boolean().optional(),
+      })
+    )
+    .mutation(async ({ ctx, input }) => {
+      // Check authorization
+      const publisherEmails = serverEnv.TEMPLATE_PUBLISHER_EMAILS || "";
+      const allowedEmails = publisherEmails
+        .split(",")
+        .map((email) => email.trim().toLowerCase())
+        .filter(Boolean);
+
+      const userEmail = ctx.session.user.email.toLowerCase();
+      if (!allowedEmails.includes(userEmail)) {
+        throw new TRPCError({
+          code: "FORBIDDEN",
+          message: "You do not have permission to publish templates to the library",
+        });
+      }
+
+      // Get template
+      const template = await ctx.db.template.findUnique({
+        where: { id: input.id },
+      });
+
+      if (!template) {
+        throw new TRPCError({
+          code: "NOT_FOUND",
+          message: "Template not found",
+        });
+      }
+
+      // Verify user has access
+      const isMember = await checkMembership(
+        ctx.db,
+        ctx.session.user.id,
+        template.organizationId
+      );
+
+      if (!isMember) {
+        throw new TRPCError({
+          code: "FORBIDDEN",
+          message: "You do not have access to this template",
+        });
+      }
+
+      // Generate thumbnail screenshot
+      const thumbnailUrl = template.htmlCode
+        ? await generateTemplateScreenshot({
+            templateId: template.id,
+            htmlCode: template.htmlCode,
+          })
+        : null;
+
+      // Create or update library template
+      const libraryTemplate = await ctx.db.templateLibrary.create({
+        data: {
+          templateId: template.id, // Link to source template for chat messages
+          name: template.name,
+          description: template.description,
+          subject: template.subject,
+          category: input.category || template.category,
+          tags: input.tags || [],
+          isPremium: input.isPremium || false,
+          thumbnail: thumbnailUrl, // Add generated thumbnail
+          reactEmailCode: template.reactEmailCode,
+          htmlCode: template.htmlCode, // Save HTML for preview (fallback)
+          styleType: template.styleType,
+          styleDefinitions: template.styleDefinitions as any,
+          previewText: template.previewText,
+        },
+      });
+
+      return libraryTemplate;
     }),
 });

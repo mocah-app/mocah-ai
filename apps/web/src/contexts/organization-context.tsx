@@ -11,6 +11,7 @@ import type {
   CreateOrgInput,
   UpdateOrgInput,
   OrganizationMetadata,
+  BrandKit,
 } from "@/types/organization";
 
 interface OrganizationContextValue {
@@ -33,6 +34,28 @@ interface OrganizationContextValue {
 const OrganizationContext = createContext<OrganizationContextValue | null>(
   null
 );
+
+// Helper to transform API response (dates are serialized as strings) to Organization type
+// Note: Using `any` parameter to handle varying API response shapes (tRPC, Better Auth)
+// The return type `Organization` ensures type safety at the boundary
+function transformToOrganization(org: any): Organization {
+  return {
+    id: org.id,
+    name: org.name,
+    slug: org.slug,
+    logo: org.logo ?? null,
+    favicon: org.favicon ?? null,
+    metadata: org.metadata,
+    createdAt: typeof org.createdAt === "string" ? new Date(org.createdAt) : org.createdAt,
+    brandKit: org.brandKit ? {
+      ...org.brandKit,
+      createdAt: typeof org.brandKit.createdAt === "string" ? new Date(org.brandKit.createdAt) : org.brandKit.createdAt,
+      updatedAt: typeof org.brandKit.updatedAt === "string" ? new Date(org.brandKit.updatedAt) : org.brandKit.updatedAt,
+      deletedAt: org.brandKit.deletedAt ? (typeof org.brandKit.deletedAt === "string" ? new Date(org.brandKit.deletedAt) : org.brandKit.deletedAt) : null,
+      scrapedAt: org.brandKit.scrapedAt ? (typeof org.brandKit.scrapedAt === "string" ? new Date(org.brandKit.scrapedAt) : org.brandKit.scrapedAt) : null,
+    } as BrandKit : null,
+  };
+}
 
 export function OrganizationProvider({ children }: { children: ReactNode }) {
   const { data: session, isPending: sessionLoading } = authClient.useSession();
@@ -61,27 +84,29 @@ export function OrganizationProvider({ children }: { children: ReactNode }) {
       // Use tRPC to load organizations
       const orgs = await trpcClient.organization.list.query();
 
-      setOrganizations(orgs as Organization[]);
+      // Transform API response to Organization type with proper Date objects
+      const transformedOrgs = orgs.map(transformToOrganization);
+      setOrganizations(transformedOrgs);
 
       // If we have an expected active org ID (e.g., just created), use it
       if (expectedActiveOrgId) {
-        const activeOrg = orgs?.find((o: any) => o.id === expectedActiveOrgId);
-        setActiveOrgState((activeOrg as Organization) || null);
+        const activeOrg = transformedOrgs.find((o) => o.id === expectedActiveOrgId);
+        setActiveOrgState(activeOrg || null);
       }
       // Otherwise, get active organization from session
       else if (session?.session?.activeOrganizationId) {
-        const activeOrg = orgs?.find(
-          (o: any) => o.id === session.session.activeOrganizationId
+        const activeOrg = transformedOrgs.find(
+          (o) => o.id === session.session.activeOrganizationId
         );
-        setActiveOrgState((activeOrg as Organization) || null);
-      } else if (orgs && orgs.length > 0) {
+        setActiveOrgState(activeOrg || null);
+      } else if (transformedOrgs.length > 0) {
         // Auto-set first org as active if none set
         // Use try/catch to handle potential errors without breaking the flow
         try {
           await authClient.organization.setActive({
-            organizationId: orgs[0].id,
+            organizationId: transformedOrgs[0].id,
           });
-          setActiveOrgState(orgs[0] as Organization);
+          setActiveOrgState(transformedOrgs[0]);
           // Refresh session in background to sync activeOrganizationId
           authClient.getSession().catch((err) => {
             logger.error(
@@ -103,7 +128,7 @@ export function OrganizationProvider({ children }: { children: ReactNode }) {
             error as Error
           );
           // Still set it locally even if backend call fails
-          setActiveOrgState(orgs[0] as Organization);
+          setActiveOrgState(transformedOrgs[0]);
         }
       }
     } catch (error) {
@@ -209,7 +234,7 @@ export function OrganizationProvider({ children }: { children: ReactNode }) {
       await loadOrganizations(newOrg.id);
 
       toast.success(`Created ${data.name}`);
-      return newOrg;
+      return transformToOrganization(newOrg);
     } catch (error: any) {
       logger.error(
         "Failed to create organization",

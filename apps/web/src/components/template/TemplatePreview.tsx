@@ -5,6 +5,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 interface TemplatePreviewProps {
   htmlCode: string | null | undefined;
   className?: string;
+  mode?: "card" | "full"; // card = small preview (default), full = full height in modal
 }
 
 /**
@@ -14,11 +15,15 @@ interface TemplatePreviewProps {
 export function TemplatePreview({
   htmlCode,
   className = "",
+  mode = "card",
 }: TemplatePreviewProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const iframeRef = useRef<HTMLIFrameElement>(null);
   const [isVisible, setIsVisible] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
+  const [iframeHeight, setIframeHeight] = useState<number | undefined>(
+    mode === "full" ? 600 : undefined,
+  );
 
   // Intersection Observer for lazy loading
   useEffect(() => {
@@ -74,6 +79,12 @@ export function TemplatePreview({
         e.stopPropagation();
       }, true);
 
+      // In full mode, measure and set iframe height to content height
+      if (mode === "full") {
+        const contentHeight = iframeDoc.documentElement.scrollHeight;
+        setIframeHeight(contentHeight);
+      }
+
       setIsLoading(false);
     };
 
@@ -88,7 +99,7 @@ export function TemplatePreview({
       iframe.onload = null;
       clearTimeout(timeout);
     };
-  }, [isVisible, htmlCode]);
+  }, [isVisible, htmlCode, mode]);
 
   // Show placeholder if no HTML code
   if (!htmlCode) {
@@ -102,10 +113,14 @@ export function TemplatePreview({
     );
   }
 
+  const containerHeightClass = mode === "full" ? "" : "h-40 sm:h-48";
+  const containerStyle = mode === "full" && iframeHeight ? { height: iframeHeight } : undefined;
+  
   return (
     <div
       ref={containerRef}
-      className={`relative w-full h-48 overflow-hidden bg-white border border-border/50 rounded-t-lg ${className}`}
+      className={`relative w-full max-w-full sm:max-w-xl mx-auto ${containerHeightClass} overflow-hidden ${className}`}
+      style={containerStyle}
     >
       {isLoading && (
         <div className="absolute inset-0 flex items-center justify-center bg-background/50 z-10">
@@ -118,11 +133,11 @@ export function TemplatePreview({
             ref={iframeRef}
             className="border pointer-events-none"
             style={{
-              transform: "scale(1.2)",
-              transformOrigin: "top top",
+              transform: mode === "full" ? "scale(1)" : "scale(1.2)",
               width: "100%",
-              height: "100%",
+              height: mode === "full" && iframeHeight ? `${iframeHeight}px` : "100%",
               border: "none",
+              maxWidth: "100%",
             }}
             title="Template preview"
             sandbox="allow-same-origin"
