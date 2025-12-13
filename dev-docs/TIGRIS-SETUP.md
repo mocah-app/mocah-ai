@@ -56,7 +56,7 @@ Handles file uploads with the following features:
 - **Authentication**: Verifies user session using Better Auth
 - **Validation**: 
   - File type validation (PNG, JPG, SVG only)
-  - File size limit (5MB max)
+  - File size limit (10MB max)
 - **Upload**: Stores files in Tigris with path structure: `logos/{randomUUID}/{timestamp}-{filename}`
 - **Metadata**: Stores user ID and organization ID in S3 object metadata (not in URL)
 - **Public URL**: Returns public URL in format: `https://storage.mocah.ai/{filePath}`
@@ -79,7 +79,7 @@ bucket/
 ## Security Considerations
 
 1. **File Validation**: Only specific file types are allowed (PNG, JPG, SVG)
-2. **Size Limits**: Maximum file size is 5MB
+2. **Size Limits**: Maximum file size is 10MB
 3. **Filename Sanitization**: Special characters are removed from filenames
 4. **User Authentication**: All uploads require authenticated session
 5. **Privacy**: Random UUIDs used in paths to prevent ID exposure

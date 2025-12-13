@@ -645,7 +645,7 @@ export const ImageStudioControls = memo(function ImageStudioControls({
                   Drag and drop or click to browse
                 </p>
                 <p className="text-xs text-muted-foreground">
-                  PNG, JPG, WebP up to 5MB
+                  PNG, JPG, WebP up to 10MB
                 </p>
               </>
             )}

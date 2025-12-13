@@ -6,7 +6,7 @@ process.env.AWS_S3_DISABLE_CHECKSUM = "true";
 import { S3Client, PutObjectCommand } from "@aws-sdk/client-s3";
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 import { serverEnv } from "@mocah/config/env";
-import { logger } from "@mocah/shared";
+import { logger, MAX_FILE_SIZE } from "@mocah/shared";
 
 const endpoint = serverEnv.TIGRIS_ENDPOINT_URL;
 const accessKeyId = serverEnv.TIGRIS_ACCESS_KEY_ID;
@@ -35,7 +35,6 @@ export const ALLOWED_IMAGE_TYPES = [
 
 export type AllowedImageType = (typeof ALLOWED_IMAGE_TYPES)[number];
 
-export const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5MB
 
 // Presigned URL expiry in seconds (15 minutes)
 export const PRESIGNED_URL_EXPIRY = 15 * 60;
@@ -53,7 +52,7 @@ export function validateImageFile(
   if (file.size > MAX_FILE_SIZE) {
     return {
       valid: false,
-      error: "File too large. Maximum size is 5MB.",
+      error: "File too large. Maximum size is 10MB.",
     };
   }
 

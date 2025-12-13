@@ -21,6 +21,7 @@ import {
   logger,
   imageGenerationInputSchema,
   type ImageGenerationInput,
+  MAX_FILE_SIZE,
 } from "@mocah/shared";
 import { buildImageGenerationPrompt } from "@mocah/api/lib/prompts";
 
@@ -480,8 +481,6 @@ export async function runFalImageGeneration(
 // External Image Re-upload to CDN
 // ============================================================================
 
-const MAX_IMAGE_SIZE = 5 * 1024 * 1024; // 5MB
-
 /**
  * Re-upload an external image URL to our CDN for reliability
  * Returns the CDN URL if successful, or the original URL on failure
@@ -524,7 +523,7 @@ export async function reuploadExternalImageToCdn(
     const buffer = Buffer.from(arrayBuffer);
 
     // Validate size
-    if (buffer.length > MAX_IMAGE_SIZE) {
+    if (buffer.length > MAX_FILE_SIZE) {
       logger.warn("[reuploadExternalImageToCdn] File too large", { url, size: buffer.length });
       return { url, wasReuploaded: false };
     }

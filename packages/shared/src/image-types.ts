@@ -80,7 +80,7 @@ export const ALLOWED_IMAGE_TYPES = [
 
 export type AllowedImageType = (typeof ALLOWED_IMAGE_TYPES)[number];
 
-export const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5MB
+export const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB
 export const MAX_IMAGE_DIMENSION = 4096; // Max width/height for uploads
 
 // ============================================================================
@@ -126,14 +126,14 @@ export const uploadFileSchema = z.object({
       message: "Please select an image file",
     })
     .refine((file) => file.size <= MAX_FILE_SIZE, {
-      message: "Image must be less than 5MB",
+      message: "Image must be less than 10MB",
     }),
 });
 
 export const createUploadUrlSchema = z.object({
   fileName: z.string().min(1, "File name is required"),
   contentType: z.enum(ALLOWED_IMAGE_TYPES as unknown as [string, ...string[]]),
-  fileSize: z.number().max(MAX_FILE_SIZE, "File too large. Maximum size is 5MB."),
+  fileSize: z.number().max(MAX_FILE_SIZE, "File too large. Maximum size is 10MB."),
   templateId: z.string().optional(),
   versionId: z.string().optional(),
   purpose: z.enum(["image", "logo", "template-reference"]).optional(),
