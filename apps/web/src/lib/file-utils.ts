@@ -27,7 +27,7 @@ export function validateImageFile(
     "image/jpg",
     "image/svg+xml",
   ];
-  const MAX_SIZE = 5 * 1024 * 1024; // 5MB
+  const MAX_SIZE = 10 * 1024 * 1024; // 10MB
 
   if (!ALLOWED_TYPES.includes(file.type)) {
     return {
@@ -39,7 +39,7 @@ export function validateImageFile(
   if (file.size > MAX_SIZE) {
     return {
       valid: false,
-      error: "File too large. Maximum size is 5MB.",
+      error: "File too large. Maximum size is 10MB.",
     };
   }
 

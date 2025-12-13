@@ -11,7 +11,6 @@ import {
   getPublicUrl,
   createPresignedUploadUrl,
   PRESIGNED_URL_EXPIRY,
-  MAX_FILE_SIZE,
   STORAGE_PREFIX_TEMPLATE_REFERENCES,
 } from "../lib/s3";
 import {
@@ -22,7 +21,7 @@ import {
   createUploadUrlSchema,
   confirmUploadSchema,
 } from "@mocah/shared";
-import { logger } from "@mocah/shared";
+import { logger, MAX_FILE_SIZE } from "@mocah/shared";
 
 // Helper to calculate simplified aspect ratio
 function calculateAspectRatio(width: number, height: number): string {
@@ -576,7 +575,7 @@ export const storageRouter = router({
         const arrayBuffer = await response.arrayBuffer();
         const buffer = Buffer.from(arrayBuffer);
 
-        // Validate size (5MB max)
+        // Validate size (10MB max)
         if (buffer.length > MAX_FILE_SIZE) {
           console.error("[storage.reuploadExternalImage] File too large");
           return { url, wasReuploaded: false, error: "File too large" };

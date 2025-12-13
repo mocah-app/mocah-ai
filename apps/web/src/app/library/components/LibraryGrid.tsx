@@ -5,7 +5,6 @@ import { useSearchParams, useRouter } from "next/navigation";
 import Image from "next/image";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
   DropdownMenu,
@@ -13,27 +12,49 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { Crown, Search, Filter, Check } from "lucide-react";
+import { Search, Filter, Check } from "lucide-react";
 import { trpc } from "@/utils/trpc";
 import { TemplateLibraryPreviewModal } from "./TemplateLibraryPreviewModal";
-import { TemplatePreview } from "@/components/template/TemplatePreview";
 import { cn } from "@/lib/utils";
+
+// Masonry layout helper - assigns row spans based on position for natural distribution
+const getMasonrySpan = (index: number, columnCount: number): number => {
+  // Create a varied but consistent pattern
+  const patterns = {
+    3: [1, 2, 1, 2, 1, 1, 2, 1, 2, 1, 1, 2], // 3 columns
+    2: [1, 2, 1, 1, 2, 1, 2, 1, 1, 2], // 2 columns
+    1: [1, 1, 1, 1, 1, 1], // 1 column (mobile)
+  };
+
+  const pattern = patterns[columnCount as keyof typeof patterns] || patterns[3];
+  return pattern[index % pattern.length];
+};
 
 export function LibraryGrid() {
   const searchParams = useSearchParams();
   const router = useRouter();
   const [search, setSearch] = useState("");
-  const [selectedCategory, setSelectedCategory] = useState<
-    string | undefined
-  >();
-  const [selectedTemplateId, setSelectedTemplateId] = useState<string | null>(
-    null
-  );
+  const [selectedCategory, setSelectedCategory] = useState<string | undefined>();
+  const [selectedTemplateId, setSelectedTemplateId] = useState<string | null>(null);
   const [previewOpen, setPreviewOpen] = useState(false);
+  const [columnCount, setColumnCount] = useState(3);
+
+  // Track screen size for responsive column count
+  useEffect(() => {
+    const updateColumns = () => {
+      const width = window.innerWidth;
+      if (width < 640) setColumnCount(1);
+      else if (width < 1024) setColumnCount(2);
+      else setColumnCount(3);
+    };
+
+    updateColumns();
+    window.addEventListener("resize", updateColumns);
+    return () => window.removeEventListener("resize", updateColumns);
+  }, []);
 
   // Fetch categories
-  const { data: categoriesData } =
-    trpc.template.getLibraryCategories.useQuery();
+  const { data: categoriesData } = trpc.template.getLibraryCategories.useQuery();
   const categories = categoriesData || [];
 
   // Fetch templates
@@ -45,27 +66,24 @@ export function LibraryGrid() {
 
   const templates = data?.items || [];
 
-  // Handle template query parameter (for direct links and callback after login)
+  // Handle template query parameter
   useEffect(() => {
-    const templateId =
-      searchParams.get("template") || searchParams.get("preview");
+    const templateId = searchParams.get("template") || searchParams.get("preview");
     if (templateId && templateId !== selectedTemplateId) {
       setSelectedTemplateId(templateId);
       setPreviewOpen(true);
     }
-  }, [searchParams]);
+  }, [searchParams, selectedTemplateId]);
 
   const handleTemplateClick = (templateId: string) => {
     setSelectedTemplateId(templateId);
     setPreviewOpen(true);
-    // Update URL to make it shareable
     router.push(`/library?template=${templateId}`, { scroll: false });
   };
 
   const handlePreviewClose = (open: boolean) => {
     setPreviewOpen(open);
     if (!open) {
-      // Clean up URL when closing preview
       router.push("/library", { scroll: false });
     }
   };
@@ -101,14 +119,12 @@ export function LibraryGrid() {
                     <Filter className="size-4" />
                     <span className="hidden sm:inline">
                       {selectedCategory
-                        ? categories.find((c) => c.slug === selectedCategory)
-                            ?.name
+                        ? categories.find((c) => c.slug === selectedCategory)?.name
                         : "All Categories"}
                     </span>
                     <span className="sm:hidden">
                       {selectedCategory
-                        ? categories.find((c) => c.slug === selectedCategory)
-                            ?.name
+                        ? categories.find((c) => c.slug === selectedCategory)?.name
                         : "All"}
                     </span>
                   </Button>
@@ -121,9 +137,7 @@ export function LibraryGrid() {
                     <Check
                       className={cn(
                         "mr-2 size-4",
-                        selectedCategory === undefined
-                          ? "opacity-100"
-                          : "opacity-0"
+                        selectedCategory === undefined ? "opacity-100" : "opacity-0"
                       )}
                     />
                     All Templates
@@ -137,9 +151,7 @@ export function LibraryGrid() {
                       <Check
                         className={cn(
                           "mr-2 size-4",
-                          selectedCategory === category.slug
-                            ? "opacity-100"
-                            : "opacity-0"
+                          selectedCategory === category.slug ? "opacity-100" : "opacity-0"
                         )}
                       />
                       {category.name}
@@ -151,12 +163,21 @@ export function LibraryGrid() {
           </div>
         </div>
 
-        {/* Template Grid */}
+        {/* Template Grid with Masonry Layout */}
         {isLoading ? (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4 auto-rows-[200px] sm:auto-rows-[250px] lg:auto-rows-[300px]">
-            {Array.from({ length: 6 }).map((_, i) => (
-              <Skeleton key={i} className="w-full h-full rounded-lg" />
-            ))}
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4 auto-rows-[200px] sm:auto-rows-[240px] lg:auto-rows-[280px]">
+            {Array.from({ length: 9 }).map((_, i) => {
+              const span = getMasonrySpan(i, columnCount);
+              return (
+                <Skeleton
+                  key={i}
+                  className={cn(
+                    "w-full h-full rounded-lg",
+                    span === 2 && "row-span-2"
+                  )}
+                />
+              );
+            })}
           </div>
         ) : templates.length === 0 ? (
           <div className="text-center py-16">
@@ -165,11 +186,10 @@ export function LibraryGrid() {
             </p>
           </div>
         ) : (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4 auto-rows-[200px] sm:auto-rows-[250px] lg:auto-rows-[300px]">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4 auto-rows-[200px] sm:auto-rows-[240px] lg:auto-rows-[280px]">
             {templates.map((template, index) => {
-              // Vary row span for masonry effect (only on larger screens)
-              const spanClass =
-                index % 7 === 0 || index % 11 === 0 ? "sm:row-span-2" : "";
+              const rowSpan = getMasonrySpan(index, columnCount);
+              const spanClass = rowSpan === 2 ? "row-span-2" : "";
 
               return (
                 <div
@@ -184,7 +204,8 @@ export function LibraryGrid() {
                   role="button"
                   tabIndex={0}
                   className={cn(
-                    "relative group overflow-hidden bg-card border border-border cursor-pointer rounded-sm scale-99 hover:scale-100 transition-all ease-in-out duration-300",
+                    "relative group overflow-hidden bg-card border border-border cursor-pointer rounded-lg transition-all duration-300 ease-out",
+                    "hover:shadow-xl hover:scale-[1.02] hover:z-10",
                     spanClass
                   )}
                 >
@@ -195,23 +216,26 @@ export function LibraryGrid() {
                         src={template.thumbnail}
                         alt={template.name}
                         fill
-                        className="object-top object-cover"
+                        sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw"
+                        className="object-cover object-center transition-transform duration-500 group-hover:scale-105"
                         unoptimized
                       />
                     ) : (
-                      <div className="absolute inset-0 bg-linear-to-br from-primary/10 via-secondary/10 to-accent/10 flex items-center justify-center">
+                      <div className="absolute inset-0 bg-linear-to-br from-primary/10 via-secondary/10 to-accent/10 flex items-center justify-center text-muted-foreground text-sm">
                         No thumbnail available
                       </div>
-                      
                     )}
                   </div>
 
                   {/* Overlay on Hover */}
-                  <div className="absolute inset-0 bg-black/0 group-hover:bg-black/10 transition-colors flex items-center justify-center">
-                    <div className="opacity-0 group-hover:opacity-100 transition-opacity">
-                      <span className="inline-flex items-center justify-center whitespace-nowrap rounded-md text-sm font-medium transition-colors h-8 px-3 bg-primary text-primary-foreground hover:bg-primary/90">
-                        Preview
+                  <div className="absolute inset-0 bg-linear-to-t from-black/60 via-black/0 to-black/0 opacity-0 group-hover:opacity-100 transition-opacity duration-300">
+                    <div className="absolute inset-0 flex flex-col items-center justify-center gap-2">
+                      <span className="inline-flex items-center justify-center whitespace-nowrap rounded-md text-sm font-medium transition-all h-9 px-4 bg-white text-black hover:bg-white/90 shadow-lg transform translate-y-2 group-hover:translate-y-0">
+                        Preview Template
                       </span>
+                      <p className="text-white text-sm font-medium px-4 text-center line-clamp-2 opacity-0 group-hover:opacity-100 transition-opacity delay-75">
+                        {template.name}
+                      </p>
                     </div>
                   </div>
                 </div>
