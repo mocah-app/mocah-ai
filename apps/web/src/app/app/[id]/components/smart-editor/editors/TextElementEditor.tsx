@@ -76,8 +76,10 @@ export function TextElementEditor({
         letterSpacing={currentStyles.letterSpacing as string}
         textAlign={currentStyles.textAlign as string}
         textDecoration={currentStyles.textDecoration as string}
+        maxWidth={currentStyles.maxWidth as string}
         onChange={handleStyleChange}
         showDecoration={true}
+        showMaxWidth={true}
         brandFont={brandFont}
       />
 

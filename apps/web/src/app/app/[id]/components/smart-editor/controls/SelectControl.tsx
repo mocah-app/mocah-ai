@@ -46,14 +46,14 @@ export function SelectControl({
   const hasCustomValue = value && !isKnownValue;
 
   return (
-    <div className={cn("space-y-1.5", className)}>
+    <div className={cn("space-y-1.5 w-full", className)}>
       {label && (
-        <Label className="text-xs text-muted-foreground">{label}</Label>
+        <Label className="text-xs text-muted-foreground/80">{label}</Label>
       )}
       <Select value={value || ''} onValueChange={onChange}>
         <SelectTrigger 
           className={cn(
-            "h-9 bg-muted/50 border-border",
+            "h-9 bg-muted/50 border-border w-full",
             hasCustomValue && "border-amber-500/50"
           )}
         >
@@ -71,7 +71,7 @@ export function SelectControl({
             </SelectItem>
           )}
           {options.map((opt) => (
-            <SelectItem key={opt.value} value={opt.value}>
+            <SelectItem key={opt.value} value={opt.value} className="text-xs">
               {opt.label}
             </SelectItem>
           ))}

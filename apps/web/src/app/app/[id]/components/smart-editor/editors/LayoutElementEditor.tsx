@@ -3,7 +3,7 @@
 import React from 'react';
 import type { ElementData, ElementUpdates } from '@/lib/react-email';
 import type { BrandColors } from '../EditorShell';
-import { PropertySection, ToggleGroupControl, SelectControl } from '../controls';
+import { PropertySection, ToggleGroupControl, SelectControl, TextInputControl } from '../controls';
 import { BackgroundSection, LayoutSection } from '../sections';
 import { TEXT_ALIGNMENTS, WIDTH_PRESETS } from '../constants/editor-constants';
 
@@ -43,15 +43,39 @@ export function LayoutElementEditor({
     <div className="space-y-0">
      
 
-      {/* Width for all layout elements */}
+      {/* Width/Max Width for all layout elements */}
       <PropertySection label="Size">
+        <div className="grid grid-cols-2 w-full gap-4">
+
         <SelectControl
           label={widthLabel}
           value={(isContainer ? currentStyles.maxWidth : currentStyles.width) as string}
           options={WIDTH_PRESETS}
           onChange={(v) => handleStyleChange(widthProperty, v)}
           placeholder="Auto"
-        />
+          />
+       
+        {/* Max Width for non-Container elements */}
+        {!isContainer && (
+          <SelectControl
+          label="Max Width"
+          value={currentStyles.maxWidth as string}
+          options={WIDTH_PRESETS}
+          onChange={(v) => handleStyleChange('maxWidth', v)}
+          placeholder="None"
+          />
+        )}
+
+         {/* Height control for Section elements */}
+         {isSection && (
+          <TextInputControl
+          label="Height"
+          value={currentStyles.height as string}
+          onChange={(v) => handleStyleChange('height', v)}
+          placeholder="auto"
+          />
+        )}
+        </div>
       </PropertySection>
 
       {/* Text Alignment */}
@@ -62,7 +86,12 @@ export function LayoutElementEditor({
           onChange={(v) => handleStyleChange('textAlign', v)}
         />
       </PropertySection>
-
+{/* Layout (padding, margin) */}
+      <LayoutSection
+        padding={currentStyles.padding as string}
+        margin={currentStyles.margin as string}
+        onChange={handleStyleChange}
+      />
       {/* Background */}
       <BackgroundSection
         value={currentStyles.backgroundColor as string}
@@ -71,12 +100,7 @@ export function LayoutElementEditor({
         currentStyles={currentStyles}
       />
 
-      {/* Layout (padding, margin) */}
-      <LayoutSection
-        padding={currentStyles.padding as string}
-        margin={currentStyles.margin as string}
-        onChange={handleStyleChange}
-      />
+      
     </div>
   );
 }

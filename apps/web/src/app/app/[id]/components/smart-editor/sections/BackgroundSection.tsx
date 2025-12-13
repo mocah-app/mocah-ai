@@ -126,6 +126,7 @@ export function BackgroundSection({
 
       {/* Background Image */}
       <ImageSection
+        onRemoveImage={handleRemoveImage}
         src={backgroundImageUrl}
         onImageSelect={handleImageSelect}
         onSrcChange={handleBackgroundImageUrlChange}
@@ -137,6 +138,7 @@ export function BackgroundSection({
       {backgroundImageUrl && backgroundImageUrl !== 'none' && (
         <>
           <PropertySection label="Background Size">
+            <div className="grid grid-cols-2 gap-2">
             <SelectControl
               label="Size"
               value={currentStyles.backgroundSize as string}
@@ -144,10 +146,18 @@ export function BackgroundSection({
               onChange={(v) => onChange('backgroundSize', v)}
               placeholder="Cover"
             />
+            <SelectControl
+              label="Repeat"
+              value={currentStyles.backgroundRepeat as string}
+              options={BACKGROUND_REPEAT_OPTIONS}
+              onChange={(v) => onChange('backgroundRepeat', v)}
+              placeholder="No Repeat"
+              />
+              </div>
           </PropertySection>
 
           <PropertySection label="Background Position">
-            <div className="space-y-2">
+            <div className="grid grid-cols-2 gap-2">
               <ToggleGroupControl
                 value={horizontalPos || 'center'}
                 options={HORIZONTAL_POSITION_OPTIONS}
