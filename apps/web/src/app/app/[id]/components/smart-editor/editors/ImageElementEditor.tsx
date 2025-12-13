@@ -5,6 +5,7 @@ import type { ElementData, ElementUpdates } from "@/lib/react-email";
 import type { BrandColors } from "../EditorShell";
 import { ImageSection, LayoutSection } from "../sections";
 import { PropertySection, SelectControl, TextInputControl } from "../controls";
+import { WIDTH_PRESETS } from "../constants/editor-constants";
 
 // ============================================================================
 // Types & Constants
@@ -17,17 +18,6 @@ interface ImageElementEditorProps {
   brandFont?: string | null;
   brandColors?: BrandColors;
 }
-
-const WIDTH_PRESETS = [
-  { value: "auto", label: "Auto" },
-  { value: "100%", label: "100%" },
-  { value: "75%", label: "75%" },
-  { value: "50%", label: "50%" },
-  { value: "200px", label: "200px" },
-  { value: "300px", label: "300px" },
-  { value: "400px", label: "400px" },
-  { value: "600px", label: "600px" },
-];
 
 // ============================================================================
 // Component
@@ -101,6 +91,12 @@ export function ImageElementEditor({
     [onUpdate]
   );
 
+  const handleRemoveImage = useCallback(() => {
+    onUpdate({
+      attributes: { src: 'none' },
+    });
+  }, [onUpdate]);
+
   // ============================================================================
   // Render
   // ============================================================================
@@ -116,6 +112,7 @@ export function ImageElementEditor({
         onAltChange={handleAltChange}
         showAltText={true}
         label="Image"
+        onRemoveImage={handleRemoveImage}
       />
 
       {/* Size Controls */}
@@ -135,6 +132,13 @@ export function ImageElementEditor({
             placeholder="auto"
           />
         </div>
+        <SelectControl
+          label="Max Width"
+          value={currentStyles.maxWidth as string}
+          options={WIDTH_PRESETS}
+          onChange={(v) => handleStyleChange("maxWidth", v)}
+          placeholder="None"
+        />
       </PropertySection>
 
       {/* Layout (margin) */}

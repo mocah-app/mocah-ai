@@ -82,7 +82,7 @@ type ImageNodeData = {
 const ImageNode = memo(({ data }: NodeProps<Node<ImageNodeData>>) => {
   // Brand kit images already use regular img tags in the canvas
   return (
-    <div className="rounded-lg overflow-hidden shadow-2xl">
+    <div className="rounded p-2 overflow-hidden shadow-2xl">
       <img
         src={data.url}
         alt={data.alt}

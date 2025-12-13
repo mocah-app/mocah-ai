@@ -8,7 +8,10 @@ import {
   TypographySection,
   ColorSection,
   LinkSection,
+  LayoutSection,
 } from '../sections';
+import { PropertySection, SelectControl } from '../controls';
+import { WIDTH_PRESETS } from '../constants/editor-constants';
 
 interface LinkElementEditorProps {
   elementData: ElementData;
@@ -76,6 +79,24 @@ export function LinkElementEditor({
         value={currentStyles.color as string}
         onChange={(v) => handleStyleChange('color', v)}
         brandColors={brandColors}
+      />
+
+      {/* Size Section */}
+      <PropertySection label="Size">
+        <SelectControl
+          label="Max Width"
+          value={currentStyles.maxWidth as string}
+          options={WIDTH_PRESETS}
+          onChange={(v) => handleStyleChange('maxWidth', v)}
+          placeholder="None"
+        />
+      </PropertySection>
+
+      {/* Layout Section */}
+      <LayoutSection
+        padding={currentStyles.padding as string}
+        margin={currentStyles.margin as string}
+        onChange={handleStyleChange}
       />
     </div>
   );

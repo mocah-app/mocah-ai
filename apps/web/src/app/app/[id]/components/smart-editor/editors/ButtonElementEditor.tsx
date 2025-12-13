@@ -10,8 +10,8 @@ import {
   LinkSection,
   LayoutSection,
 } from '../sections';
-import { PropertySection, ColorControl } from '../controls';
-import { BACKGROUND_COLOR_PRESETS } from '../constants/editor-constants';
+import { PropertySection, ColorControl, SelectControl } from '../controls';
+import { BACKGROUND_COLOR_PRESETS, WIDTH_PRESETS } from '../constants/editor-constants';
 
 interface ButtonElementEditorProps {
   elementData: ElementData;
@@ -108,6 +108,7 @@ export function ButtonElementEditor({
         />
       </PropertySection>
 
+
       {/* Layout (padding, border-radius) */}
       <LayoutSection
         padding={(currentStyles.padding as string) ?? ''}
@@ -115,6 +116,18 @@ export function ButtonElementEditor({
         onChange={handleStyleChange}
         showBorderRadius={true}
       />
+
+            {/* Size Section */}
+            <PropertySection label="Size">
+        <SelectControl
+          label="Max Width"
+          value={currentStyles.maxWidth as string}
+          options={WIDTH_PRESETS}
+          onChange={(v) => handleStyleChange('maxWidth', v)}
+          placeholder="None"
+        />
+      </PropertySection>
+
     </div>
   );
 }

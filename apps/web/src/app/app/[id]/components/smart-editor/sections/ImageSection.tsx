@@ -4,7 +4,7 @@ import Loader from '@/components/loader';
 import { Button } from '@/components/ui/button';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { useOrganization } from '@/contexts/organization-context';
-import { LibraryBig, Sparkles, Upload } from 'lucide-react';
+import { LibraryBig, Sparkles, Upload, X } from 'lucide-react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import React, { useCallback, useMemo, useRef } from 'react';
 import { useImageStudio } from '../../image-studio/ImageStudioContext';
@@ -27,6 +27,8 @@ interface ImageSectionProps {
   showAltText?: boolean;
   /** Label for the section (default: "Image") */
   label?: string;
+  /** Called when image is removed */
+  onRemoveImage?: () => void;
 }
 
 export function ImageSection({
@@ -34,6 +36,7 @@ export function ImageSection({
   alt,
   onImageSelect,
   onSrcChange,
+  onRemoveImage,
   onAltChange,
   showAltText = true,
   label = 'Image',
@@ -104,47 +107,48 @@ export function ImageSection({
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
             src={src}
-            alt={alt || 'Image preview'}
+            alt={alt || "Image preview"}
             className="w-full h-full object-contain"
           />
+          <Button
+            variant="outline"
+            size="icon"
+            className="absolute top-2 right-2 h-9"
+            onClick={onRemoveImage}
+          >
+            <X className="size-3.5" />
+          </Button>
         </div>
       )}
 
       {/* Action Buttons */}
       <div className="grid grid-cols-2 gap-2 mb-3">
-
-<div className="flex items-center gap-2">
-        <Tooltip>
-          <TooltipTrigger asChild>
-            <Button 
-              variant="outline" 
-              size="icon" 
-              className="h-9" 
-              onClick={handleOpenLibrary}
-              aria-label="Select from library"
-            >
-              <LibraryBig className="size-3.5" />
-            </Button>
-          </TooltipTrigger>
-          <TooltipContent>
-            Select from library
-          </TooltipContent>
-        </Tooltip>
-        <Button
-          variant="outline"
-          size="sm"
-          className="h-9"
-          onClick={() => fileInputRef.current?.click()}
-          disabled={isUploading}
-          aria-label="Upload image"
-        >
-          {isUploading ? (
-            <Loader />
-          ) : (
-            <Upload className="size-3.5" />
-          )}
-          Upload
-        </Button>
+        <div className="flex items-center gap-2">
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                variant="outline"
+                size="icon"
+                className="h-9"
+                onClick={handleOpenLibrary}
+                aria-label="Select from library"
+              >
+                <LibraryBig className="size-3.5" />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>Select from library</TooltipContent>
+          </Tooltip>
+          <Button
+            variant="outline"
+            size="sm"
+            className="h-9"
+            onClick={() => fileInputRef.current?.click()}
+            disabled={isUploading}
+            aria-label="Upload image"
+          >
+            {isUploading ? <Loader /> : <Upload className="size-3.5" />}
+            Upload
+          </Button>
         </div>
         <Button
           variant="outline"
@@ -155,7 +159,6 @@ export function ImageSection({
           <Sparkles className="size-3.5 mr-1.5" />
           Generate Image
         </Button>
-        
       </div>
 
       {/* Hidden file input */}
