@@ -106,6 +106,15 @@ export const BORDER_RADIUS = [
   { value: '9999px', label: 'Full' },
 ] as const;
 
+// Border Width/Stroke Presets
+export const BORDER_WIDTH_PRESETS = [
+  { value: '0px', label: 'None' },
+  { value: '1px', label: 'Thin' },
+  { value: '2px', label: 'Medium' },
+  { value: '4px', label: 'Thick' },
+  { value: '8px', label: 'Extra Thick' },
+] as const;
+
 // Width presets
 export const WIDTH_PRESETS = [
   { value: 'auto', label: 'Auto' },
@@ -147,4 +156,5 @@ export type Spacing = typeof SPACING_SCALE[number]['value'];
 export type TextAlign = typeof TEXT_ALIGNMENTS[number]['value'];
 export type TextDecoration = typeof TEXT_DECORATIONS[number]['value'];
 export type BorderRadius = typeof BORDER_RADIUS[number]['value'];
+export type BorderWidth = typeof BORDER_WIDTH_PRESETS[number]['value'];
 

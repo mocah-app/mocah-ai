@@ -10,4 +10,5 @@ export { BackgroundSection } from './BackgroundSection';
 export { LinkSection } from './LinkSection';
 export { LayoutSection } from './LayoutSection';
 export { ImageSection } from './ImageSection';
+export { BorderSection } from './BorderSection';
 
