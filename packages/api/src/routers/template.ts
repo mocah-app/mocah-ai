@@ -885,6 +885,105 @@ export const templateRouter = router({
     }),
 
   /**
+   * Create a new version from current template state
+   * This snapshots the current template state before saving new changes
+   */
+  createVersion: protectedProcedure
+    .input(
+      z.object({
+        templateId: z.string(),
+        name: z.string().optional(),
+        changeNote: z.string().optional(),
+      })
+    )
+    .mutation(async ({ ctx, input }) => {
+      // 1. Get current template with latest version
+      const template = await ctx.db.template.findUnique({
+        where: { id: input.templateId },
+        include: {
+          versions: {
+            orderBy: { version: "desc" },
+            take: 1,
+          },
+        },
+      });
+
+      if (!template) {
+        throw new TRPCError({
+          code: "NOT_FOUND",
+          message: "Template not found",
+        });
+      }
+
+      // 2. Verify user has access
+      const isMember = await checkMembership(
+        ctx.db,
+        ctx.session.user.id,
+        template.organizationId
+      );
+
+      if (!isMember) {
+        throw new TRPCError({
+          code: "FORBIDDEN",
+          message: "You do not have access to this template",
+        });
+      }
+
+      // 3. Calculate next version number
+      const latestVersion = template.versions[0];
+      const nextVersionNumber = latestVersion ? latestVersion.version + 1 : 1;
+
+      // 4. Create new version (snapshot current template state)
+      const newVersion = await ctx.db.templateVersion.create({
+        data: {
+          templateId: input.templateId,
+          version: nextVersionNumber,
+          name: input.name || `Version ${nextVersionNumber}`,
+          changeNote: input.changeNote,
+          reactEmailCode: template.reactEmailCode,
+          styleType: template.styleType,
+          styleDefinitions: template.styleDefinitions || undefined,
+          htmlCode: template.htmlCode,
+          tableHtmlCode: template.tableHtmlCode,
+          subject: template.subject,
+          previewText: template.previewText,
+          isCurrent: true,
+          parentVersionId: template.currentVersionId,
+          createdBy: ctx.session.user.id,
+          metadata: template.styleDefinitions
+            ? {
+                source: "manual_save",
+                createdAt: new Date().toISOString(),
+              }
+            : undefined,
+        },
+      });
+
+      // 5. Mark previous version as not current
+      if (latestVersion && latestVersion.isCurrent) {
+        await ctx.db.templateVersion.update({
+          where: { id: latestVersion.id },
+          data: { isCurrent: false },
+        });
+      }
+
+      // 6. Update template's currentVersionId
+      await ctx.db.template.update({
+        where: { id: input.templateId },
+        data: { currentVersionId: newVersion.id },
+      });
+
+      logger.info("📦 [Template] Version created:", {
+        templateId: input.templateId,
+        versionId: newVersion.id,
+        versionNumber: nextVersionNumber,
+        source: "manual_save",
+      });
+
+      return newVersion;
+    }),
+
+  /**
    * Check if current user can publish templates to library
    */
   canPublishToLibrary: protectedProcedure.query(async ({ ctx }) => {

@@ -10,6 +10,7 @@ import {
 import { EditorModeProvider } from "./components/providers/EditorModeProvider";
 import { DesignChangesProvider } from "./components/providers/DesignChangesProvider";
 import { ErrorFixProvider } from "./components/providers/ErrorFixProvider";
+import { HistoryProvider, useHistory } from "./components/providers/HistoryProvider";
 import { InfiniteCanvas } from "./components/canvas/InfiniteCanvas";
 import { FloatingNav } from "./components/floating-panels/FloatingNav";
 import { SaveDesignEdit } from "./components/canvas/SaveDesignEdit";
@@ -49,6 +50,13 @@ const SmartEditorPanel = dynamic(
   { ssr: false }
 );
 
+const VersionHistoryPanel = dynamic(
+  () => import("./components/floating-panels/VersionHistoryPanel").then(
+    (mod) => mod.VersionHistoryPanel
+  ),
+  { ssr: false }
+);
+
 const ImageStudioModal = dynamic(
   () => import("./components/image-studio/ImageStudioModal").then(
     (mod) => mod.ImageStudioModal
@@ -62,6 +70,7 @@ function EditorContent({ templateId }: { templateId: string }) {
   const { state: templateState, actions: templateActions } = useTemplate();
   const { state: canvasState, actions: canvasActions } = useCanvas();
   const { state: editorState, actions: editorActions } = useEditorMode();
+  const { actions: historyActions } = useHistory();
   const { getData, clearPrompt } = useTemplateCreation();
 
   // Read prompt and image URLs immediately on first render for ChatPanel prop
@@ -137,10 +146,15 @@ function EditorContent({ templateId }: { templateId: string }) {
 
         // Clear ALL pending changes after successful save
         editorActions.clearAllPendingChanges();
+        
+        // Clear undo/redo history on save
+        historyActions.clearOnSave();
       }
       // Handle code editor changes (when no smart editor changes)
       else if (templateState.isDirty) {
         await templateActions.saveTemplate();
+        // Clear undo/redo history on save
+        historyActions.clearOnSave();
       }
     } catch (error) {
       console.error("Failed to save changes:", error);
@@ -207,6 +221,9 @@ function EditorContent({ templateId }: { templateId: string }) {
 
       // Clear pending changes
       editorActions.clearAllPendingChanges();
+      
+      // Clear undo/redo history on save
+      historyActions.clearOnSave();
     } catch (error) {
       console.error("Failed to save smart editor changes:", error);
     } finally {
@@ -219,6 +236,21 @@ function EditorContent({ templateId }: { templateId: string }) {
     editorActions.clearAllPendingChanges();
     editorActions.refreshPreview();
   }, [editorActions]);
+
+  // Clear history when AI generation completes
+  useEffect(() => {
+    if (templateState.generationPhase === 'complete' && !templateState.isStreaming) {
+      // Clear undo/redo history after AI generation completes
+      historyActions.clearOnSave();
+    }
+  }, [templateState.generationPhase, templateState.isStreaming, historyActions]);
+
+  // Clear history when version changes (version switch)
+  useEffect(() => {
+    // Clear undo/redo history when switching to a different version
+    // This prevents applying changes built against a different version snapshot
+    historyActions.clearOnSave();
+  }, [templateState.currentVersion, historyActions]);
 
   // Auto-open chat if we have a prompt
   useEffect(() => {
@@ -249,7 +281,7 @@ function EditorContent({ templateId }: { templateId: string }) {
   }, [searchParams, router, templateId]);
 
   // Handle panel toggle with mutual exclusivity
-  const handlePanelToggle = (panel: string) => {
+  const handlePanelToggle = useCallback((panel: string) => {
     if (activePanel === panel) {
       // Close the currently open panel
       setActivePanel(null);
@@ -275,7 +307,7 @@ function EditorContent({ templateId }: { templateId: string }) {
         editorActions.setDesignMode(false);
       }
     }
-  };
+  }, [activePanel, editorActions, editorState.selectedElement]);
 
   // Handle opening chat with initial text
   const handleOpenChatWithText = useCallback((text: string) => {
@@ -299,6 +331,27 @@ ${error}`;
 
     setErrorFixPrompt(errorFixMessage);
     setActivePanel("chat");
+  }, []);
+
+  // Handle closing panels
+  const handleClosePanel = useCallback(() => {
+    setActivePanel(null);
+  }, []);
+
+  const handleCloseEditor = useCallback(() => {
+    setActivePanel(null);
+    editorActions.selectElement(null);
+    editorActions.setDesignMode(false);
+  }, [editorActions]);
+
+  // Handle consuming error fix prompt
+  const handleErrorFixConsumed = useCallback(() => {
+    setErrorFixPrompt(undefined);
+  }, []);
+
+  // Handle consuming initial chat input
+  const handleInputConsumed = useCallback(() => {
+    setInitialChatInput(undefined);
   }, []);
 
   // Initialize template node - either loading or with data
@@ -486,29 +539,27 @@ ${error}`;
             />
             <ChatPanel
               isOpen={activePanel === "chat"}
-              onClose={() => {
-                setActivePanel(null);
-              }}
+              onClose={handleClosePanel}
               initialPrompt={initialPrompt || undefined}
               initialImageUrls={initialImageUrls}
               onPromptConsumed={clearPrompt}
               errorFixPrompt={errorFixPrompt}
-              onErrorFixConsumed={() => setErrorFixPrompt(undefined)}
+              onErrorFixConsumed={handleErrorFixConsumed}
               initialInput={initialChatInput}
-              onInputConsumed={() => setInitialChatInput(undefined)}
+              onInputConsumed={handleInputConsumed}
             />
             <SmartEditorPanel
               isOpen={activePanel === "editor"}
-              onClose={() => {
-                setActivePanel(null);
-                editorActions.selectElement(null);
-                editorActions.setDesignMode(false);
-              }}
+              onClose={handleCloseEditor}
               onOpenChat={handleOpenChatWithText}
             />
             <ImageLibraryPanel
               isOpen={activePanel === "library"}
-              onClose={() => setActivePanel(null)}
+              onClose={handleClosePanel}
+            />
+            <VersionHistoryPanel
+              isOpen={activePanel === "versions"}
+              onClose={handleClosePanel}
             />
           </div>
           <InfiniteCanvas />
@@ -554,7 +605,9 @@ export function TemplateEditorPage({ templateId }: { templateId: string }) {
     <CanvasProvider>
       <TemplateProvider templateId={templateId}>
         <EditorModeProvider>
-          <EditorContent templateId={templateId} />
+          <HistoryProvider>
+            <EditorContent templateId={templateId} />
+          </HistoryProvider>
         </EditorModeProvider>
       </TemplateProvider>
     </CanvasProvider>

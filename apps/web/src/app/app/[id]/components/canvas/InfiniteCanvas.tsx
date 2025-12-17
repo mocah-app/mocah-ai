@@ -52,7 +52,7 @@ export function InfiniteCanvas() {
           bgColor="var(--background)"
         />
         <Controls
-          position="bottom-center"
+          position="bottom-right"
           orientation="horizontal"
           showZoom={false}
           showFitView={false}

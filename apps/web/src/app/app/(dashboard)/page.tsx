@@ -25,7 +25,7 @@ export default function DashboardPage() {
 
   return (
     <div className="flex flex-1 flex-col h-full gap-4 p-1 w-full">
-      <div className="flex flex-1 flex-col gap-4 p-4 border border-border">
+      <div className="flex flex-1 flex-col gap-4 py-4 border border-border">
         <Dashboard />
       </div>
     </div>

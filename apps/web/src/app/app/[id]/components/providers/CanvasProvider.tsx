@@ -18,7 +18,7 @@ interface CanvasState {
   edges: Edge[];
 }
 
-interface CanvasActions {
+export interface CanvasActions {
   addNode: (node: Node<TemplateNodeData>) => void;
   updateNode: (nodeId: string, data: any) => void;
   deleteNode: (nodeId: string) => void;

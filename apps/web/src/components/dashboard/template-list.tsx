@@ -59,8 +59,8 @@ export function TemplateList({
   }, [handleObserver]);
 
   return (
-    <Card className="relative z-10">
-      <CardContent>
+    <Card className="relative z-10 border-border rounded-none">
+      <CardContent className="px-4">
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           {templates.map((template) => (
             <TemplateCard key={template.id} template={template} />

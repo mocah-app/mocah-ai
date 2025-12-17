@@ -22,7 +22,7 @@ interface TemplateCardProps {
 
 export function TemplateCard({ template }: TemplateCardProps) {
   return (
-    <Card className="gap-0 hover:shadow-md bg-accent/50 transition-all duration-300 p-0 h-full overflow-hidden flex flex-col">
+    <Card className="gap-0 hover:shadow-md bg-accent/50 transition-all duration-300 p-0 h-full overflow-hidden flex flex-col border-border rounded-md">
       <Link href={`/app/${template.id}`} className="flex-1 flex flex-col">
         <CardHeader className="p-0 w-full group flex-1 flex flex-col">
           <div className="flex w-full items-start justify-between">

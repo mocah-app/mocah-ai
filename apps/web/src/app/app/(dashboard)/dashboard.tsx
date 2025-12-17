@@ -87,7 +87,7 @@ function DashboardContent() {
     brandKit.logo;
 
   return (
-    <div className="space-y-6 relative">
+    <div className="space-y-2 relative">
       <h1 className="sr-only">{displayOrg?.name}</h1>
 
       {/* Brand Kit Setup Banner */}
@@ -98,7 +98,7 @@ function DashboardContent() {
       )}
 
       {/* Templates Header */}
-      <Card className="relative z-10 p-2 px-6">
+      <Card className="relative z-10 pt-0 pb-4 px-6 border-0 border-b border-border rounded-none">
         <CardHeader className="flex flex-row items-center justify-between p-0">
           <CardTitle>
             <h1 className="text-lg font-bold">Your Templates</h1>
@@ -122,6 +122,7 @@ function DashboardContent() {
       </Card>
 
       {/* Templates Content */}
+      <div className="flex flex-1 flex-col gap-4 px-2">
       {isDataLoading ? (
         <Card className="relative z-10">
           <CardContent>
@@ -139,6 +140,7 @@ function DashboardContent() {
       ) : (
         <EmptyState onCreateTemplate={handleCreateTemplate} />
       )}
+    </div>
     </div>
   );
 }
