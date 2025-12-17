@@ -3,16 +3,19 @@
 import BrandKitSetupBanner from "@/components/brand-kit/BrandKitSetupBanner";
 import { EmptyState } from "@/components/dashboard/empty-state";
 import { NoBrandState } from "@/components/dashboard/no-brand-state";
-import { TemplateList } from "@/components/dashboard/template-list";
-import { TemplateListSkeleton } from "@/components/dashboard/template-list-skeleton";
+import { TemplateGridView } from "@/components/dashboard/template-grid-view";
+import { TemplateListView } from "@/components/dashboard/template-list-view";
+import { TemplateGridViewSkeleton } from "@/components/dashboard/template-grid-view-skeleton";
+import { TemplateListViewSkeleton } from "@/components/dashboard/template-list-view-skeleton";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { DashboardProvider, useDashboard } from "@/contexts/dashboard-context";
 import { useOrganization } from "@/contexts/organization-context";
 import { trpc } from "@/utils/trpc";
-import { Plus } from "lucide-react";
-import { useEffect, useRef } from "react";
+import { Grid3x3, List, Plus } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 
 const TEMPLATES_PER_PAGE = 6;
@@ -24,6 +27,7 @@ function DashboardContent() {
     organizations,
     isLoading: orgLoading,
   } = useOrganization();
+  const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
 
   // Show first organization if we have orgs but no active one set yet
   const displayOrg =
@@ -103,13 +107,25 @@ function DashboardContent() {
           <CardTitle>
             <h1 className="text-lg font-bold">Your Templates</h1>
           </CardTitle>
-          {isDataLoading ? (
-            <Skeleton className="h-6 w-20" />
-          ) : (
-            <span className="text-base font-bold text-muted-foreground">
-              {templates.length} of {templateCount}
-            </span>
-          )}
+          <div className="flex items-center gap-4">
+            {isDataLoading ? (
+              <Skeleton className="h-6 w-20" />
+            ) : (
+              <span className="text-base font-bold text-muted-foreground">
+                {templates.length} of {templateCount}
+              </span>
+            )}
+            <Tabs value={viewMode} onValueChange={(v) => setViewMode(v as "grid" | "list")}>
+              <TabsList>
+                <TabsTrigger value="grid">
+                  <Grid3x3 className="h-4 w-4" />
+                </TabsTrigger>
+                <TabsTrigger value="list">
+                  <List className="h-4 w-4" />
+                </TabsTrigger>
+              </TabsList>
+            </Tabs>
+          </div>
           <Button
             onClick={handleCreateTemplate}
             className="self-end ml-auto"
@@ -123,24 +139,38 @@ function DashboardContent() {
 
       {/* Templates Content */}
       <div className="flex flex-1 flex-col gap-4 px-2">
-      {isDataLoading ? (
-        <Card className="relative z-10">
-          <CardContent>
-            <TemplateListSkeleton />
-          </CardContent>
-        </Card>
-      ) : templateCount > 0 ? (
-        <TemplateList
-          templates={templates}
-          hasNextPage={hasNextPage ?? false}
-          isFetchingNextPage={isFetchingNextPage}
-          fetchNextPage={fetchNextPage}
-          templatesPerPage={TEMPLATES_PER_PAGE}
-        />
-      ) : (
-        <EmptyState onCreateTemplate={handleCreateTemplate} />
-      )}
-    </div>
+        {isDataLoading ? (
+          <Card className="relative z-10 border-border rounded-none">
+            <CardContent>
+              {viewMode === "grid" ? (
+                <TemplateGridViewSkeleton />
+              ) : (
+                <TemplateListViewSkeleton />
+              )}
+            </CardContent>
+          </Card>
+        ) : templateCount > 0 ? (
+          viewMode === "grid" ? (
+            <TemplateGridView
+              templates={templates}
+              hasNextPage={hasNextPage ?? false}
+              isFetchingNextPage={isFetchingNextPage}
+              fetchNextPage={fetchNextPage}
+              templatesPerPage={TEMPLATES_PER_PAGE}
+            />
+          ) : (
+            <TemplateListView
+              templates={templates}
+              hasNextPage={hasNextPage ?? false}
+              isFetchingNextPage={isFetchingNextPage}
+              fetchNextPage={fetchNextPage}
+              templatesPerPage={TEMPLATES_PER_PAGE}
+            />
+          )
+        ) : (
+          <EmptyState onCreateTemplate={handleCreateTemplate} />
+        )}
+      </div>
     </div>
   );
 }
