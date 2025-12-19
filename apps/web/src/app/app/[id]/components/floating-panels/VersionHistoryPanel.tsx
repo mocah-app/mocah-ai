@@ -9,7 +9,8 @@ import { format } from "date-fns";
 import {
   Check,
   History,
-  X
+  X,
+  Eye
 } from "lucide-react";
 import { useParams } from "next/navigation";
 import React, { useCallback, useMemo, useState } from "react";
@@ -49,22 +50,24 @@ export const VersionHistoryPanel = ({
     }
   }, [enableTransition]);
 
-  const handleSwitchVersion = useCallback(
-    async (versionId: string) => {
-      if (versionId === currentVersionId) return;
-
-      try {
-        await templateActions.switchToVersion(versionId);
-        // Close panel after switching
-        onClose();
-      } catch (error) {
-        console.error("Failed to switch version:", error);
-        toast.error("Failed to switch version", {
-          description: error instanceof Error ? error.message : "Unknown error",
-        });
+  const handlePreviewVersion = useCallback(
+    (versionId: string) => {
+      // Allow clicking current version if we're previewing something else
+      // to go back to current
+      if (versionId === currentVersionId && !templateState.previewingVersionId) {
+        return;
       }
+      
+      // If clicking the current version while previewing, cancel preview
+      if (versionId === currentVersionId && templateState.previewingVersionId) {
+        templateActions.cancelVersionPreview();
+        return;
+      }
+      
+      // Instant preview - no API call, no loading state
+      templateActions.previewVersion(versionId);
     },
-    [currentVersionId, templateActions, onClose]
+    [currentVersionId, templateState.previewingVersionId, templateActions]
   );
 
   type VersionItem = {
@@ -106,28 +109,68 @@ export const VersionHistoryPanel = ({
       </div>
 
       {/* Versions List */}
-      <ScrollArea className="flex-1">
+      <ScrollArea className="flex-1 overflow-y-auto">
         {isLoading ? (
           <div className="p-4 text-center text-sm text-muted-foreground">
             Loading versions...
           </div>
-        ) : sortedVersions.length === 0 ? (
-          <div className="p-4 text-center text-sm text-muted-foreground">
-            No versions yet. Versions are created when you save changes.
-          </div>
         ) : (
-          <div className="p-4 space-y-2">
-            {sortedVersions.map((version: VersionItem) => {
-              const isCurrent = version.id === currentVersionId;
+          <div className="p-4 space-y-3">
+            {/* Current Version Section */}
+            <div>
+              <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2 px-2">
+                Current Version
+              </h4>
+              <div
+                className={cn(
+                  "rounded-lg border-2 cursor-pointer transition-colors",
+                  templateState.previewingVersionId
+                    ? "border-border bg-muted/30"
+                    : "border-primary bg-primary/5"
+                )}
+                onClick={() => {
+                  if (templateState.previewingVersionId) {
+                    templateActions.cancelVersionPreview();
+                  }
+                }}
+              >
+                <div className="flex items-start justify-between gap-2">
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center justify-between gap-2 p-3">
+                      <div className="flex items-center gap-2">
+                        <div className="size-2 rounded-full bg-primary animate-pulse" />
+                        <span className="font-medium text-sm">Active</span>
+                      </div>
+                      {!templateState.previewingVersionId && (
+                        <Badge variant="default" className="text-xs px-2 py-0.5">
+                          <Check className="w-3 h-3" />
+                        </Badge>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Version History Section */}
+            {sortedVersions.length > 0 && (
+              <div>
+                <h4 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-2 px-2">
+                  Version History ({sortedVersions.length}/10)
+                </h4>
+                <div className="space-y-2">
+                  {sortedVersions.map((version: VersionItem) => {
+              const isPreviewing = templateState.previewingVersionId === version.id;
              
               return (
                 <div
                   key={version.id}
                   className={cn(
                     "rounded-lg border border-border cursor-pointer transition-colors",
-                    isCurrent ? "border-primary/50" : "hover:bg-muted/50"
+                    isPreviewing && "border-amber-500 bg-amber-500/5",
+                    !isPreviewing && "hover:bg-muted/50"
                   )}
-                  onClick={() => handleSwitchVersion(version.id)}
+                  onClick={() => handlePreviewVersion(version.id)}
                 >
                   <div className="flex items-start justify-between gap-2">
                     <div className="flex-1 min-w-0">
@@ -136,9 +179,10 @@ export const VersionHistoryPanel = ({
                           {version.name || `V ${version.version}`}
                         </span>
 
-                        {isCurrent && (
-                          <Badge variant="default" className="text-xs p-1">
-                            <Check className="w-3 h-3" />
+                        {isPreviewing && (
+                          <Badge variant="secondary" className="text-xs px-2 py-0.5 bg-amber-500/20 text-amber-700 dark:text-amber-400">
+                            <Eye className="w-3 h-3 mr-1" />
+                            Previewing
                           </Badge>
                         )}
                       </div>
@@ -167,6 +211,15 @@ export const VersionHistoryPanel = ({
                 </div>
               );
             })}
+                </div>
+              </div>
+            )}
+
+            {sortedVersions.length === 0 && (
+              <div className="text-center text-sm text-muted-foreground py-8">
+                No version history yet. Versions are created when you save changes.
+              </div>
+            )}
           </div>
         )}
       </ScrollArea>

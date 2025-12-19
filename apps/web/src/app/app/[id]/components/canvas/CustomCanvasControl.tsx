@@ -46,7 +46,7 @@ export function CustomCanvasControl({
   const zoomLevel = externalZoomLevel ?? internalZoomLevel;
 
   // Initialize zoom level on mount only
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+
   useEffect(() => {
     const currentZoom = getZoom();
     const initialZoom = Math.round(currentZoom * 100);

@@ -388,12 +388,18 @@ ${error}`;
       const template = templateState.currentTemplate;
 
       // Build template content using React Email format
+      // Use preview data if in preview mode, otherwise use current state
       const templateContent = {
         subject: template.subject ?? undefined,
         previewText: template.previewText ?? undefined,
         reactEmailCode:
-          templateState.reactEmailCode || template.reactEmailCode || undefined,
-        styleDefinitions: templateState.styleDefinitions,
+          templateState.previewVersionData?.reactEmailCode ||
+          templateState.reactEmailCode ||
+          template.reactEmailCode ||
+          undefined,
+        styleDefinitions:
+          templateState.previewVersionData?.styleDefinitions ||
+          templateState.styleDefinitions,
       };
 
       const initialNode = {
@@ -433,12 +439,18 @@ ${error}`;
     const template = templateState.currentTemplate;
 
     // Build template content using React Email format
+    // Use preview data if in preview mode, otherwise use current state
     const templateContent = {
       subject: template.subject ?? undefined,
       previewText: template.previewText ?? undefined,
       reactEmailCode:
-        templateState.reactEmailCode || template.reactEmailCode || undefined,
-      styleDefinitions: templateState.styleDefinitions,
+        templateState.previewVersionData?.reactEmailCode ||
+        templateState.reactEmailCode ||
+        template.reactEmailCode ||
+        undefined,
+      styleDefinitions:
+        templateState.previewVersionData?.styleDefinitions ||
+        templateState.styleDefinitions,
     };
 
     // Check if content actually changed (avoid infinite updates)
@@ -476,6 +488,7 @@ ${error}`;
     templateState.currentTemplate,
     templateState.reactEmailCode,
     templateState.styleDefinitions,
+    templateState.previewVersionData, // IMPORTANT: Include preview data to trigger updates
     canvasState.nodes,
     canvasActions,
   ]);

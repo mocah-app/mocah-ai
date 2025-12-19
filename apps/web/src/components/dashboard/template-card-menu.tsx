@@ -27,6 +27,9 @@ import {
   Loader2,
   Check,
   Image as ImageIcon,
+  Globe,
+  ExternalLink,
+  RefreshCw,
 } from "lucide-react";
 import { useState, useEffect } from "react";
 import { toast } from "sonner";
@@ -36,6 +39,12 @@ import { cn } from "@/lib/utils";
 interface TemplateCardMenuProps {
   templateId: string;
   templateName: string;
+  libraryEntry?: {
+    id: string;
+    _count: {
+      customizations: number;
+    };
+  } | null;
 }
 
 type PublishStage =
@@ -48,6 +57,7 @@ type PublishStage =
 export function TemplateCardMenu({
   templateId,
   templateName,
+  libraryEntry,
 }: TemplateCardMenuProps) {
   const {
     duplicateTemplate,
@@ -58,6 +68,7 @@ export function TemplateCardMenu({
   } = useDashboard();
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [showPublishDialog, setShowPublishDialog] = useState(false);
+  const [showUnpublishDialog, setShowUnpublishDialog] = useState(false);
   const [publishStage, setPublishStage] = useState<PublishStage>("confirm");
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
@@ -65,12 +76,15 @@ export function TemplateCardMenu({
   const { data: canPublish, isLoading: isCheckingPermission } =
     trpc.template.canPublishToLibrary.useQuery();
 
+  const isPublished = !!libraryEntry;
+
   // Publish mutation
   // Note: Using `any` for callback parameters to prevent "Type instantiation is excessively deep" error
   const publishMutation = trpc.template.publishToLibrary.useMutation({
     onSuccess: () => {
       setPublishStage("success");
       utils.template.list.invalidate();
+      utils.template.getLibraryEntryForTemplate.invalidate({ templateId });
       // Auto-close after 2 seconds on success
       setTimeout(() => {
         setShowPublishDialog(false);
@@ -80,6 +94,19 @@ export function TemplateCardMenu({
     onError: (error: any) => {
       setPublishStage("error");
       setErrorMessage(error.message || "Failed to publish template");
+    },
+  });
+
+  // Unpublish mutation
+  const unpublishMutation = trpc.template.unpublishTemplate.useMutation({
+    onSuccess: () => {
+      toast.success("Template unpublished from library");
+      utils.template.list.invalidate();
+      utils.template.getLibraryEntryForTemplate.invalidate({ templateId });
+      setShowUnpublishDialog(false);
+    },
+    onError: (error: any) => {
+      toast.error(error.message || "Failed to unpublish template");
     },
   });
 
@@ -135,6 +162,24 @@ export function TemplateCardMenu({
     }
   };
 
+  const handleViewInLibrary = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (libraryEntry) {
+      window.open(`/library?template=${libraryEntry.id}`, "_blank");
+    }
+  };
+
+  const handleUnpublishClick = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    setShowUnpublishDialog(true);
+  };
+
+  const handleUnpublishConfirm = () => {
+    if (libraryEntry) {
+      unpublishMutation.mutate({ libraryId: libraryEntry.id });
+    }
+  };
+
   return (
     <>
       <DropdownMenu>
@@ -144,7 +189,7 @@ export function TemplateCardMenu({
           </Button>
         </DropdownMenuTrigger>
         <DropdownMenuContent>
-          {canPublish && (
+          {canPublish && !isPublished && (
             <DropdownMenuItem
               onClick={handleLibraryClick}
               disabled={publishMutation.isPending || isCheckingPermission}
@@ -152,6 +197,18 @@ export function TemplateCardMenu({
               <BookOpenText className="h-4 w-4" />
               Publish to Library
             </DropdownMenuItem>
+          )}
+          {canPublish && isPublished && (
+            <>
+              <DropdownMenuItem onClick={handleViewInLibrary}>
+                <ExternalLink className="h-4 w-4" />
+                View in Library
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={handleUnpublishClick}>
+                <Globe className="h-4 w-4" />
+                Unpublish
+              </DropdownMenuItem>
+            </>
           )}
           <DropdownMenuItem
             onClick={handleRemix}
@@ -343,6 +400,41 @@ export function TemplateCardMenu({
                 Done
               </Button>
             )}
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Unpublish Confirmation Dialog */}
+      <AlertDialog open={showUnpublishDialog} onOpenChange={setShowUnpublishDialog}>
+        <AlertDialogContent className="sm:max-w-md">
+          <AlertDialogHeader>
+            <AlertDialogTitle>Unpublish Template?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to unpublish{" "}
+              <span className="font-semibold">{templateName}</span>? It will be
+              removed from the public library but can be republished later.
+              {libraryEntry && libraryEntry._count.customizations > 0 && (
+                <div className="mt-3 p-3 bg-yellow-500/10 border border-yellow-500/20 rounded-md text-yellow-800 dark:text-yellow-200 text-sm">
+                  {libraryEntry._count.customizations} users have remixed this
+                  template. Unpublishing will not affect their copies.
+                </div>
+              )}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={unpublishMutation.isPending}>
+              Cancel
+            </AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleUnpublishConfirm}
+              disabled={unpublishMutation.isPending}
+              className="bg-yellow-600 hover:bg-yellow-700 focus:ring-yellow-600"
+            >
+              {unpublishMutation.isPending && (
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              )}
+              Unpublish
+            </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>

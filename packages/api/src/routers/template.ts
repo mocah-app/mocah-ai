@@ -887,6 +887,7 @@ export const templateRouter = router({
   /**
    * Create a new version from current template state
    * This snapshots the current template state before saving new changes
+   * NOTE: This does NOT update template.currentVersionId - that only happens on restore
    */
   createVersion: protectedProcedure
     .input(
@@ -897,13 +898,12 @@ export const templateRouter = router({
       })
     )
     .mutation(async ({ ctx, input }) => {
-      // 1. Get current template with latest version
+      // 1. Get current template with all versions for cleanup
       const template = await ctx.db.template.findUnique({
         where: { id: input.templateId },
         include: {
           versions: {
             orderBy: { version: "desc" },
-            take: 1,
           },
         },
       });
@@ -929,11 +929,28 @@ export const templateRouter = router({
         });
       }
 
-      // 3. Calculate next version number
+      // 3. Delete oldest versions if we have 10 or more (keep most recent 9)
+      if (template.versions.length >= 10) {
+        const versionsToDelete = template.versions.slice(9); // Keep first 9, delete rest
+        const idsToDelete = versionsToDelete.map((v) => v.id);
+        
+        await ctx.db.templateVersion.deleteMany({
+          where: {
+            id: { in: idsToDelete },
+          },
+        });
+        
+        logger.info("🗑️ [Template] Deleted old versions:", {
+          templateId: input.templateId,
+          deletedCount: idsToDelete.length,
+        });
+      }
+
+      // 4. Calculate next version number
       const latestVersion = template.versions[0];
       const nextVersionNumber = latestVersion ? latestVersion.version + 1 : 1;
 
-      // 4. Create new version (snapshot current template state)
+      // 5. Create new version (snapshot current template state)
       const newVersion = await ctx.db.templateVersion.create({
         data: {
           templateId: input.templateId,
@@ -947,7 +964,7 @@ export const templateRouter = router({
           tableHtmlCode: template.tableHtmlCode,
           subject: template.subject,
           previewText: template.previewText,
-          isCurrent: true,
+          isCurrent: false, // Snapshots are NOT current - template is current
           parentVersionId: template.currentVersionId,
           createdBy: ctx.session.user.id,
           metadata: template.styleDefinitions
@@ -959,21 +976,11 @@ export const templateRouter = router({
         },
       });
 
-      // 5. Mark previous version as not current
-      if (latestVersion && latestVersion.isCurrent) {
-        await ctx.db.templateVersion.update({
-          where: { id: latestVersion.id },
-          data: { isCurrent: false },
-        });
-      }
+      // NOTE: We do NOT update template.currentVersionId here
+      // Snapshots are historical records, not the current state
+      // Only restoreVersion should update currentVersionId
 
-      // 6. Update template's currentVersionId
-      await ctx.db.template.update({
-        where: { id: input.templateId },
-        data: { currentVersionId: newVersion.id },
-      });
-
-      logger.info("📦 [Template] Version created:", {
+      logger.info("📦 [Template] Version snapshot created:", {
         templateId: input.templateId,
         versionId: newVersion.id,
         versionNumber: nextVersionNumber,
@@ -1205,5 +1212,419 @@ export const templateRouter = router({
       });
 
       return libraryTemplate;
+    }),
+
+  /**
+   * Get all published templates for current organization
+   */
+  getPublishedTemplates: protectedProcedure
+    .input(
+      z.object({
+        search: z.string().optional(),
+        category: z.string().optional(),
+        sortBy: z.enum(["newest", "oldest", "name_asc", "name_desc"]).optional().default("newest"),
+      })
+    )
+    .query(async ({ ctx, input }) => {
+      if (!ctx.activeOrganization) {
+        throw new Error("No active organization");
+      }
+
+      // Build where clause
+      const where: any = {
+        deletedAt: null,
+        sourceTemplate: {
+          organizationId: ctx.activeOrganization.id,
+          deletedAt: null,
+        },
+      };
+
+      // Search filter
+      if (input.search) {
+        where.OR = [
+          { name: { contains: input.search, mode: "insensitive" } },
+          { description: { contains: input.search, mode: "insensitive" } },
+          { tags: { hasSome: [input.search] } },
+        ];
+      }
+
+      // Category filter
+      if (input.category) {
+        where.category = input.category;
+      }
+
+      // Build orderBy
+      let orderBy: any = { createdAt: "desc" };
+      switch (input.sortBy) {
+        case "oldest":
+          orderBy = { createdAt: "asc" };
+          break;
+        case "name_asc":
+          orderBy = { name: "asc" };
+          break;
+        case "name_desc":
+          orderBy = { name: "desc" };
+          break;
+      }
+
+      const publishedTemplates = await ctx.db.templateLibrary.findMany({
+        where,
+        orderBy,
+        include: {
+          sourceTemplate: {
+            select: {
+              id: true,
+              name: true,
+              updatedAt: true,
+            },
+          },
+          _count: {
+            select: {
+              customizations: true, // Count of remixes
+            },
+          },
+        },
+      });
+
+      return publishedTemplates;
+    }),
+
+  /**
+   * Get library entry for a specific template (check if published)
+   */
+  getLibraryEntryForTemplate: protectedProcedure
+    .input(
+      z.object({
+        templateId: z.string(),
+      })
+    )
+    .query(async ({ ctx, input }) => {
+      // Verify user has access to template
+      const template = await ctx.db.template.findUnique({
+        where: { id: input.templateId },
+      });
+
+      if (!template) {
+        throw new TRPCError({
+          code: "NOT_FOUND",
+          message: "Template not found",
+        });
+      }
+
+      const isMember = await checkMembership(
+        ctx.db,
+        ctx.session.user.id,
+        template.organizationId
+      );
+
+      if (!isMember) {
+        throw new TRPCError({
+          code: "FORBIDDEN",
+          message: "You do not have access to this template",
+        });
+      }
+
+      // Get library entry
+      const libraryEntry = await ctx.db.templateLibrary.findFirst({
+        where: {
+          templateId: input.templateId,
+          deletedAt: null,
+        },
+        include: {
+          _count: {
+            select: {
+              customizations: true,
+            },
+          },
+        },
+      });
+
+      return libraryEntry;
+    }),
+
+  /**
+   * Update library entry metadata
+   */
+  updateLibraryEntry: protectedProcedure
+    .input(
+      z.object({
+        libraryId: z.string(),
+        name: z.string().optional(),
+        description: z.string().optional(),
+        subject: z.string().optional(),
+        category: z.string().optional(),
+        tags: z.array(z.string()).optional(),
+        isPremium: z.boolean().optional(),
+        regenerateThumbnail: z.boolean().optional(),
+      })
+    )
+    .mutation(async ({ ctx, input }) => {
+      // Get library entry with source template
+      const libraryEntry = await ctx.db.templateLibrary.findUnique({
+        where: { id: input.libraryId },
+        include: {
+          sourceTemplate: true,
+        },
+      });
+
+      if (!libraryEntry) {
+        throw new TRPCError({
+          code: "NOT_FOUND",
+          message: "Library entry not found",
+        });
+      }
+
+      if (!libraryEntry.sourceTemplate) {
+        throw new TRPCError({
+          code: "NOT_FOUND",
+          message: "Source template not found",
+        });
+      }
+
+      // Verify ownership
+      const isMember = await checkMembership(
+        ctx.db,
+        ctx.session.user.id,
+        libraryEntry.sourceTemplate.organizationId
+      );
+
+      if (!isMember) {
+        throw new TRPCError({
+          code: "FORBIDDEN",
+          message: "You do not have access to this library entry",
+        });
+      }
+
+      // Regenerate thumbnail if requested
+      let thumbnailUrl = libraryEntry.thumbnail;
+      if (input.regenerateThumbnail && libraryEntry.htmlCode) {
+        thumbnailUrl = await generateTemplateScreenshot({
+          templateId: libraryEntry.sourceTemplate.id,
+          htmlCode: libraryEntry.htmlCode,
+        });
+      }
+
+      // Update library entry
+      const updated = await ctx.db.templateLibrary.update({
+        where: { id: input.libraryId },
+        data: {
+          name: input.name,
+          description: input.description,
+          subject: input.subject,
+          category: input.category,
+          tags: input.tags,
+          isPremium: input.isPremium,
+          thumbnail: thumbnailUrl,
+        },
+      });
+
+      return updated;
+    }),
+
+  /**
+   * Update library entry from source template (sync latest changes)
+   */
+  updateLibraryFromSource: protectedProcedure
+    .input(
+      z.object({
+        libraryId: z.string(),
+      })
+    )
+    .mutation(async ({ ctx, input }) => {
+      // Get library entry with source template
+      const libraryEntry = await ctx.db.templateLibrary.findUnique({
+        where: { id: input.libraryId },
+        include: {
+          sourceTemplate: true,
+        },
+      });
+
+      if (!libraryEntry) {
+        throw new TRPCError({
+          code: "NOT_FOUND",
+          message: "Library entry not found",
+        });
+      }
+
+      if (!libraryEntry.sourceTemplate) {
+        throw new TRPCError({
+          code: "NOT_FOUND",
+          message: "Source template not found or has been deleted",
+        });
+      }
+
+      // Verify ownership
+      const isMember = await checkMembership(
+        ctx.db,
+        ctx.session.user.id,
+        libraryEntry.sourceTemplate.organizationId
+      );
+
+      if (!isMember) {
+        throw new TRPCError({
+          code: "FORBIDDEN",
+          message: "You do not have access to this library entry",
+        });
+      }
+
+      const sourceTemplate = libraryEntry.sourceTemplate;
+
+      // Generate new thumbnail
+      const thumbnailUrl = sourceTemplate.htmlCode
+        ? await generateTemplateScreenshot({
+            templateId: sourceTemplate.id,
+            htmlCode: sourceTemplate.htmlCode,
+          })
+        : libraryEntry.thumbnail;
+
+      // Update library entry with source template data
+      const updated = await ctx.db.templateLibrary.update({
+        where: { id: input.libraryId },
+        data: {
+          reactEmailCode: sourceTemplate.reactEmailCode,
+          htmlCode: sourceTemplate.htmlCode,
+          styleType: sourceTemplate.styleType,
+          styleDefinitions: sourceTemplate.styleDefinitions as any,
+          previewText: sourceTemplate.previewText,
+          thumbnail: thumbnailUrl,
+          // Note: We don't update name/description/category automatically
+          // User can update those separately via updateLibraryEntry
+        },
+      });
+
+      return {
+        updated,
+        changes: {
+          codeUpdated: true,
+          thumbnailRegenerated: !!thumbnailUrl,
+        },
+      };
+    }),
+
+  /**
+   * Unpublish template (soft delete from library)
+   */
+  unpublishTemplate: protectedProcedure
+    .input(
+      z.object({
+        libraryId: z.string(),
+      })
+    )
+    .mutation(async ({ ctx, input }) => {
+      // Get library entry with source template
+      const libraryEntry = await ctx.db.templateLibrary.findUnique({
+        where: { id: input.libraryId },
+        include: {
+          sourceTemplate: true,
+          _count: {
+            select: {
+              customizations: true,
+            },
+          },
+        },
+      });
+
+      if (!libraryEntry) {
+        throw new TRPCError({
+          code: "NOT_FOUND",
+          message: "Library entry not found",
+        });
+      }
+
+      if (!libraryEntry.sourceTemplate) {
+        throw new TRPCError({
+          code: "NOT_FOUND",
+          message: "Source template not found",
+        });
+      }
+
+      // Verify ownership
+      const isMember = await checkMembership(
+        ctx.db,
+        ctx.session.user.id,
+        libraryEntry.sourceTemplate.organizationId
+      );
+
+      if (!isMember) {
+        throw new TRPCError({
+          code: "FORBIDDEN",
+          message: "You do not have access to this library entry",
+        });
+      }
+
+      // Soft delete (set deletedAt)
+      await ctx.db.templateLibrary.update({
+        where: { id: input.libraryId },
+        data: {
+          deletedAt: new Date(),
+        },
+      });
+
+      return {
+        success: true,
+        remixCount: libraryEntry._count.customizations,
+      };
+    }),
+
+  /**
+   * Permanently delete library entry
+   */
+  deleteLibraryEntry: protectedProcedure
+    .input(
+      z.object({
+        libraryId: z.string(),
+      })
+    )
+    .mutation(async ({ ctx, input }) => {
+      // Get library entry with source template
+      const libraryEntry = await ctx.db.templateLibrary.findUnique({
+        where: { id: input.libraryId },
+        include: {
+          sourceTemplate: true,
+          _count: {
+            select: {
+              customizations: true,
+            },
+          },
+        },
+      });
+
+      if (!libraryEntry) {
+        throw new TRPCError({
+          code: "NOT_FOUND",
+          message: "Library entry not found",
+        });
+      }
+
+      if (!libraryEntry.sourceTemplate) {
+        throw new TRPCError({
+          code: "NOT_FOUND",
+          message: "Source template not found",
+        });
+      }
+
+      // Verify ownership
+      const isMember = await checkMembership(
+        ctx.db,
+        ctx.session.user.id,
+        libraryEntry.sourceTemplate.organizationId
+      );
+
+      if (!isMember) {
+        throw new TRPCError({
+          code: "FORBIDDEN",
+          message: "You do not have access to this library entry",
+        });
+      }
+
+      // Hard delete
+      await ctx.db.templateLibrary.delete({
+        where: { id: input.libraryId },
+      });
+
+      return {
+        success: true,
+        remixCount: libraryEntry._count.customizations,
+      };
     }),
 });

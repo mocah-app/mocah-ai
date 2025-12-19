@@ -16,8 +16,9 @@ import {
   SidebarTrigger,
   useSidebar,
 } from "@/components/ui/sidebar";
-import { navigationConfig } from "@/config/navigation";
+import { navigationConfig, type NavLink } from "@/config/navigation";
 import { cn } from "@/lib/utils";
+import { trpc } from "@/utils/trpc";
 import { HelpCircle } from "lucide-react";
 import type { Route } from "next";
 import Link from "next/link";
@@ -28,11 +29,25 @@ import { WorkspaceSwitcher } from "../workspace-switcher";
 export function DashboardSidebar() {
   const pathname = usePathname();
   const { state, isMobile, open } = useSidebar();
+
+  // Check if user can publish to library
+  const { data: canPublish } = trpc.template.canPublishToLibrary.useQuery();
+
   const isActive = (href: string) => {
     if (href === "/app") {
       return pathname === href;
     }
     return pathname.startsWith(href);
+  };
+
+  // Filter links based on publisher permission
+  const filterLinks = (links: NavLink[]) => {
+    return links.filter(link => {
+      if (link.requiresPublisher && !canPublish) {
+        return false;
+      }
+      return true;
+    });
   };
 
   return (
@@ -57,57 +72,100 @@ export function DashboardSidebar() {
 
       <SidebarContent>
         {/* Main Navigation */}
-        {navigationConfig.mainNav.map((section, sectionIndex) => (
-          <SidebarGroup key={sectionIndex}>
-            {section.title && (
-              <SidebarGroupLabel>{section.title}</SidebarGroupLabel>
-            )}
-            <SidebarGroupContent>
-              <SidebarMenu>
-                {section.links.map((link) => (
-                  <SidebarMenuItem key={link.href}>
-                    <SidebarMenuButton
-                      asChild
-                      isActive={isActive(link.href)}
-                      tooltip={link.label}
-                    >
-                      <Link href={link.href as Route}>
-                        {link.icon && <link.icon />}
-                        <span>{link.label}</span>
-                      </Link>
-                    </SidebarMenuButton>
-                  </SidebarMenuItem>
-                ))}
-              </SidebarMenu>
-            </SidebarGroupContent>
-          </SidebarGroup>
-        ))}
+        {navigationConfig.mainNav.map((section, sectionIndex) => {
+          const filteredLinks = filterLinks(section.links);
+          if (filteredLinks.length === 0) return null;
 
+          return (
+            <SidebarGroup key={sectionIndex}>
+              {section.title && (
+                <SidebarGroupLabel>{section.title}</SidebarGroupLabel>
+              )}
+              <SidebarGroupContent>
+                <SidebarMenu>
+                  {filteredLinks.map((link) => (
+                    <SidebarMenuItem key={link.href}>
+                      <SidebarMenuButton
+                        asChild
+                        isActive={isActive(link.href)}
+                        tooltip={link.label}
+                      >
+                        <Link href={link.href as Route}>
+                          {link.icon && <link.icon />}
+                          <span>{link.label}</span>
+                        </Link>
+                      </SidebarMenuButton>
+                    </SidebarMenuItem>
+                  ))}
+                </SidebarMenu>
+              </SidebarGroupContent>
+            </SidebarGroup>
+          );
+        })}
+
+        {/* Collection Navigation */}
+        {(() => {
+          const filteredLinks = filterLinks(navigationConfig.collectionNav.links);
+          if (filteredLinks.length === 0) return null;
+
+          return (
+            <SidebarGroup>
+              <SidebarGroupLabel>
+                {navigationConfig.collectionNav.title}
+              </SidebarGroupLabel>
+              <SidebarGroupContent>
+                <SidebarMenu>
+                  {filteredLinks.map((link) => (
+                    <SidebarMenuItem key={link.href}>
+                      <SidebarMenuButton
+                        asChild
+                        isActive={isActive(link.href)}
+                        tooltip={link.label}
+                      >
+                        <Link href={link.href as Route}>
+                          {link.icon && <link.icon />}
+                          <span>{link.label}</span>
+                        </Link>
+                      </SidebarMenuButton>
+                    </SidebarMenuItem>
+                  ))}
+                </SidebarMenu>
+              </SidebarGroupContent>
+            </SidebarGroup>
+          );
+        })()}
 
         {/* Private */}
-        <SidebarGroup>
-          <SidebarGroupLabel>
-            {navigationConfig.privateNav.title}
-          </SidebarGroupLabel>
-          <SidebarGroupContent>
-            <SidebarMenu>
-              {navigationConfig.privateNav.links.map((link) => (
-                <SidebarMenuItem key={link.href}>
-                  <SidebarMenuButton
-                    asChild
-                    isActive={isActive(link.href)}
-                    tooltip={link.label}
-                  >
-                    <Link href={link.href as Route}>
-                      {link.icon && <link.icon />}
-                      <span>{link.label}</span>
-                    </Link>
-                  </SidebarMenuButton>
-                </SidebarMenuItem>
-              ))}
-            </SidebarMenu>
-          </SidebarGroupContent>
-        </SidebarGroup>
+        {(() => {
+          const filteredLinks = filterLinks(navigationConfig.privateNav.links);
+          if (filteredLinks.length === 0) return null;
+
+          return (
+            <SidebarGroup>
+              <SidebarGroupLabel>
+                {navigationConfig.privateNav.title}
+              </SidebarGroupLabel>
+              <SidebarGroupContent>
+                <SidebarMenu>
+                  {filteredLinks.map((link) => (
+                    <SidebarMenuItem key={link.href}>
+                      <SidebarMenuButton
+                        asChild
+                        isActive={isActive(link.href)}
+                        tooltip={link.label}
+                      >
+                        <Link href={link.href as Route}>
+                          {link.icon && <link.icon />}
+                          <span>{link.label}</span>
+                        </Link>
+                      </SidebarMenuButton>
+                    </SidebarMenuItem>
+                  ))}
+                </SidebarMenu>
+              </SidebarGroupContent>
+            </SidebarGroup>
+          );
+        })()}
       </SidebarContent>
 
       <SidebarFooter>

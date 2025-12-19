@@ -46,6 +46,13 @@ interface TemplateState {
   validationError: ValidationError | null; // When AI generates code that fails validation
   error: TemplateError; // Template-level error (not found, load failed, etc.)
 
+  // Version preview mode (Figma-style)
+  previewingVersionId: string | null; // When not null, user is previewing a historical version
+  previewVersionData: {
+    reactEmailCode: string | null;
+    styleDefinitions: Record<string, React.CSSProperties>;
+  } | null;
+
   // React Email specific state
   reactEmailCode: string | null;
   styleDefinitions: Record<string, React.CSSProperties>;
@@ -67,6 +74,11 @@ export interface TemplateActions {
   setIsDirty: (dirty: boolean) => void;
   onPreviewRenderComplete: () => void; // Called when preview finishes rendering
   clearValidationError: () => void; // Clear validation error state
+  
+  // Version preview actions (Figma-style)
+  previewVersion: (versionId: string) => void; // Preview a version without committing
+  restoreVersion: (versionId: string) => Promise<void>; // Restore previewed version as current
+  cancelVersionPreview: () => void; // Exit preview mode
   
   // React Email specific actions
   updateReactEmailCode: (code: string, styleDefinitions?: Record<string, React.CSSProperties>) => void;
@@ -114,6 +126,8 @@ export function TemplateProvider({
     waitingForRender: false,
     validationError: null,
     error: null,
+    previewingVersionId: null,
+    previewVersionData: null,
     reactEmailCode: null,
     styleDefinitions: {},
   });
@@ -980,6 +994,139 @@ export function TemplateProvider({
     }));
   }, []);
 
+  // Preview a version without committing (instant, no API call)
+  const previewVersion = useCallback((versionId: string) => {
+    // Find the version in already-loaded data
+    const version = state.versions.find((v) => v.id === versionId);
+    
+    if (!version) {
+      logger.warn("[TemplateProvider] Version not found for preview", { versionId });
+      return;
+    }
+
+    logger.info("[TemplateProvider] Previewing version", { versionId });
+
+    // Store current state if not already previewing
+    if (!state.previewingVersionId) {
+      setState((prev) => ({
+        ...prev,
+        previewingVersionId: versionId,
+        previewVersionData: {
+          reactEmailCode: version.reactEmailCode || null,
+          styleDefinitions: (version.styleDefinitions as Record<string, React.CSSProperties>) || {},
+        },
+      }));
+    } else {
+      // Already previewing, just switch to different version
+      setState((prev) => ({
+        ...prev,
+        previewingVersionId: versionId,
+        previewVersionData: {
+          reactEmailCode: version.reactEmailCode || null,
+          styleDefinitions: (version.styleDefinitions as Record<string, React.CSSProperties>) || {},
+        },
+      }));
+    }
+  }, [state.versions, state.previewingVersionId]);
+
+  // Restore the previewed version as the current version
+  const restoreVersion = useCallback(async (versionId: string) => {
+    if (!templateId) {
+      throw new Error("No template ID available");
+    }
+
+    // Capture version data from current state before async operations
+    let versionToRestore: TemplateVersion | undefined;
+    setState((prev) => {
+      versionToRestore = prev.versions.find((v) => v.id === versionId);
+      return {
+        ...prev,
+        isSwitchingVersion: true,
+      };
+    });
+
+    if (!versionToRestore) {
+      setState((prev) => ({ ...prev, isSwitchingVersion: false }));
+      throw new Error(`Version ${versionId} not found`);
+    }
+
+    try {
+      logger.info("[TemplateProvider] Restoring version", { versionId });
+
+      // 1. Create snapshot of CURRENT template state before restoring
+      try {
+        await createVersionMutation.mutateAsync({
+          templateId,
+          name: undefined,
+          changeNote: "Auto-save before version restore",
+        });
+        logger.info("[TemplateProvider] Created snapshot before restore");
+      } catch (versionError) {
+        logger.warn("[TemplateProvider] Failed to create snapshot before restore");
+      }
+
+      // 2. Generate HTML for the restored version
+      let htmlCode: string | undefined;
+      if (versionToRestore.reactEmailCode) {
+        try {
+          const { renderReactEmailClientSide } = await import("@/lib/react-email/client-renderer");
+          htmlCode = await renderReactEmailClientSide(versionToRestore.reactEmailCode, { skipCache: false });
+        } catch (renderError) {
+          logger.warn("[TemplateProvider] Failed to generate HTML for restored version");
+        }
+      }
+
+      // 3. Clear preview mode FIRST (before update) so the canvas will re-render with new data
+      setState((prev) => ({
+        ...prev,
+        previewingVersionId: null,
+        previewVersionData: null,
+      }));
+
+      // 4. Update template with the VERSION's data (not just the pointer!)
+      await updateMutation.mutateAsync({
+        id: templateId,
+        reactEmailCode: versionToRestore.reactEmailCode,
+        htmlCode: htmlCode,
+        styleDefinitions: versionToRestore.styleDefinitions,
+        currentVersionId: versionId, // Also update the pointer
+      } as any);
+
+      // 5. Refetch to ensure UI is in sync
+      // This will trigger the canvas update because preview is already cleared
+      await refetch();
+
+      // 6. Clear switching state
+      setState((prev) => ({
+        ...prev,
+        isSwitchingVersion: false,
+      }));
+
+      logger.info("[TemplateProvider] Version restored successfully");
+    } catch (error) {
+      logger.error("[TemplateProvider] Failed to restore version", {
+        error: error instanceof Error ? error.message : String(error),
+        versionId,
+      });
+      setState((prev) => ({
+        ...prev,
+        isSwitchingVersion: false,
+      }));
+      throw error;
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [templateId]);
+
+  // Cancel version preview and return to current state
+  const cancelVersionPreview = useCallback(() => {
+    logger.info("[TemplateProvider] Cancelling version preview");
+    setState((prev) => ({
+      ...prev,
+      previewingVersionId: null,
+      previewVersionData: null,
+    }));
+  }, []);
+
   const actions: TemplateActions = {
     loadTemplate,
     saveTemplate,
@@ -996,6 +1143,9 @@ export function TemplateProvider({
     setIsDirty,
     onPreviewRenderComplete,
     clearValidationError,
+    previewVersion,
+    restoreVersion,
+    cancelVersionPreview,
     updateReactEmailCode,
     saveReactEmailCode,
     resetReactEmailCode,
