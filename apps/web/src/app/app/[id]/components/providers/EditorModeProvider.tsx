@@ -28,7 +28,7 @@ interface EditorModeState {
   previewRenderKey: number; // Increment to force preview re-render
 }
 
-interface EditorModeActions {
+export interface EditorModeActions {
   setGlobalMode: (mode: EditorMode) => void;
   setNodeMode: (nodeId: string, mode: EditorMode) => void;
   selectElement: (path: string | null) => void;
@@ -39,6 +39,7 @@ interface EditorModeActions {
   // Pending changes management
   setPendingChanges: (changes: PendingElementChanges | null) => void;
   updatePendingChanges: (updates: ElementUpdates) => void;
+  updatePendingChangesForElement: (elementId: string, updates: ElementUpdates, originalElement?: string) => void;
   hasPendingChanges: () => boolean;
   hasAnyPendingChanges: () => boolean;
   clearPendingChanges: () => void;
@@ -235,6 +236,67 @@ export function EditorModeProvider({ children }: { children: React.ReactNode }) 
     return state.allPendingChanges.get(elementId);
   }, [state.allPendingChanges]);
 
+  // Update pending changes for a specific element (used by undo/redo)
+  const updatePendingChangesForElement = useCallback(
+    (elementId: string, updates: ElementUpdates, originalElement?: string) => {
+      setState((prev) => {
+        // Get existing changes for this specific element
+        const existingElementChanges = prev.allPendingChanges.get(elementId);
+
+        // Merge with existing pending changes
+        const mergedUpdates: ElementUpdates = {
+          content: updates.content ?? existingElementChanges?.updates.content,
+          styles: {
+            ...existingElementChanges?.updates.styles,
+            ...updates.styles,
+          },
+          attributes: {
+            ...existingElementChanges?.updates.attributes,
+            ...updates.attributes,
+          },
+        };
+
+        // Clean up empty objects
+        if (mergedUpdates.styles && Object.keys(mergedUpdates.styles).length === 0) {
+          delete mergedUpdates.styles;
+        }
+        if (mergedUpdates.attributes && Object.keys(mergedUpdates.attributes).length === 0) {
+          delete mergedUpdates.attributes;
+        }
+
+        const newPendingChange: PendingElementChanges = {
+          elementId,
+          updates: mergedUpdates,
+          originalElement: originalElement || existingElementChanges?.originalElement || '',
+        };
+
+        // Update the Map with changes for this element
+        const newAllPendingChanges = new Map(prev.allPendingChanges);
+        newAllPendingChanges.set(elementId, newPendingChange);
+
+        // Check if this is the currently selected element
+        let isSelectedElement = false;
+        if (prev.selectedElement) {
+          try {
+            const parsed = JSON.parse(prev.selectedElement);
+            isSelectedElement = parsed.id === elementId;
+          } catch {
+            // If parsing fails, check if selectedElement is the elementId itself
+            isSelectedElement = prev.selectedElement === elementId;
+          }
+        }
+
+        return {
+          ...prev,
+          // Update pendingChanges if this is the currently selected element
+          pendingChanges: isSelectedElement ? newPendingChange : prev.pendingChanges,
+          allPendingChanges: newAllPendingChanges,
+        };
+      });
+    },
+    []
+  );
+
   const refreshPreview = useCallback(() => {
     setState((prev) => ({
       ...prev,
@@ -284,6 +346,7 @@ export function EditorModeProvider({ children }: { children: React.ReactNode }) 
     setDesignMode,
     setPendingChanges,
     updatePendingChanges,
+    updatePendingChangesForElement,
     hasPendingChanges,
     hasAnyPendingChanges,
     clearPendingChanges,

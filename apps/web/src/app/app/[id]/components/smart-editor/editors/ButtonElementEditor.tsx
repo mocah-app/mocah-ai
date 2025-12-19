@@ -9,6 +9,7 @@ import {
   ColorSection,
   LinkSection,
   LayoutSection,
+  BorderSection,
 } from '../sections';
 import { PropertySection, ColorControl, SelectControl } from '../controls';
 import { BACKGROUND_COLOR_PRESETS, WIDTH_PRESETS } from '../constants/editor-constants';
@@ -117,8 +118,16 @@ export function ButtonElementEditor({
         showBorderRadius={true}
       />
 
-            {/* Size Section */}
-            <PropertySection label="Size">
+      {/* Border */}
+      <BorderSection
+        borderWidth={(currentStyles.borderWidth as string) ?? ''}
+        borderColor={(currentStyles.borderColor as string) ?? ''}
+        onChange={handleStyleChange}
+        brandColors={brandColors}
+      />
+
+      {/* Size Section */}
+      <PropertySection label="Size">
         <SelectControl
           label="Max Width"
           value={currentStyles.maxWidth as string}
@@ -127,7 +136,6 @@ export function ButtonElementEditor({
           placeholder="None"
         />
       </PropertySection>
-
     </div>
   );
 }

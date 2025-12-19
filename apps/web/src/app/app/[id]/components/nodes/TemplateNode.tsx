@@ -88,12 +88,23 @@ export function TemplateNode({ data, id }: TemplateNodeProps) {
               </p>
             </div>
           )}
+          {/* Show loading overlay when switching versions */}
+          {templateState.isSwitchingVersion && (
+            <div className="absolute inset-0 bg-background/80 backdrop-blur-sm z-10 flex flex-col items-center justify-center">
+              <div className="relative mb-4">
+                <MocahLoadingIcon isLoading={true} size="sm" />
+              </div>
+              <p className="text-muted-foreground text-sm animate-pulse">
+                Switching to version...
+              </p>
+            </div>
+          )}
           {mode === "view" ? (
             <ViewModeContent template={data.template} />
           ) : (
-            <CodeModeContent 
-              template={data.template} 
-              nodeId={nodeId} 
+            <CodeModeContent
+              template={data.template}
+              nodeId={nodeId}
               hasUnsavedSmartEditorChanges={hasSmartEditorPendingChanges}
               onSaveSmartEditorChanges={onSaveSmartEditorChanges}
               onResetSmartEditorChanges={onResetSmartEditorChanges}

@@ -4,7 +4,7 @@ import React from 'react';
 import type { ElementData, ElementUpdates } from '@/lib/react-email';
 import type { BrandColors } from '../EditorShell';
 import { PropertySection, ToggleGroupControl, SelectControl, TextInputControl } from '../controls';
-import { BackgroundSection, LayoutSection } from '../sections';
+import { BackgroundSection, LayoutSection, BorderSection } from '../sections';
 import { TEXT_ALIGNMENTS, WIDTH_PRESETS } from '../constants/editor-constants';
 
 interface LayoutElementEditorProps {
@@ -86,11 +86,13 @@ export function LayoutElementEditor({
           onChange={(v) => handleStyleChange('textAlign', v)}
         />
       </PropertySection>
-{/* Layout (padding, margin) */}
+{/* Layout (padding, margin, border-radius) */}
       <LayoutSection
         padding={currentStyles.padding as string}
         margin={currentStyles.margin as string}
+        borderRadius={currentStyles.borderRadius as string}
         onChange={handleStyleChange}
+        showBorderRadius={true}
       />
       {/* Background */}
       <BackgroundSection
@@ -99,8 +101,13 @@ export function LayoutElementEditor({
         brandColors={brandColors}
         currentStyles={currentStyles}
       />
-
-      
+      {/* Border */}
+      <BorderSection
+        borderWidth={currentStyles.borderWidth as string}
+        borderColor={currentStyles.borderColor as string}
+        onChange={handleStyleChange}
+        brandColors={brandColors}
+      />
     </div>
   );
 }

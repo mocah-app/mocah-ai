@@ -38,23 +38,32 @@ interface TemplateState {
   brandKit: BrandKit | null;
   isDirty: boolean;
   isLoading: boolean;
+  isSwitchingVersion: boolean; // True when switching to a different version
   isStreaming: boolean;
   streamingProgress: StreamingProgress | null;
   generationPhase: GenerationPhase;
   waitingForRender: boolean; // True when waiting for preview to render after generation
   validationError: ValidationError | null; // When AI generates code that fails validation
   error: TemplateError; // Template-level error (not found, load failed, etc.)
-  
+
+  // Version preview mode (Figma-style)
+  previewingVersionId: string | null; // When not null, user is previewing a historical version
+  previewVersionData: {
+    reactEmailCode: string | null;
+    styleDefinitions: Record<string, React.CSSProperties>;
+  } | null;
+
   // React Email specific state
   reactEmailCode: string | null;
   styleDefinitions: Record<string, React.CSSProperties>;
 }
 
-interface TemplateActions {
+export interface TemplateActions {
   loadTemplate: (id: string) => Promise<void>;
   saveTemplate: () => Promise<void>;
-  createVersion: (name?: string) => Promise<void>;
-  switchVersion: (versionId: string) => void;
+  createVersion: (name?: string, changeNote?: string) => Promise<any>;
+  switchVersion: (versionId: string) => void; // Legacy - kept for backward compat
+  switchToVersion: (versionId: string) => Promise<void>;
   deleteVersion: (versionId: string) => Promise<void>;
   updateElement: (elementPath: string, data: any) => void;
   regenerateElement: (elementPath: string, prompt: string) => Promise<void>;
@@ -65,6 +74,11 @@ interface TemplateActions {
   setIsDirty: (dirty: boolean) => void;
   onPreviewRenderComplete: () => void; // Called when preview finishes rendering
   clearValidationError: () => void; // Clear validation error state
+  
+  // Version preview actions (Figma-style)
+  previewVersion: (versionId: string) => void; // Preview a version without committing
+  restoreVersion: (versionId: string) => Promise<void>; // Restore previewed version as current
+  cancelVersionPreview: () => void; // Exit preview mode
   
   // React Email specific actions
   updateReactEmailCode: (code: string, styleDefinitions?: Record<string, React.CSSProperties>) => void;
@@ -105,12 +119,15 @@ export function TemplateProvider({
     brandKit: null,
     isDirty: false,
     isLoading: false,
+    isSwitchingVersion: false,
     isStreaming: false,
     streamingProgress: null,
     generationPhase: 'idle',
     waitingForRender: false,
     validationError: null,
     error: null,
+    previewingVersionId: null,
+    previewVersionData: null,
     reactEmailCode: null,
     styleDefinitions: {},
   });
@@ -238,6 +255,17 @@ export function TemplateProvider({
           generationPhase: 'complete',
           validationError: null, // Clear any previous validation errors
         }));
+
+        // Create version snapshot in background (non-blocking)
+        if (templateId) {
+          createVersionMutation.mutateAsync({
+            templateId,
+            name: undefined, // Auto-generated name
+            changeNote: "AI generation",
+          }).catch(err => {
+            logger.warn("[TemplateProvider] Failed to create version after AI generation");
+          });
+        }
 
         // Refetch to get the latest data
         await refetch();
@@ -384,6 +412,17 @@ export function TemplateProvider({
           validationError: null, // Clear any previous validation errors
         }));
 
+        // Create version snapshot in background (non-blocking)
+        if (templateId) {
+          createVersionMutation.mutateAsync({
+            templateId,
+            name: undefined, // Auto-generated name
+            changeNote: "AI regeneration",
+          }).catch(err => {
+            logger.warn("[TemplateProvider] Failed to create version after AI regeneration");
+          });
+        }
+
         // Refetch to get the latest data
         await refetch();
       } catch (error) {
@@ -475,6 +514,15 @@ export function TemplateProvider({
       // Invalidate the specific template query to ensure fresh data on refetch
       if (templateId) {
         utils.template.get.invalidate({ id: templateId });
+      }
+    },
+  });
+
+  const createVersionMutation = trpc.template.createVersion.useMutation({
+    onSuccess: () => {
+      // Invalidate versions cache so VersionHistoryPanel updates immediately
+      if (templateId) {
+        utils.template.versions.invalidate({ templateId });
       }
     },
   });
@@ -598,23 +646,96 @@ export function TemplateProvider({
   }, [state.currentTemplate, state.reactEmailCode, state.styleDefinitions, updateMutation]);
 
   const createVersion = useCallback(
-    async (name?: string) => {
-      if (!state.currentTemplate) return;
+    async (name?: string, changeNote?: string) => {
+      if (!templateId) {
+        throw new Error("No template ID available");
+      }
 
       try {
-        // Placeholder - will be replaced with actual tRPC call
-        // const newVersion = await api.template.createVersion.mutate({ templateId: state.currentTemplate.id, name });
-        console.log("Creating version:", name);
+        const newVersion = await createVersionMutation.mutateAsync({
+          templateId,
+          name,
+          changeNote,
+        });
+
+        logger.info("[TemplateProvider] Version created");
+
+        // Refetch to update versions list
+        await refetch();
+
+        return newVersion;
       } catch (error) {
-        console.error("Failed to create version:", error);
+        logger.error("[TemplateProvider] Failed to create version");
+        throw error;
       }
     },
-    [state.currentTemplate]
+    [templateId, createVersionMutation, refetch]
   );
 
-  const switchVersion = useCallback((versionId: string) => {
-    setState((prev) => ({ ...prev, currentVersion: versionId }));
-  }, []);
+  const switchToVersion = useCallback(
+    async (versionId: string) => {
+      if (!templateId) {
+        throw new Error("No template ID available");
+      }
+
+      // Set loading state
+      setState((prev) => ({
+        ...prev,
+        isSwitchingVersion: true,
+      }));
+
+      try {
+        // Get all versions to find the one we want to switch to
+        const templateData = await utils.template.get.fetch({ id: templateId }) as any;
+        const version = templateData?.versions?.find((v: any) => v.id === versionId);
+
+        if (!version) {
+          throw new Error(`Version ${versionId} not found`);
+        }
+
+        // Apply version data to template state
+        setState((prev) => ({
+          ...prev,
+          reactEmailCode: version.reactEmailCode || null,
+          styleDefinitions:
+            (version.styleDefinitions as Record<string, React.CSSProperties>) ||
+            {},
+          currentVersion: versionId,
+          isDirty: false, // Reset dirty state when switching versions
+        }));
+
+        // Update template's currentVersionId
+        await updateMutation.mutateAsync({
+          id: templateId,
+          currentVersionId: versionId,
+        } as any);
+
+        // Refetch to ensure UI is in sync (this will update canvas nodes via useEffect)
+        await refetch();
+
+        // Clear loading state after successful switch
+        setState((prev) => ({
+          ...prev,
+          isSwitchingVersion: false,
+        }));
+      } catch (error) {
+        logger.error("[TemplateProvider] Failed to switch version", {
+          templateId,
+          versionId,
+          error,
+        });
+
+        // Clear loading state on error
+        setState((prev) => ({
+          ...prev,
+          isSwitchingVersion: false,
+        }));
+
+        throw error;
+      }
+    },
+    [templateId, utils, updateMutation, refetch]
+  );
 
   const deleteVersion = useCallback(async (versionId: string) => {
     try {
@@ -748,27 +869,42 @@ export function TemplateProvider({
       throw new Error("No template loaded");
     }
 
+    const currentTemplateId = state.currentTemplate.id;
+
     try {
-      // Generate HTML client-side for preview caching
+      // 1. FIRST: Create a version snapshot of the CURRENT state before saving
+      // This preserves the current state as a version in history
+      try {
+        await createVersionMutation.mutateAsync({
+          templateId: currentTemplateId,
+          name: undefined, // Auto-generated name
+          changeNote: "Manual save",
+        });
+        logger.info("[TemplateProvider] Version snapshot created before save");
+      } catch (versionError) {
+        // Log but don't fail the save if version creation fails
+        logger.warn("[TemplateProvider] Failed to create version snapshot");
+      }
+
+      // 2. Generate HTML client-side for preview caching
       let htmlCode: string | undefined;
       try {
         const { renderReactEmailClientSide } = await import("@/lib/react-email/client-renderer");
         htmlCode = await renderReactEmailClientSide(code, { skipCache: false });
       } catch (renderError) {
         // Log but don't fail the save if HTML generation fails
-        logger.warn("[TemplateProvider] Failed to generate HTML for preview:", {
-          error: renderError instanceof Error ? renderError.message : String(renderError),
-        });
+        logger.warn("[TemplateProvider] Failed to generate HTML for preview");
       }
 
+      // 3. Update template with new code
       await updateMutation.mutateAsync({
-        id: state.currentTemplate.id,
+        id: currentTemplateId,
         reactEmailCode: code,
         htmlCode: htmlCode,
         styleDefinitions: styleDefinitions,
       } as any); // Type assertion needed until tRPC types regenerate
 
-      // Update local state
+      // 4. Update local state
       setState((prev) => ({
         ...prev,
         reactEmailCode: code,
@@ -776,10 +912,12 @@ export function TemplateProvider({
         isDirty: false,
       }));
 
-      // Refetch to ensure UI is in sync
+      // 5. Refetch to ensure UI is in sync (includes updated versions list)
       await refetch();
+
+      logger.info("[TemplateProvider] Code saved successfully with version snapshot");
     } catch (error) {
-      console.error("Failed to save React Email code:", error);
+      logger.error("[TemplateProvider] Failed to save React Email code");
       throw error;
     }
   }, [state.currentTemplate, updateMutation, refetch]);
@@ -856,11 +994,145 @@ export function TemplateProvider({
     }));
   }, []);
 
+  // Preview a version without committing (instant, no API call)
+  const previewVersion = useCallback((versionId: string) => {
+    // Find the version in already-loaded data
+    const version = state.versions.find((v) => v.id === versionId);
+    
+    if (!version) {
+      logger.warn("[TemplateProvider] Version not found for preview", { versionId });
+      return;
+    }
+
+    logger.info("[TemplateProvider] Previewing version", { versionId });
+
+    // Store current state if not already previewing
+    if (!state.previewingVersionId) {
+      setState((prev) => ({
+        ...prev,
+        previewingVersionId: versionId,
+        previewVersionData: {
+          reactEmailCode: version.reactEmailCode || null,
+          styleDefinitions: (version.styleDefinitions as Record<string, React.CSSProperties>) || {},
+        },
+      }));
+    } else {
+      // Already previewing, just switch to different version
+      setState((prev) => ({
+        ...prev,
+        previewingVersionId: versionId,
+        previewVersionData: {
+          reactEmailCode: version.reactEmailCode || null,
+          styleDefinitions: (version.styleDefinitions as Record<string, React.CSSProperties>) || {},
+        },
+      }));
+    }
+  }, [state.versions, state.previewingVersionId]);
+
+  // Restore the previewed version as the current version
+  const restoreVersion = useCallback(async (versionId: string) => {
+    if (!templateId) {
+      throw new Error("No template ID available");
+    }
+
+    // Capture version data from current state before async operations
+    let versionToRestore: TemplateVersion | undefined;
+    setState((prev) => {
+      versionToRestore = prev.versions.find((v) => v.id === versionId);
+      return {
+        ...prev,
+        isSwitchingVersion: true,
+      };
+    });
+
+    if (!versionToRestore) {
+      setState((prev) => ({ ...prev, isSwitchingVersion: false }));
+      throw new Error(`Version ${versionId} not found`);
+    }
+
+    try {
+      logger.info("[TemplateProvider] Restoring version", { versionId });
+
+      // 1. Create snapshot of CURRENT template state before restoring
+      try {
+        await createVersionMutation.mutateAsync({
+          templateId,
+          name: undefined,
+          changeNote: "Auto-save before version restore",
+        });
+        logger.info("[TemplateProvider] Created snapshot before restore");
+      } catch (versionError) {
+        logger.warn("[TemplateProvider] Failed to create snapshot before restore");
+      }
+
+      // 2. Generate HTML for the restored version
+      let htmlCode: string | undefined;
+      if (versionToRestore.reactEmailCode) {
+        try {
+          const { renderReactEmailClientSide } = await import("@/lib/react-email/client-renderer");
+          htmlCode = await renderReactEmailClientSide(versionToRestore.reactEmailCode, { skipCache: false });
+        } catch (renderError) {
+          logger.warn("[TemplateProvider] Failed to generate HTML for restored version");
+        }
+      }
+
+      // 3. Clear preview mode FIRST (before update) so the canvas will re-render with new data
+      setState((prev) => ({
+        ...prev,
+        previewingVersionId: null,
+        previewVersionData: null,
+      }));
+
+      // 4. Update template with the VERSION's data (not just the pointer!)
+      await updateMutation.mutateAsync({
+        id: templateId,
+        reactEmailCode: versionToRestore.reactEmailCode,
+        htmlCode: htmlCode,
+        styleDefinitions: versionToRestore.styleDefinitions,
+        currentVersionId: versionId, // Also update the pointer
+      } as any);
+
+      // 5. Refetch to ensure UI is in sync
+      // This will trigger the canvas update because preview is already cleared
+      await refetch();
+
+      // 6. Clear switching state
+      setState((prev) => ({
+        ...prev,
+        isSwitchingVersion: false,
+      }));
+
+      logger.info("[TemplateProvider] Version restored successfully");
+    } catch (error) {
+      logger.error("[TemplateProvider] Failed to restore version", {
+        error: error instanceof Error ? error.message : String(error),
+        versionId,
+      });
+      setState((prev) => ({
+        ...prev,
+        isSwitchingVersion: false,
+      }));
+      throw error;
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [templateId]);
+
+  // Cancel version preview and return to current state
+  const cancelVersionPreview = useCallback(() => {
+    logger.info("[TemplateProvider] Cancelling version preview");
+    setState((prev) => ({
+      ...prev,
+      previewingVersionId: null,
+      previewVersionData: null,
+    }));
+  }, []);
+
   const actions: TemplateActions = {
     loadTemplate,
     saveTemplate,
     createVersion,
-    switchVersion,
+    switchVersion: switchToVersion,
+    switchToVersion,
     deleteVersion,
     updateElement,
     regenerateElement,
@@ -871,6 +1143,9 @@ export function TemplateProvider({
     setIsDirty,
     onPreviewRenderComplete,
     clearValidationError,
+    previewVersion,
+    restoreVersion,
+    cancelVersionPreview,
     updateReactEmailCode,
     saveReactEmailCode,
     resetReactEmailCode,

@@ -1,4 +1,4 @@
-import { BookOpenText, DollarSign, LayoutGrid, Settings2, type LucideIcon } from "lucide-react";
+import { BookmarkCheck, BookOpenText, Globe, LayoutGrid, Repeat2, Settings2, Star, type LucideIcon } from "lucide-react";
 import type { Route } from "next";
 
 export type NavLink = {
@@ -6,6 +6,7 @@ export type NavLink = {
   href: Route | string; // Route for existing routes, string for mock/future routes
   icon?: LucideIcon;
   badge?: string | number;
+  requiresPublisher?: boolean; // Flag for conditional rendering
 };
 
 export type NavSection = {
@@ -17,25 +18,44 @@ export type NavSection = {
 export const navigationConfig: {
   mainNav: NavSection[];
   privateNav: NavSection;
+  collectionNav: NavSection;
 } = {
   mainNav: [
     {
-      title: "Workspace",
+      title: "Email",
       links: [
         {
           label: "Templates",
           href: "/app",
           icon: LayoutGrid,
         },
-        {
-          label: "Library",
-          href: "/library",
-          icon: BookOpenText,
-        },
+        // {
+        //   label: "Templates",
+        //   href: "/app/published",
+        //   icon: Globe,
+        //   requiresPublisher: true,
+        // },
+       
       ],
     },
   ],
 
+  collectionNav: {
+    title: "Collections",
+    links: [
+      {
+        label: "Library",
+        href: "/library",
+        icon: BookOpenText,
+      },
+      {
+        label: "Published",
+        href: "/app/published",
+        icon: Repeat2,
+        requiresPublisher: true,
+      },
+    ],
+  },
 
   privateNav: {
     title: "Brand",

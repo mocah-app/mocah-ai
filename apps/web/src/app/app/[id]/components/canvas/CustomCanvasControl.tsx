@@ -7,6 +7,12 @@ import {
     DropdownMenuItem,
     DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import {
+    Tooltip,
+    TooltipContent,
+    TooltipProvider,
+    TooltipTrigger,
+} from "@/components/ui/tooltip";
 import { useReactFlow } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
 import {
@@ -17,6 +23,7 @@ import {
     Undo2
 } from "lucide-react";
 import React, { useState, useEffect, useCallback } from "react";
+import { useHistory } from "../providers/HistoryProvider";
 
 interface CustomCanvasControlProps {
   isHandMode?: boolean;
@@ -33,12 +40,13 @@ export function CustomCanvasControl({
 }: CustomCanvasControlProps) {
   const { zoomIn, zoomOut, fitView, getZoom, setViewport } = useReactFlow();
   const [internalZoomLevel, setInternalZoomLevel] = useState(100);
+  const { actions: historyActions, state: historyState } = useHistory();
   
   // Use external zoom level if provided, otherwise use internal state
   const zoomLevel = externalZoomLevel ?? internalZoomLevel;
 
   // Initialize zoom level on mount only
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+
   useEffect(() => {
     const currentZoom = getZoom();
     const initialZoom = Math.round(currentZoom * 100);
@@ -71,6 +79,22 @@ export function CustomCanvasControl({
     onZoomLevelChange?.(100);
   }, [setViewport, externalZoomLevel, onZoomLevelChange]);
 
+  const handleUndo = useCallback(() => {
+    if (historyState.canUndo) {
+      historyActions.undo();
+    }
+  }, [historyActions, historyState.canUndo]);
+
+  const handleRedo = useCallback(() => {
+    if (historyState.canRedo) {
+      historyActions.redo();
+    }
+  }, [historyActions, historyState.canRedo]);
+
+  const toggleMode = () => {
+    setIsHandMode(!isHandMode);
+  };
+
   // Keyboard shortcuts
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -80,6 +104,17 @@ export function CustomCanvasControl({
       if (!isCmdOrCtrl) return;
 
       switch (e.key) {
+        case 'z':
+        case 'Z':
+          e.preventDefault();
+          if (e.shiftKey) {
+            // Cmd+Shift+Z = Redo
+            handleRedo();
+          } else {
+            // Cmd+Z = Undo
+            handleUndo();
+          }
+          break;
         case '+':
         case '=':
           e.preventDefault();
@@ -103,21 +138,7 @@ export function CustomCanvasControl({
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [handleZoomIn, handleZoomOut, handleZoomTo100, handleFitView]);
-
-  const toggleMode = () => {
-    setIsHandMode(!isHandMode);
-  };
-
-  const handleUndo = () => {
-    // Implement undo logic
-    console.log("Undo");
-  };
-
-  const handleRedo = () => {
-    // Implement redo logic
-    console.log("Redo");
-  };
+  }, [handleZoomIn, handleZoomOut, handleZoomTo100, handleFitView, handleUndo, handleRedo]);
 
   return (
     <div className="flex items-center gap-2 bg-secondary/50 backdrop-blur-sm rounded-lg p-1 border border-border/50 shadow-2xl">
@@ -140,20 +161,38 @@ export function CustomCanvasControl({
       <div className="h-6 w-px bg-border" />
 
       {/* Undo/Redo */}
-      <div className="flex items-center gap-0.5">
-        <ControlButton
-          onClick={handleUndo}
-          icon={Undo2}
-          label="Undo"
-          isActive={false}
-        />
-        <ControlButton
-          onClick={handleRedo}
-          icon={Redo2}
-          label="Redo"
-          isActive={false}
-        />
-      </div>
+      <TooltipProvider delayDuration={300}>
+        <div className="flex items-center gap-0.5">
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <ControlButton
+                onClick={handleUndo}
+                icon={Undo2}
+                label="Undo"
+                isActive={false}
+                disabled={!historyState.canUndo}
+              />
+            </TooltipTrigger>
+            <TooltipContent>
+              <p>Undo (⌘Z)</p>
+            </TooltipContent>
+          </Tooltip>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <ControlButton
+                onClick={handleRedo}
+                icon={Redo2}
+                label="Redo"
+                isActive={false}
+                disabled={!historyState.canRedo}
+              />
+            </TooltipTrigger>
+            <TooltipContent>
+              <p>Redo (⌘⇧Z)</p>
+            </TooltipContent>
+          </Tooltip>
+        </div>
+      </TooltipProvider>
 
       <div className="h-6 w-px bg-border" />
 
@@ -224,6 +263,7 @@ interface ControlButtonProps {
   icon: React.ElementType;
   label: string;
   isActive: boolean;
+  disabled?: boolean;
 }
 
 function ControlButton({
@@ -231,14 +271,16 @@ function ControlButton({
   icon: Icon,
   label,
   isActive,
+  disabled = false,
 }: ControlButtonProps) {
   return (
     <Button
       variant="ghost"
       onClick={onClick}
+      disabled={disabled}
       className={`size-8 ${
         isActive ? "bg-accent text-accent-foreground" : ""
-      }`}
+      } ${disabled ? "opacity-50 cursor-not-allowed" : ""}`}
       aria-label={label}
     >
       <Icon className="size-4" />

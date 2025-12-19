@@ -1,12 +1,13 @@
 "use client";
 
-import React, { useEffect, useState, useCallback, useMemo } from "react";
+import React, { useEffect, useState, useCallback, useMemo, useRef } from "react";
 import { MousePointer } from "lucide-react";
 import type { ElementData, ElementUpdates } from "@/lib/react-email";
 import { getCurrentStyles } from "@/lib/react-email";
 import { cn } from "@/lib/utils";
 import { EditorHeader } from "./EditorHeader";
 import { useEditorMode } from "../providers/EditorModeProvider";
+import { useHistory } from "../providers/HistoryProvider";
 import {
   TextElementEditor,
   ButtonElementEditor,
@@ -48,9 +49,20 @@ export function EditorShell({
   onOpenChat,
 }: EditorShellProps) {
   const { actions: editorActions, state: editorState } = useEditorMode();
+  const { actions: historyActions } = useHistory();
   
   // Local state for accumulated changes (within current session for this element)
   const [localUpdates, setLocalUpdates] = useState<ElementUpdates>({});
+  
+  // Track previous values for undo/redo
+  const previousValuesRef = useRef<{
+    styles?: Record<string, unknown>;
+    content?: string;
+    attributes?: Record<string, unknown>;
+  }>({});
+  
+  // Debounce timer for recording property changes
+  const debounceTimerRef = useRef<NodeJS.Timeout | null>(null);
   
   // Get pending changes for the current element from the Map
   const elementPendingChanges = elementData?.id 
@@ -102,34 +114,135 @@ export function EditorShell({
     };
   }, [elementData, elementPendingChanges, localUpdates.attributes]);
 
-  // Reset local updates when element changes
+  // Reset local updates and previous values when element changes
   useEffect(() => {
     setLocalUpdates({});
-  }, [elementData?.id]);
+    // Initialize previous values with current element state
+    if (elementData) {
+      const currentStyles = getCurrentStyles(elementData, styleDefinitions);
+      previousValuesRef.current = {
+        styles: currentStyles as Record<string, unknown>,
+        content: elementData.content,
+        attributes: elementData.attributes as Record<string, unknown>,
+      };
+    } else {
+      previousValuesRef.current = {};
+    }
+    
+    // Clear debounce timer when element changes
+    if (debounceTimerRef.current) {
+      clearTimeout(debounceTimerRef.current);
+      debounceTimerRef.current = null;
+    }
+  }, [elementData?.id, styleDefinitions]);
+
+  // Record property changes to history (debounced)
+  const recordPropertyChanges = useCallback(
+    (updates: ElementUpdates) => {
+      if (!elementData) return;
+
+      // Clear existing debounce timer
+      if (debounceTimerRef.current) {
+        clearTimeout(debounceTimerRef.current);
+      }
+
+      // Set new debounce timer
+      debounceTimerRef.current = setTimeout(() => {
+        const previous = previousValuesRef.current;
+        const elementDataString = JSON.stringify(elementData);
+
+        // Record style changes
+        if (updates.styles) {
+          Object.entries(updates.styles).forEach(([property, newValue]) => {
+            const oldValue = previous.styles?.[property];
+            if (oldValue !== newValue) {
+              historyActions.recordPropertyChange(
+                elementData.id,
+                `style.${property}`,
+                oldValue,
+                newValue,
+                elementDataString
+              );
+            }
+          });
+        }
+
+        // Record content changes
+        if (updates.content !== undefined) {
+          const oldValue = previous.content;
+          if (oldValue !== updates.content) {
+            historyActions.recordPropertyChange(
+              elementData.id,
+              'content',
+              oldValue,
+              updates.content,
+              elementDataString
+            );
+          }
+        }
+
+        // Record attribute changes
+        if (updates.attributes) {
+          Object.entries(updates.attributes).forEach(([property, newValue]) => {
+            const oldValue = previous.attributes?.[property];
+            if (oldValue !== newValue) {
+              historyActions.recordPropertyChange(
+                elementData.id,
+                property,
+                oldValue,
+                newValue,
+                elementDataString
+              );
+            }
+          });
+        }
+
+        // Update previous values
+        previousValuesRef.current = {
+          styles: {
+            ...previous.styles,
+            ...(updates.styles as Record<string, unknown>),
+          },
+          content: updates.content ?? previous.content,
+          attributes: {
+            ...previous.attributes,
+            ...(updates.attributes as Record<string, unknown>),
+          },
+        };
+      }, 300); // 300ms debounce
+    },
+    [elementData, historyActions]
+  );
 
   // Handle updates from element editors
-  const handleUpdate = useCallback((updates: ElementUpdates) => {
-    if (!elementData) return;
-    
-    // Accumulate local updates
-    setLocalUpdates((prev) => ({
-      content: updates.content ?? prev.content,
-      styles: {
-        ...prev.styles,
-        ...updates.styles,
-      },
-      attributes: {
-        ...prev.attributes,
-        ...updates.attributes,
-      },
-    }));
+  const handleUpdate = useCallback(
+    (updates: ElementUpdates) => {
+      if (!elementData) return;
 
-    // Update pending changes in context (for SaveDesignEdit visibility)
-    editorActions.updatePendingChanges(updates);
-    
-    // Update preview immediately (visual feedback without saving)
-    onPreviewUpdate(elementData.id, updates);
-  }, [elementData, editorActions, onPreviewUpdate]);
+      // Accumulate local updates
+      setLocalUpdates((prev) => ({
+        content: updates.content ?? prev.content,
+        styles: {
+          ...prev.styles,
+          ...updates.styles,
+        },
+        attributes: {
+          ...prev.attributes,
+          ...updates.attributes,
+        },
+      }));
+
+      // Update pending changes in context (for SaveDesignEdit visibility)
+      editorActions.updatePendingChanges(updates);
+
+      // Update preview immediately (visual feedback without saving)
+      onPreviewUpdate(elementData.id, updates);
+
+      // Record to history (debounced)
+      recordPropertyChanges(updates);
+    },
+    [elementData, editorActions, onPreviewUpdate, recordPropertyChanges]
+  );
 
   // Build breadcrumb
   const breadcrumb = elementData

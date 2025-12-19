@@ -17,7 +17,7 @@ interface Template {
   };
 }
 
-interface TemplateListProps {
+interface TemplateGridViewProps {
   templates: Template[];
   hasNextPage: boolean;
   isFetchingNextPage: boolean;
@@ -25,13 +25,13 @@ interface TemplateListProps {
   templatesPerPage: number;
 }
 
-export function TemplateList({
+export function TemplateGridView({
   templates,
   hasNextPage,
   isFetchingNextPage,
   fetchNextPage,
   templatesPerPage,
-}: TemplateListProps) {
+}: TemplateGridViewProps) {
   const loadMoreRef = useRef<HTMLDivElement>(null);
 
   const handleObserver = useCallback(
@@ -93,3 +93,4 @@ export function TemplateList({
     </Card>
   );
 }
+
