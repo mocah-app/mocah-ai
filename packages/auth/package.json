@@ -25,6 +25,7 @@
     "@better-auth/stripe": "catalog:",
     "@mocah/config": "workspace:*",
     "@mocah/db": "workspace:*",
+    "@mocah/shared": "workspace:*",
     "better-auth": "catalog:",
     "dotenv": "catalog:",
     "resend": "^6.4.2",

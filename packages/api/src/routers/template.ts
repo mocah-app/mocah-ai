@@ -1,7 +1,12 @@
 import { z } from "zod";
 import { TRPCError } from "@trpc/server";
 import { protectedProcedure, publicProcedure, router } from "../index";
-import { organizationProcedure } from "../middleware";
+import { 
+  organizationProcedure, 
+  templateQuotaProcedure,
+  requireActiveOrganization,
+  requireTemplateGenerationQuota 
+} from "../middleware";
 import { aiClient, TEMPLATE_GENERATION_MODEL } from "../lib/ai";
 import {
   buildReactEmailPrompt,
@@ -13,6 +18,10 @@ import { validateReactEmailCode, logger } from "@mocah/shared";
 import { checkMembership } from "../lib/membership-cache";
 import { serverEnv } from "@mocah/config/env";
 import { generateTemplateScreenshot } from "../lib/screenshot";
+import {
+  getActiveTrial,
+  incrementUsage,
+} from "../lib/usage-tracking";
 
 // Valid style type values for templates
 const VALID_STYLE_TYPES = ["INLINE", "PREDEFINED_CLASSES", "STYLE_OBJECTS"] as const;
@@ -165,8 +174,11 @@ export const templateRouter = router({
 
   /**
    * Generate a new template using AI (non-streaming fallback)
+   * Uses templateQuotaProcedure + organizationProcedure for usage limit enforcement and org context
    */
-  generate: organizationProcedure
+  generate: protectedProcedure
+    .use(requireActiveOrganization)
+    .use(requireTemplateGenerationQuota)
     .input(
       z.object({
         prompt: z.string(),
@@ -255,6 +267,13 @@ export const templateRouter = router({
       }
 
       // 3. Create template
+      if (!ctx.organizationId) {
+        throw new TRPCError({
+          code: "PRECONDITION_FAILED",
+          message: "Organization context required",
+        });
+      }
+      
       const template = await ctx.db.template.create({
         data: {
           organizationId: ctx.organizationId,
@@ -294,6 +313,15 @@ export const templateRouter = router({
         data: { currentVersionId: version.id },
       });
 
+      // 6. Increment usage after successful generation
+      if (!ctx.session?.user?.id) {
+        throw new TRPCError({
+          code: "UNAUTHORIZED",
+          message: "Authentication required",
+        });
+      }
+      await incrementUsage(ctx.session.user.id, "templateGeneration");
+
       return template;
     }),
 
@@ -322,8 +350,9 @@ export const templateRouter = router({
 
   /**
    * Regenerate template content using AI (creates new version)
+   * Uses templateQuotaProcedure for usage limit enforcement
    */
-  regenerate: protectedProcedure
+  regenerate: templateQuotaProcedure
     .input(
       z.object({
         templateId: z.string(),
@@ -344,9 +373,17 @@ export const templateRouter = router({
         });
       }
 
+      if (!ctx.session?.user?.id) {
+        throw new TRPCError({
+          code: "UNAUTHORIZED",
+          message: "Authentication required",
+        });
+      }
+
+      const userId = ctx.session.user.id;
       const membership = await ctx.db.member.findFirst({
         where: {
-          userId: ctx.session.user.id,
+          userId,
           organizationId: template.organizationId,
         },
       });
@@ -387,6 +424,13 @@ export const templateRouter = router({
       );
 
       // Create new version
+      if (!ctx.session?.user?.id) {
+        throw new TRPCError({
+          code: "UNAUTHORIZED",
+          message: "Authentication required",
+        });
+      }
+      
       const version = await ctx.db.templateVersion.create({
         data: {
           templateId: input.templateId,
@@ -418,6 +462,15 @@ export const templateRouter = router({
           previewText: result.previewText,
         },
       });
+
+      // Increment usage after successful regeneration
+      if (!ctx.session?.user?.id) {
+        throw new TRPCError({
+          code: "UNAUTHORIZED",
+          message: "Authentication required",
+        });
+      }
+      await incrementUsage(ctx.session.user.id, "templateGeneration");
 
       return version;
     }),
@@ -800,6 +853,7 @@ export const templateRouter = router({
 
   /**
    * Delete a template (soft delete)
+   * Note: Template deletion is blocked during trial period
    */
   delete: protectedProcedure
     .input(
@@ -808,6 +862,20 @@ export const templateRouter = router({
       })
     )
     .mutation(async ({ ctx, input }) => {
+      // Check if user is in trial - templates cannot be deleted during trial
+      const trial = await getActiveTrial(ctx.session.user.id);
+      if (trial && trial.status === "active") {
+        throw new TRPCError({
+          code: "FORBIDDEN",
+          message:
+            "Templates cannot be deleted during trial. This preserves your trial generation count. Upgrade to manage templates freely.",
+          cause: {
+            code: "TRIAL_RESTRICTION",
+            upgradeUrl: "/pricing",
+          },
+        });
+      }
+
       // Verify access
       const template = await ctx.db.template.findUnique({
         where: { id: input.id },

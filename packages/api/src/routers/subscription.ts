@@ -4,6 +4,10 @@
  */
 
 import { TRIAL_LIMITS } from "@mocah/auth/subscription-plans";
+import {
+  cachedStripeInvoicesList,
+  setUserCustomerMapping,
+} from "@mocah/auth/stripe-sync";
 import { serverEnv } from "@mocah/config/env";
 import prisma from "@mocah/db";
 import { logger } from "@mocah/shared/logger";
@@ -69,6 +73,8 @@ async function getOrCreateStripeCustomer(
   });
 
   if (user?.stripeCustomerId) {
+    // Ensure bidirectional mapping exists (might be missing in old accounts)
+    await setUserCustomerMapping(userId, user.stripeCustomerId);
     return user.stripeCustomerId;
   }
 
@@ -86,6 +92,9 @@ async function getOrCreateStripeCustomer(
     where: { id: userId },
     data: { stripeCustomerId: customer.id },
   });
+
+  // Store bidirectional mapping for fast lookups
+  await setUserCustomerMapping(userId, customer.id);
 
   return customer.id;
 }
@@ -283,10 +292,8 @@ export const subscriptionRouter = router({
     }
 
     try {
-      const invoices = await stripe.invoices.list({
-        customer: user.stripeCustomerId,
-        limit: 12,
-      });
+      // Use cached function for better performance
+      const invoices = await cachedStripeInvoicesList(user.stripeCustomerId);
 
       return invoices.data.map((inv) => ({
         id: inv.id,

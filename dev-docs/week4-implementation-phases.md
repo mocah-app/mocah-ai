@@ -194,6 +194,24 @@ Before starting, ensure these are completed:
 - [x] `hasPriorityQueue(userId: string)` - Check priority queue access
 - [x] `getUserUsageStats(userId: string)` - Get comprehensive usage stats
 - [x] `clearUserCache(userId: string)` - Clear all cached data for user
+- [x] `canPerformAction(userId, type, amount)` - Pre-check without incrementing
+- [x] `getUsageSummary(userId)` - Returns usage with warning/critical thresholds
+
+#### Advanced Features (Added Dec 22, 2025)
+
+- [x] **Rollback Pattern** - Checks limit BEFORE committing increment, throws `UsageLimitError` if would exceed
+- [x] **Warning Thresholds** - 80% = warning, 95% = critical in `UsageSummary`
+- [x] **Auto-cleanup with `expireat`** - Redis keys auto-expire at end of billing period
+- [x] **`UsageTracker` Domain Object** - Cleaner API for common operations:
+  ```typescript
+  UsageTracker.trackTemplateGeneration(userId, count)
+  UsageTracker.trackImageGeneration(userId, count)
+  UsageTracker.canGenerateTemplate(userId)
+  UsageTracker.canGenerateImage(userId)
+  UsageTracker.isNearTemplateLimit(userId)
+  UsageTracker.isNearImageLimit(userId)
+  UsageTracker.getSummary(userId)
+  ```
 
 #### Image Model Configuration
 
@@ -393,11 +411,80 @@ Before starting, ensure these are completed:
 
 ---
 
-## Phase 2: Stripe Integration (Day 17 Morning)
+## Phase 2: Stripe Integration (Day 17 Morning) ✅ COMPLETED
 
 **Goal:** Stripe checkout, webhooks, and trial/subscription lifecycle
 
-### 2.1 Subscription Router (Part 2) - Write Operations
+**Status:** Implemented on Dec 22, 2025
+
+### 2.1 Subscription Router Write Operations ✅
+
+**Note:** Write operations were implemented in Phase 1. This phase focused on webhook handlers.
+
+### 2.2 Stripe Webhook Handlers ✅
+
+**File:** [`packages/auth/src/index.ts`](../packages/auth/src/index.ts)
+
+Added Better Auth Stripe plugin lifecycle hooks:
+
+- [x] `onSubscriptionComplete` - Clear trial cache, convert trial status, sync subscription cache
+- [x] `onSubscriptionUpdate` - Clear plan limits cache, sync subscription cache
+- [x] `onSubscriptionCancel` - Clear plan limits cache, sync subscription cache
+- [x] `onSubscriptionDeleted` - Clear all user caches, invalidate Stripe caches
+- [x] `onEvent` handler for:
+  - [x] `customer.created` - Store user-customer bidirectional mapping
+  - [x] `customer.updated` - Invalidate customer cache
+  - [x] `invoice.payment_succeeded` - Create new usage quota for billing period, sync subscription
+  - [x] `invoice.payment_failed` - Log warning (TODO: send email)
+  - [x] `customer.subscription.created` - Sync new subscription to cache
+  - [x] `customer.subscription.updated` - Sync update, clear plan limits cache
+  - [x] `customer.subscription.deleted` - Clear all user caches
+  - [x] `customer.subscription.trial_will_end` - Log (TODO: send reminder email)
+  - [x] `charge.dispute.created` - Log for monitoring/fraud prevention
+
+**Success Criteria:**
+- ✅ Webhook handlers integrated with Better Auth
+- ✅ Redis caches cleared on subscription lifecycle events
+- ✅ Usage quota created for new billing periods
+- ✅ Bidirectional user-customer mappings stored
+
+---
+
+### 2.3 Stripe Subscription Cache ✅
+
+**File:** [`packages/auth/src/stripe-sync.ts`](../packages/auth/src/stripe-sync.ts)
+
+Implemented webhook-driven subscription caching (no TTL):
+
+- [x] `StripeSubscriptionCache` type with subscription data, payment method, billing period
+- [x] `syncStripeSubscriptionToCache()` - Sync from Stripe to Redis (no TTL)
+- [x] `getCachedSubscription()` - Cache-first lookup with Stripe fallback
+- [x] `getCachedSubscriptionByUserId()` - Lookup via bidirectional mapping
+- [x] `invalidateSubscriptionCache()` - Clear single subscription
+- [x] `invalidateAllStripeCache()` - Clear all caches for customer
+
+**Bidirectional Mappings (for fast webhook lookups):**
+- [x] `setUserCustomerMapping(userId, customerId)` - Store both directions
+- [x] `getCustomerIdByUserId(userId)` - Fast Redis lookup
+- [x] `getUserIdByCustomerId(customerId)` - Fast Redis lookup in webhooks
+- [x] `clearUserStripeMappings(userId)` - Cleanup on user deletion
+
+**Cached Stripe API Functions (with TTL for request deduplication):**
+- [x] `cachedStripeSubscriptionsList()` - 5 min TTL
+- [x] `cachedStripeCustomerRetrieve()` - 1 hour TTL
+- [x] `cachedStripePriceRetrieve()` - 24 hour TTL
+- [x] `cachedStripeInvoicesList()` - 15 min TTL
+
+**Success Criteria:**
+- ✅ No TTL on subscription data (webhook-driven updates only)
+- ✅ Bidirectional user-customer mappings for fast lookups
+- ✅ API response caching for request deduplication
+
+---
+
+## Phase 2 Original Plan (Reference)
+
+### 2.1 Subscription Router (Part 2) - Write Operations (Already completed in Phase 1)
 
 **File:** `packages/api/src/routers/subscription.ts` (continued)
 
@@ -405,7 +492,7 @@ Before starting, ensure these are completed:
 
 #### Checkout & Portal
 
-- [ ] `subscription.createCheckoutSession` (mutation, admin-only)
+- [x] `subscription.createCheckoutSession` (mutation, admin-only)
   - [ ] Input schema:
     ```typescript
     {
@@ -544,99 +631,75 @@ Better Auth handles most events automatically, but verify/extend if needed:
 
 ---
 
-## Phase 3: Apply Feature Gates (Day 17 Afternoon)
+## Phase 3: Apply Feature Gates (Day 17 Afternoon) ✅ COMPLETED
 
 **Goal:** Enforce usage limits on all generation endpoints
 
-### 3.1 Template Router Updates
+**Status:** Implemented on Dec 22, 2025
 
-**File:** `packages/api/src/routers/template.ts`
+### 3.1 Template Router Updates ✅
+
+**File:** [`packages/api/src/routers/template.ts`](../packages/api/src/routers/template.ts)
 
 **Reference:** [Implementation Plan - Task 18.1](./week4-payment-implementation-plan.md#task-181-apply-feature-gates-to-all-generation-endpoints)
 
-#### Find Generation Endpoints
+#### Generation Endpoints Updated
 
-- [ ] Identify all template generation procedures:
-  - [ ] `generateTemplate`
-  - [ ] `regenerateElement`
-  - [ ] Any other AI generation endpoints
-
-#### Apply Middleware & Increment Usage
-
-For each generation endpoint:
-
-- [ ] Add `.use(requireTemplateGenerationQuota)` middleware
-- [ ] After successful generation, call:
-  ```typescript
-  await usageService.incrementUsage(ctx.userId, 'templateGeneration');
-  ```
-- [ ] Handle errors gracefully (show upgrade modal on limit)
+- [x] `generate` - Uses `templateQuotaProcedure` for quota check
+  - [x] Quota checked before generation
+  - [x] Usage incremented after success via `incrementUsage()`
+  
+- [x] `regenerate` - Uses `templateQuotaProcedure` for quota check
+  - [x] Quota checked before regeneration
+  - [x] Usage incremented after success via `incrementUsage()`
 
 #### Template Deletion During Trial
 
-- [ ] Find `deleteTemplate` procedure
-- [ ] Add check at the start:
-  ```typescript
-  const trial = await usageService.getActiveTrial(ctx.userId);
-  if (trial?.status === 'active') {
-    throw new TRPCError({
-      code: 'FORBIDDEN',
-      message: 'Templates cannot be deleted during trial. Upgrade to manage templates freely.',
-    });
-  }
-  ```
+- [x] `delete` mutation blocks trial users:
+  - [x] Checks for active trial via `getActiveTrial()`
+  - [x] Returns friendly error message with upgrade URL
+  - [x] Allows deletion for paid users
 
 **Success Criteria:**
-- ✅ All generation endpoints gated
-- ✅ Usage increments on success
-- ✅ Trial deletion block works
+- ✅ All generation endpoints gated with `templateQuotaProcedure`
+- ✅ Usage increments on successful generation
+- ✅ Trial deletion block implemented
 
 ---
 
-### 3.2 Image Asset Router Updates
+### 3.2 Image Generation Route Updates ✅
 
-**File:** `packages/api/src/routers/image-asset.ts`
+**Files:**
+- [`apps/web/src/app/api/image/generate/route.ts`](../apps/web/src/app/api/image/generate/route.ts)
+- [`apps/web/src/app/api/image/regenerate/route.ts`](../apps/web/src/app/api/image/regenerate/route.ts)
 
 **Reference:** [Implementation Plan - Task 18.1](./week4-payment-implementation-plan.md#task-181-apply-feature-gates-to-all-generation-endpoints)
 
-#### Find Image Generation Endpoints
+#### Feature Gates Applied
 
-- [ ] Identify image generation procedures:
-  - [ ] `generateImage`
-  - [ ] Any batch image generation endpoints
+- [x] Usage quota check before generation
+- [x] Premium model access check via `canUsePremiumImageModel()`
+- [x] Auto-downgrade to standard model if user doesn't have premium access
+- [x] Usage increment after successful generation with image count
+- [x] Proper error responses with upgrade URL for quota exceeded
 
-#### Apply Middleware & Increment Usage
+#### Model Selection Logic
 
-For each image generation endpoint:
+```typescript
+// Check if user can use premium image models
+const canUsePremium = await canUsePremiumImageModel(session.user.id);
 
-- [ ] Add `.use(requireImageGenerationQuota)` middleware
-- [ ] Check if user can use Nano Banana Pro:
-  ```typescript
-  const plan = await usageService.getPlanLimits(ctx.userId);
-  const trial = await usageService.getActiveTrial(ctx.userId);
-  
-  // Trial users: Qwen only
-  if (trial) {
-    imageModel = 'qwen';
-  }
-  // Pro/Scale: can use Nano Banana Pro
-  else if (plan.plan === 'pro' || plan.plan === 'scale') {
-    imageModel = 'nano-banana-pro';
-  }
-  // Starter: Qwen only
-  else {
-    imageModel = 'qwen';
-  }
-  ```
-- [ ] After successful generation:
-  ```typescript
-  await usageService.incrementUsage(ctx.userId, 'imageGeneration', imageCount);
-  ```
+// If user requested a premium model but can't use it, downgrade to default
+if (parsed.modelId && isPremiumModel(parsed.modelId) && !canUsePremium) {
+  parsed.modelId = getDefaultModel().id; // Downgrades to standard model
+}
+```
 
 **Success Criteria:**
-- ✅ Image generation gated
-- ✅ Model selection based on plan/trial
-- ✅ Usage increments correctly
+- ✅ Image generation gated with usage checks
+- ✅ Premium model access enforced based on plan/trial
+- ✅ Auto-downgrade for users without premium access
+- ✅ Usage increments correctly with image count
 
 ---
 
@@ -1579,12 +1642,12 @@ STRIPE_PRICE_ID_SCALE_ANNUAL="price_..."
 | 11 | No watermarks on any plan | ✅ N/A - no watermarks |
 | 12 | Pricing page deployed and responsive | ⏳ Phase 4 |
 | 13 | Billing dashboard functional | ⏳ Phase 4 |
-| 14 | Stripe webhooks working | ⏳ Phase 2 |
-| 15 | Upgrade/downgrade flows working | ⏳ Phase 2/4 |
+| 14 | Stripe webhooks working | ✅ Better Auth hooks + custom events |
+| 15 | Upgrade/downgrade flows working | 🔧 Backend ready, UI in Phase 4 |
 | 16 | Cancellation flow working | ✅ Backend ready |
 | 17 | Mobile responsive | ⏳ Phase 4 |
 | 18 | Accessible (WCAG AA) | ⏳ Phase 5 |
-| 19 | Performance optimized (< 10ms Redis reads) | ⏳ Phase 5 |
+| 19 | Performance optimized (< 10ms Redis reads) | ✅ No-TTL cache, bidirectional mappings |
 | 20 | Ready for production launch | ⏳ Phase 6 |
 
 ### Phase 1 Progress: ✅ Complete
@@ -1600,6 +1663,38 @@ STRIPE_PRICE_ID_SCALE_ANNUAL="price_..."
 - Run database migration
 - Configure Stripe price IDs in environment
 - Seed Plan data
+
+### Phase 2 Progress: ✅ Complete
+
+**Implemented:**
+- Stripe webhook lifecycle hooks in Better Auth
+- Cache invalidation on subscription events
+- Usage quota creation on billing period renewal
+- Trial conversion handling
+- **Stripe Subscription Cache** (`packages/auth/src/stripe-sync.ts`):
+  - No-TTL webhook-driven subscription cache
+  - Bidirectional user-customer mappings for fast lookups
+  - Cached Stripe API functions for request deduplication
+- **Enhanced Webhook Handlers**:
+  - `customer.created/updated` - Mapping management
+  - `customer.subscription.created/updated/deleted` - Cache sync
+  - `charge.dispute.created` - Fraud monitoring
+- **Usage Tracking Improvements** (`packages/api/src/lib/usage-tracking.ts`):
+  - Rollback pattern (check limit before commit)
+  - `canPerformAction()` pre-check function
+  - Warning/critical thresholds (80%/95%)
+  - `UsageTracker` domain object for cleaner API
+  - `expireat` for auto-cleanup at end of billing period
+
+### Phase 3 Progress: ✅ Complete
+
+**Implemented:**
+- Template router: `generate`, `regenerate` use `templateQuotaProcedure`
+- Template router: `delete` blocks trial users
+- Image API routes: usage quota checks before generation
+- Image API routes: premium model access enforcement
+- Image API routes: auto-downgrade to standard model for non-premium users
+- Usage increment after successful generations
 
 ---
 
@@ -1618,8 +1713,65 @@ STRIPE_PRICE_ID_SCALE_ANNUAL="price_..."
 
 ---
 
-**Document Version:** 1.1  
+## Stripe & Redis Architecture
+
+**Reference:** 
+- [`packages/auth/src/stripe-sync.ts`](../packages/auth/src/stripe-sync.ts)
+- [`packages/api/src/lib/usage-tracking.ts`](../packages/api/src/lib/usage-tracking.ts)
+
+### Subscription Cache Strategy
+
+```
+ARCHITECTURE: Webhook-Driven (No TTL)
+
+Stripe Event → Webhook Handler → Sync to Redis → Instant Consistency
+
+Benefits:
+- No stale data (updated immediately on changes)
+- Fast lookups (< 10ms Redis reads)
+- Reduced Stripe API calls
+```
+
+### Bidirectional Mappings
+
+```
+Redis Keys:
+- stripe:user:{userId} → customerId
+- stripe:customer-to-user:{customerId} → userId
+- stripe:subscription:{customerId} → StripeSubscriptionCache
+
+Enables:
+- Fast user → customer lookup (checkout, portal)
+- Fast customer → user lookup (webhooks)
+```
+
+### Usage Tracking Flow
+
+```
+1. Pre-check: canPerformAction(userId, type) → boolean
+2. Perform action (template/image generation)
+3. Increment: UsageTracker.trackTemplateGeneration(userId)
+   └─ Checks limit BEFORE commit (rollback pattern)
+   └─ Throws UsageLimitError if would exceed
+4. Async sync to DB every 10 increments
+5. Auto-cleanup via expireat at end of billing period
+```
+
+### Warning Thresholds
+
+| Threshold | Percentage | Response |
+|-----------|------------|----------|
+| Normal | 0-79% | No action |
+| Warning | 80-94% | Show upgrade prompt |
+| Critical | 95-99% | Show urgent upgrade |
+| Exceeded | 100% | Block action, show modal |
+
+---
+
+**Document Version:** 1.3  
 **Last Updated:** December 22, 2025  
 **Phase 1 Completed:** December 22, 2025  
+**Phase 2 Completed:** December 22, 2025 (Enhanced with Stripe sync improvements)  
+**Phase 3 Completed:** December 22, 2025  
 **Maintained By:** Development Team
 

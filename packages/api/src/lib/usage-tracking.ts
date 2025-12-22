@@ -1,6 +1,13 @@
 /**
  * Usage Tracking Service
  * Redis-cached usage tracking with database sync for trials and subscriptions
+ * 
+ * Features:
+ * - Rollback pattern on quota exceeded
+ * - Pre-check before action (canPerformAction)
+ * - Warning/critical thresholds for usage alerts
+ * - Auto monthly reset using Redis expireat
+ * - Domain-specific helper methods (UsageTracker object)
  */
 
 import { PLAN_LIMITS, TRIAL_LIMITS } from "@mocah/auth/subscription-plans";
@@ -29,6 +36,7 @@ export interface UsageCheckResult {
   used: number;
   limit: number;
   remaining: number;
+  percentage: number;
   resetDate?: Date;
   isTrialUser?: boolean;
 }
@@ -58,6 +66,27 @@ export interface UsageQuotaData {
   lastSyncedAt: Date;
 }
 
+/** Usage limit with warning/critical thresholds */
+export interface UsageLimit {
+  type: UsageType;
+  used: number;
+  limit: number;
+  remaining: number;
+  percentage: number;
+  resetDate: Date;
+}
+
+/** Comprehensive usage summary with warning/critical alerts */
+export interface UsageSummary {
+  userId: string;
+  planName: PlanName;
+  isTrialUser: boolean;
+  limits: UsageLimit[];
+  isOverLimit: boolean;
+  warningLimits: UsageLimit[]; // > 80% used
+  criticalLimits: UsageLimit[]; // > 95% used
+}
+
 // ============================================================================
 // Cache Keys
 // ============================================================================
@@ -80,6 +109,12 @@ const SYNC_THRESHOLD = {
   trialIncrements: 5, // Sync to DB every 5 increments
   usageIncrements: 10, // Sync to DB every 10 increments
   maxSyncInterval: 5 * 60 * 1000, // 5 minutes max between syncs
+} as const;
+
+// Warning thresholds
+const USAGE_THRESHOLDS = {
+  warning: 80, // 80% usage
+  critical: 95, // 95% usage
 } as const;
 
 // ============================================================================
@@ -141,10 +176,21 @@ function getMonthBoundaries(): { start: Date; end: Date } {
   return { start, end };
 }
 
+/** Get end of current month as Unix timestamp */
+function getEndOfMonthTimestamp(): number {
+  const { end } = getMonthBoundaries();
+  return Math.floor(end.getTime() / 1000);
+}
+
 function addDays(date: Date, days: number): Date {
   const result = new Date(date);
   result.setDate(result.getDate() + days);
   return result;
+}
+
+function calculatePercentage(used: number, limit: number): number {
+  if (limit === 0) return 100;
+  return Math.round((used / limit) * 100);
 }
 
 // ============================================================================
@@ -204,14 +250,12 @@ export async function createTrial(
     stripeCustomerId: trial.stripeCustomerId,
   };
 
-  // Initialize Redis cache
+  // Initialize Redis cache with expiration at trial end
   if (redis && isRedisAvailable()) {
     try {
-      await redis.setex(
-        USAGE_CACHE_KEYS.trial(userId),
-        CACHE_TTL.trial,
-        JSON.stringify(trialData)
-      );
+      const expirationTs = Math.floor(expiresAt.getTime() / 1000) + 86400; // +1 day buffer
+      await redis.set(USAGE_CACHE_KEYS.trial(userId), JSON.stringify(trialData));
+      await redis.expireat(USAGE_CACHE_KEYS.trial(userId), expirationTs);
     } catch (error) {
       logger.error("Failed to cache trial data", error as Error);
     }
@@ -268,15 +312,12 @@ export async function getActiveTrial(userId: string): Promise<TrialData | null> 
     stripeCustomerId: trial.stripeCustomerId,
   };
 
-  // Repopulate Redis cache
+  // Repopulate Redis cache with expireat
   if (redis && isRedisAvailable()) {
     try {
-      const ttl = Math.floor((trial.expiresAt.getTime() - Date.now()) / 1000) + 86400; // +1 day buffer
-      await redis.setex(
-        USAGE_CACHE_KEYS.trial(userId),
-        Math.max(ttl, 60),
-        JSON.stringify(trialData)
-      );
+      const expirationTs = Math.floor(trial.expiresAt.getTime() / 1000) + 86400;
+      await redis.set(USAGE_CACHE_KEYS.trial(userId), JSON.stringify(trialData));
+      await redis.expireat(USAGE_CACHE_KEYS.trial(userId), expirationTs);
     } catch (error) {
       logger.error("Failed to repopulate trial cache", error as Error);
     }
@@ -300,6 +341,7 @@ export async function checkTrialUsageLimit(
       used: 0,
       limit: 0,
       remaining: 0,
+      percentage: 0,
       isTrialUser: false,
     };
   }
@@ -313,21 +355,23 @@ export async function checkTrialUsageLimit(
     used,
     limit,
     remaining,
+    percentage: calculatePercentage(used, limit),
     resetDate: trial.expiresAt,
     isTrialUser: true,
   };
 }
 
 /**
- * Increment trial usage counter
+ * Increment trial usage counter with rollback on failure
  */
 export async function incrementTrialUsage(
   userId: string,
   type: UsageType,
   amount: number = 1
-): Promise<void> {
+): Promise<number> {
   const redis = getRedis();
   const field = type === "templateGeneration" ? "templatesUsed" : "imagesUsed";
+  const limitField = type === "templateGeneration" ? "templatesLimit" : "imagesLimit";
 
   if (redis && isRedisAvailable()) {
     try {
@@ -336,33 +380,50 @@ export async function incrementTrialUsage(
       
       if (cached) {
         const trial = typeof cached === "string" ? JSON.parse(cached) : cached;
-        trial[field] = (trial[field] || 0) + amount;
+        const newUsage = (trial[field] || 0) + amount;
+        const limit = trial[limitField] || TRIAL_LIMITS.templatesLimit;
         
-        // Get remaining TTL
+        // Check limit BEFORE committing
+        if (newUsage > limit) {
+          throw new UsageLimitError({
+            code: "TRIAL_LIMIT_REACHED",
+            remaining: 0,
+            limit,
+            resetDate: new Date(trial.expiresAt),
+          });
+        }
+        
+        trial[field] = newUsage;
+        
+        // Get remaining TTL and update
         const ttl = await redis.ttl(key);
         await redis.setex(key, ttl > 0 ? ttl : CACHE_TTL.trial, JSON.stringify(trial));
 
         // Async sync to database every N increments
-        if (trial[field] % SYNC_THRESHOLD.trialIncrements === 0) {
+        if (newUsage % SYNC_THRESHOLD.trialIncrements === 0) {
           syncTrialToDatabase(userId).catch((err) =>
             logger.error("Trial sync error", err as Error)
           );
         }
-        return;
+        
+        return newUsage;
       }
     } catch (error) {
+      if (error instanceof UsageLimitError) throw error;
       logger.error("Failed to increment trial in Redis", error as Error);
     }
   }
 
   // Direct database update if Redis unavailable
-  await prisma.trial.update({
+  const result = await prisma.trial.update({
     where: { userId },
     data: {
       [field]: { increment: amount },
       lastSyncedAt: new Date(),
     },
   });
+
+  return result[field as keyof typeof result] as number;
 }
 
 /**
@@ -579,10 +640,11 @@ export async function getCurrentQuota(userId: string): Promise<UsageQuotaData> {
     lastSyncedAt: quota.lastSyncedAt,
   };
 
-  // Populate Redis cache
+  // Populate Redis cache with expireat at end of month
   if (redis && isRedisAvailable()) {
     try {
-      await redis.setex(cacheKey, CACHE_TTL.usage, JSON.stringify(quotaData));
+      await redis.set(cacheKey, JSON.stringify(quotaData));
+      await redis.expireat(cacheKey, getEndOfMonthTimestamp() + 86400); // +1 day buffer
     } catch (error) {
       logger.error("Failed to cache usage quota", error as Error);
     }
@@ -592,7 +654,7 @@ export async function getCurrentQuota(userId: string): Promise<UsageQuotaData> {
 }
 
 /**
- * Check if user is within usage limit
+ * Check if user is within usage limit (pre-check before action)
  */
 export async function checkUsageLimit(
   userId: string,
@@ -616,30 +678,50 @@ export async function checkUsageLimit(
     used,
     limit,
     remaining,
+    percentage: calculatePercentage(used, limit),
     resetDate: quota.periodEnd,
     isTrialUser: false,
   };
 }
 
 /**
- * Increment usage counter
+ * Check if user can perform an action WITHOUT incrementing usage
+ * Use this to check before performing an expensive operation
+ */
+export async function canPerformAction(
+  userId: string,
+  type: UsageType,
+  amount: number = 1
+): Promise<boolean> {
+  try {
+    const result = await checkUsageLimit(userId, type, amount);
+    return result.allowed;
+  } catch (error) {
+    logger.error(`Error checking action permission for ${type}`, { userId, error });
+    // Default to allowing action if check fails (fail-open)
+    return true;
+  }
+}
+
+/**
+ * Increment usage counter with rollback on quota exceeded
  */
 export async function incrementUsage(
   userId: string,
   type: UsageType,
   amount: number = 1
-): Promise<void> {
+): Promise<number> {
   // Check if user is in trial
   const trial = await getActiveTrial(userId);
   if (trial) {
-    await incrementTrialUsage(userId, type, amount);
-    return;
+    return incrementTrialUsage(userId, type, amount);
   }
 
   const redis = getRedis();
   const month = getCurrentMonth();
   const cacheKey = USAGE_CACHE_KEYS.usage(userId, month);
   const field = type === "templateGeneration" ? "templatesUsed" : "imagesUsed";
+  const limitField = type === "templateGeneration" ? "templatesLimit" : "imagesLimit";
 
   if (redis && isRedisAvailable()) {
     try {
@@ -647,29 +729,58 @@ export async function incrementUsage(
       
       if (cached) {
         const quota = typeof cached === "string" ? JSON.parse(cached) : cached;
-        quota[field] = (quota[field] || 0) + amount;
+        const newUsage = (quota[field] || 0) + amount;
+        const limit = quota[limitField];
+        
+        // Check limit BEFORE committing (rollback pattern)
+        if (newUsage > limit) {
+          throw new UsageLimitError({
+            code: "QUOTA_EXCEEDED",
+            remaining: 0,
+            limit,
+            resetDate: new Date(quota.periodEnd),
+          });
+        }
+        
+        quota[field] = newUsage;
         quota.lastSyncedAt = new Date().toISOString();
 
-        // Get remaining TTL
-        const ttl = await redis.ttl(cacheKey);
-        await redis.setex(cacheKey, ttl > 0 ? ttl : CACHE_TTL.usage, JSON.stringify(quota));
+        // Update cache (TTL managed by expireat)
+        await redis.set(cacheKey, JSON.stringify(quota));
 
         // Async sync to database every N increments
-        if (quota[field] % SYNC_THRESHOLD.usageIncrements === 0) {
+        if (newUsage % SYNC_THRESHOLD.usageIncrements === 0) {
           syncUsageToDatabase(userId).catch((err) =>
             logger.error("Usage sync error", err as Error)
           );
         }
-        return;
+        
+        return newUsage;
       }
     } catch (error) {
+      if (error instanceof UsageLimitError) throw error;
       logger.error("Failed to increment usage in Redis", error as Error);
     }
   }
 
   // Direct database update if Redis unavailable or cache miss
   const { start, end } = getMonthBoundaries();
-  await prisma.usageQuota.upsert({
+  
+  // First check limit
+  const currentQuota = await getCurrentQuota(userId);
+  const currentUsed = type === "templateGeneration" ? currentQuota.templatesUsed : currentQuota.imagesUsed;
+  const currentLimit = type === "templateGeneration" ? currentQuota.templatesLimit : currentQuota.imagesLimit;
+  
+  if (currentUsed + amount > currentLimit) {
+    throw new UsageLimitError({
+      code: "QUOTA_EXCEEDED",
+      remaining: 0,
+      limit: currentLimit,
+      resetDate: currentQuota.periodEnd,
+    });
+  }
+  
+  const result = await prisma.usageQuota.upsert({
     where: {
       userId_periodStart: {
         userId,
@@ -691,6 +802,8 @@ export async function incrementUsage(
       lastSyncedAt: new Date(),
     },
   });
+
+  return result[field as keyof typeof result] as number;
 }
 
 /**
@@ -778,7 +891,80 @@ export async function hasPriorityQueue(userId: string): Promise<boolean> {
 }
 
 /**
- * Get comprehensive usage stats for a user
+ * Get comprehensive usage summary with warning/critical alerts
+ */
+export async function getUsageSummary(userId: string): Promise<UsageSummary> {
+  const trial = await getActiveTrial(userId);
+  const limits = await getPlanLimits(userId);
+  
+  let usageLimits: UsageLimit[] = [];
+  let resetDate: Date;
+  
+  if (trial) {
+    resetDate = trial.expiresAt;
+    usageLimits = [
+      {
+        type: "templateGeneration",
+        used: trial.templatesUsed,
+        limit: trial.templatesLimit,
+        remaining: Math.max(0, trial.templatesLimit - trial.templatesUsed),
+        percentage: calculatePercentage(trial.templatesUsed, trial.templatesLimit),
+        resetDate,
+      },
+      {
+        type: "imageGeneration",
+        used: trial.imagesUsed,
+        limit: trial.imagesLimit,
+        remaining: Math.max(0, trial.imagesLimit - trial.imagesUsed),
+        percentage: calculatePercentage(trial.imagesUsed, trial.imagesLimit),
+        resetDate,
+      },
+    ];
+  } else {
+    const quota = await getCurrentQuota(userId);
+    resetDate = quota.periodEnd;
+    usageLimits = [
+      {
+        type: "templateGeneration",
+        used: quota.templatesUsed,
+        limit: quota.templatesLimit,
+        remaining: Math.max(0, quota.templatesLimit - quota.templatesUsed),
+        percentage: calculatePercentage(quota.templatesUsed, quota.templatesLimit),
+        resetDate,
+      },
+      {
+        type: "imageGeneration",
+        used: quota.imagesUsed,
+        limit: quota.imagesLimit,
+        remaining: Math.max(0, quota.imagesLimit - quota.imagesUsed),
+        percentage: calculatePercentage(quota.imagesUsed, quota.imagesLimit),
+        resetDate,
+      },
+    ];
+  }
+  
+  // Categorize by warning/critical thresholds
+  const warningLimits = usageLimits.filter(
+    (l) => l.percentage >= USAGE_THRESHOLDS.warning && l.percentage < USAGE_THRESHOLDS.critical
+  );
+  const criticalLimits = usageLimits.filter(
+    (l) => l.percentage >= USAGE_THRESHOLDS.critical
+  );
+  const isOverLimit = usageLimits.some((l) => l.percentage >= 100);
+
+  return {
+    userId,
+    planName: limits.plan,
+    isTrialUser: !!trial,
+    limits: usageLimits,
+    isOverLimit,
+    warningLimits,
+    criticalLimits,
+  };
+}
+
+/**
+ * Get comprehensive usage stats for a user (legacy format for backward compatibility)
  */
 export async function getUserUsageStats(userId: string): Promise<{
   trial: TrialData | null;
@@ -827,3 +1013,81 @@ export async function clearUserCache(userId: string): Promise<void> {
   }
 }
 
+// ============================================================================
+// Domain-Specific Helper Methods (UsageTracker)
+// ============================================================================
+
+/**
+ * Domain-specific helper methods for common usage tracking scenarios
+ * Provides a cleaner API for specific operations
+ */
+export const UsageTracker = {
+  /**
+   * Track template generation
+   * @returns New usage count
+   * @throws UsageLimitError if quota exceeded
+   */
+  async trackTemplateGeneration(userId: string, count: number = 1): Promise<number> {
+    return incrementUsage(userId, "templateGeneration", count);
+  },
+
+  /**
+   * Track image generation
+   * @returns New usage count
+   * @throws UsageLimitError if quota exceeded
+   */
+  async trackImageGeneration(userId: string, count: number = 1): Promise<number> {
+    return incrementUsage(userId, "imageGeneration", count);
+  },
+
+  /**
+   * Check if user can generate templates without incrementing
+   */
+  async canGenerateTemplate(userId: string, count: number = 1): Promise<boolean> {
+    return canPerformAction(userId, "templateGeneration", count);
+  },
+
+  /**
+   * Check if user can generate images without incrementing
+   */
+  async canGenerateImage(userId: string, count: number = 1): Promise<boolean> {
+    return canPerformAction(userId, "imageGeneration", count);
+  },
+
+  /**
+   * Get template usage info
+   */
+  async getTemplateUsage(userId: string): Promise<UsageCheckResult> {
+    return checkUsageLimit(userId, "templateGeneration");
+  },
+
+  /**
+   * Get image usage info
+   */
+  async getImageUsage(userId: string): Promise<UsageCheckResult> {
+    return checkUsageLimit(userId, "imageGeneration");
+  },
+
+  /**
+   * Check if user is near template limit (>80%)
+   */
+  async isNearTemplateLimit(userId: string): Promise<boolean> {
+    const result = await checkUsageLimit(userId, "templateGeneration");
+    return result.percentage >= USAGE_THRESHOLDS.warning;
+  },
+
+  /**
+   * Check if user is near image limit (>80%)
+   */
+  async isNearImageLimit(userId: string): Promise<boolean> {
+    const result = await checkUsageLimit(userId, "imageGeneration");
+    return result.percentage >= USAGE_THRESHOLDS.warning;
+  },
+
+  /**
+   * Get full usage summary with warnings
+   */
+  async getSummary(userId: string): Promise<UsageSummary> {
+    return getUsageSummary(userId);
+  },
+};
