@@ -1,5 +1,11 @@
 import { TRPCError } from "@trpc/server";
-import { t, protectedProcedure } from "./index";
+import { protectedProcedure, t } from "./index";
+import {
+  checkUsageLimit,
+  getActiveTrial,
+  getPlanLimits,
+  UsageLimitError
+} from "./lib/usage-tracking";
 
 /**
  * Middleware that requires an active organization to be set in the session
@@ -88,3 +94,129 @@ export const organizationProcedure = protectedProcedure.use(requireActiveOrganiz
 export const adminProcedure = protectedProcedure.use(
   requireOrganizationRole(["owner", "admin"])
 );
+
+// ============================================================================
+// Usage Quota Middleware
+// ============================================================================
+
+/**
+ * Middleware that requires template generation quota
+ * Use this for template generation endpoints
+ */
+export const requireTemplateGenerationQuota = t.middleware(async ({ ctx, next }) => {
+  if (!ctx.session?.user?.id) {
+    throw new TRPCError({
+      code: "UNAUTHORIZED",
+      message: "Authentication required",
+    });
+  }
+
+  const userId = ctx.session.user.id;
+  const usageCheck = await checkUsageLimit(userId, "templateGeneration");
+
+  if (!usageCheck.allowed) {
+    const trial = await getActiveTrial(userId);
+    throw new UsageLimitError({
+      code: trial ? "TRIAL_LIMIT_REACHED" : "QUOTA_EXCEEDED",
+      remaining: usageCheck.remaining,
+      limit: usageCheck.limit,
+      resetDate: usageCheck.resetDate,
+    });
+  }
+
+  const planLimits = await getPlanLimits(userId);
+
+  return next({
+    ctx: {
+      ...ctx,
+      usageCheck,
+      planLimits,
+    },
+  });
+});
+
+/**
+ * Middleware that requires image generation quota
+ * Use this for image generation endpoints
+ */
+export const requireImageGenerationQuota = t.middleware(async ({ ctx, next }) => {
+  if (!ctx.session?.user?.id) {
+    throw new TRPCError({
+      code: "UNAUTHORIZED",
+      message: "Authentication required",
+    });
+  }
+
+  const userId = ctx.session.user.id;
+  const usageCheck = await checkUsageLimit(userId, "imageGeneration");
+
+  if (!usageCheck.allowed) {
+    const trial = await getActiveTrial(userId);
+    throw new UsageLimitError({
+      code: trial ? "TRIAL_LIMIT_REACHED" : "QUOTA_EXCEEDED",
+      remaining: usageCheck.remaining,
+      limit: usageCheck.limit,
+      resetDate: usageCheck.resetDate,
+    });
+  }
+
+  const planLimits = await getPlanLimits(userId);
+
+  return next({
+    ctx: {
+      ...ctx,
+      usageCheck,
+      planLimits,
+    },
+  });
+});
+
+/**
+ * Middleware that blocks certain actions during trial
+ * Use this for features that should be restricted during trial (e.g., template deletion)
+ */
+export const requireTrialNotActive = t.middleware(async ({ ctx, next }) => {
+  if (!ctx.session?.user?.id) {
+    throw new TRPCError({
+      code: "UNAUTHORIZED",
+      message: "Authentication required",
+    });
+  }
+
+  const userId = ctx.session.user.id;
+  const trial = await getActiveTrial(userId);
+
+  if (trial && trial.status === "active") {
+    throw new TRPCError({
+      code: "FORBIDDEN",
+      message:
+        "This action is not available during your trial. Upgrade to unlock full access.",
+      cause: {
+        trialRestriction: true,
+        upgradeUrl: "/pricing",
+      },
+    });
+  }
+
+  return next({ ctx });
+});
+
+/**
+ * Protected procedure with template generation quota check
+ */
+export const templateQuotaProcedure = protectedProcedure.use(
+  requireTemplateGenerationQuota
+);
+
+/**
+ * Protected procedure with image generation quota check
+ */
+export const imageQuotaProcedure = protectedProcedure.use(
+  requireImageGenerationQuota
+);
+
+/**
+ * Protected procedure that requires user NOT be in trial
+ * Use for actions blocked during trial (e.g., deleting templates)
+ */
+export const paidUserProcedure = protectedProcedure.use(requireTrialNotActive);

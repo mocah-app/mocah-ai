@@ -76,28 +76,33 @@ model AIPrompt {
 }
 
 model UsageQuota {
-  id          String   @id @default(uuid())
-  organizationId String
-  userId      String?
-  period      QuotaPeriod
-  periodStart DateTime
-  periodEnd   DateTime
-  textGenerations Int  @default(0)
-  imageGenerations Int @default(0)
-  totalTokens     Int  @default(0)
-  limitTextGenerations Int?
-  limitImageGenerations Int?
-  limitTokens         Int?
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  id              String     @id @default(uuid())
+  userId          String     // Account-level tracking (not organization)
+  plan            PlanName   // Plan at time of period creation
+  
+  // Billing period
+  periodStart     DateTime
+  periodEnd       DateTime
+  
+  // Template generation usage
+  templatesUsed   Int        @default(0)
+  templatesLimit  Int        // Based on plan: 75, 200, or 500
+  
+  // Image generation usage
+  imagesUsed      Int        @default(0)
+  imagesLimit     Int        // Based on plan: 20, 100, or 300
+  
+  // Sync tracking
+  lastSyncedAt    DateTime   @default(now())
+  createdAt       DateTime   @default(now())
+  updatedAt       DateTime   @updatedAt
 
   // Relations
-  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  user         User?         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user            User       @relation(fields: [userId], references: [id], onDelete: Cascade)
 
-  @@unique([organizationId, userId, period, periodStart])
-  @@index([organizationId])
+  @@unique([userId, periodStart])
   @@index([userId])
+  @@index([userId, periodStart, periodEnd])
   @@index([periodStart, periodEnd])
   @@map("usage_quota")
 }

@@ -1,6 +1,19 @@
 // enums.prisma
 // Shared enums across the application
 
+enum PlanName {
+  starter
+  pro
+  scale
+}
+
+enum TrialStatus {
+  active
+  converted
+  cancelled
+  expired
+}
+
 enum GenerationType {
   text
   image

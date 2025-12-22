@@ -1,24 +1,25 @@
 // billing.prisma
-// Monetization & Billing - Plan definitions and payment processing
+// Monetization & Billing - Plan definitions, trials, and payment processing
 // Note: Subscriptions are managed by Better Auth Stripe plugin (see stripe.prisma)
 
 model Plan {
   id                String   @id @default(uuid())
-  name              String   @unique // free, starter, pro, scale (must match Better Auth plan names)
+  name              String   @unique // starter, pro, scale (must match Better Auth plan names)
   displayName       String
   description       String?  @db.Text
   price             Decimal  @db.Decimal(10, 2) // Monthly price in USD
+  annualPrice       Decimal? @db.Decimal(10, 2) // Annual price per month (discounted)
   interval          String   @default("month") // month, year
-  stripePriceId     String?  @unique
-  stripeProductId   String?  @unique
-  annualDiscountPriceId String? // For annual billing discount
+  stripePriceIdMonthly  String?  @unique
+  stripePriceIdAnnual   String?  @unique
+  stripeProductId       String?  @unique
   features          Json?    // Feature flags and limits
   limits            Json?    // Plan limits (matches Better Auth limits format)
-  maxWorkspaces     Int      @default(1)
-  maxTextGenerations Int?    // null = unlimited
-  maxImageGenerations Int?
-  maxTokens         Int?
+  templatesLimit    Int      @default(75)  // Monthly template generation limit
+  imagesLimit       Int      @default(20)  // Monthly image generation limit
   allowedExportFormats String[] // Array of allowed export formats
+  hasPremiumImageModel Boolean  @default(false) // Access to premium image generation models
+  hasPriorityQueue     Boolean  @default(false) // Priority processing queue
   isActive          Boolean  @default(true)
   sortOrder         Int      @default(0)
   createdAt         DateTime @default(now())
@@ -28,6 +29,59 @@ model Plan {
   @@index([isActive])
   @@index([sortOrder])
   @@map("plan")
+}
+
+// Trial model for 7-day credit card required trials
+model Trial {
+  id                String      @id @default(uuid())
+  userId            String      @unique  // One trial per user
+  email             String
+  plan              PlanName    // The plan they're trying
+  stripeCustomerId  String      // For one-trial-per-card tracking
+  
+  // Trial period
+  startedAt         DateTime    @default(now())
+  expiresAt         DateTime    // 7 days from startedAt
+  
+  // Usage tracking during trial
+  templatesUsed     Int         @default(0)
+  imagesUsed        Int         @default(0)
+  templatesLimit    Int         @default(5)  // Trial limit: 5 templates
+  imagesLimit       Int         @default(5)  // Trial limit: 5 images
+  
+  // Trial outcome
+  status            TrialStatus @default(active)
+  convertedAt       DateTime?   // When they upgraded
+  cancelledAt       DateTime?   // When they cancelled
+  
+  // Metadata
+  lastSyncedAt      DateTime    @default(now())
+  createdAt         DateTime    @default(now())
+  updatedAt         DateTime    @updatedAt
+
+  // Relations
+  user              User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([stripeCustomerId])
+  @@index([status])
+  @@index([expiresAt])
+  @@map("trial")
+}
+
+// Cancellation feedback for improving retention
+model CancellationFeedback {
+  id                String    @id @default(uuid())
+  userId            String
+  subscriptionId    String?
+  reason            String?   @db.Text
+  feedback          String?   @db.Text
+  wouldRecommend    Boolean?
+  createdAt         DateTime  @default(now())
+
+  @@index([userId])
+  @@index([createdAt])
+  @@map("cancellation_feedback")
 }
 
 // Note: Invoices and Payment Methods are managed by Stripe
