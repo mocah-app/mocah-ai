@@ -31,7 +31,7 @@ export function DashboardSidebar() {
   const { state, isMobile, open } = useSidebar();
 
   // Check if user can publish to library
-  const { data: canPublish } = trpc.template.canPublishToLibrary.useQuery();
+  const { data: canPublish } = trpc.template.library.canPublish.useQuery();
 
   const isActive = (href: string) => {
     if (href === "/app") {

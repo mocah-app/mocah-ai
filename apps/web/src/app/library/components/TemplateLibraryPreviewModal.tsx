@@ -46,7 +46,7 @@ export function TemplateLibraryPreviewModal({
 
   // Fetch template detail - explicitly type to break inference chain
   const { data: templateData, isLoading } =
-    trpc.template.getLibraryTemplateDetail.useQuery(
+    trpc.template.library.getDetail.useQuery(
       { id: templateId! },
       { enabled: !!templateId && open }
     );
@@ -72,10 +72,10 @@ export function TemplateLibraryPreviewModal({
   } | undefined;
 
   // Remix mutation
-  const remixMutation = trpc.template.duplicate.useMutation({
+  const remixMutation = trpc.template.core.duplicate.useMutation({
     onSuccess: (data: { id: string }) => {
       toast.success("Template remixed successfully");
-      utils.template.list.invalidate();
+      utils.template.core.list.invalidate();
       onOpenChange(false);
       router.push(`/app/${data.id}`);
     },

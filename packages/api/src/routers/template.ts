@@ -5,13 +5,13 @@ import { templateLibraryRouter } from "./template-library";
 
 /**
  * Template router aggregating core, versions, and library operations
- * All endpoints are available at template.* level (flat structure)
+ * Properly typed nested structure for type safety
  */
 export const templateRouter = router({
   // Core template operations (CRUD + generation)
-  ...(templateCoreRouter as any),
+  core: templateCoreRouter,
   // Version management operations
-  ...(templateVersionsRouter as any),
+  versions: templateVersionsRouter,
   // Library/publishing operations
-  ...(templateLibraryRouter as any),
+  library: templateLibraryRouter,
 });

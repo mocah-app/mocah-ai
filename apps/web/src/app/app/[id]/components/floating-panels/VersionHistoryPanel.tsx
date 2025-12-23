@@ -32,7 +32,7 @@ export const VersionHistoryPanel = ({
 
   // Fetch versions - always enabled to preload data
   // This prevents loading state when opening the panel
-  const { data: versions, isLoading } = trpc.template.versions.useQuery(
+  const { data: versions, isLoading } = trpc.template.versions.list.useQuery(
     { templateId },
     { enabled: !!templateId }
   );

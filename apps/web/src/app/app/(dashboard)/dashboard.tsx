@@ -4,8 +4,8 @@ import BrandKitSetupBanner from "@/components/brand-kit/BrandKitSetupBanner";
 import { EmptyState } from "@/components/dashboard/empty-state";
 import { NoBrandState } from "@/components/dashboard/no-brand-state";
 import { TemplateGridView } from "@/components/dashboard/template-grid-view";
-import { TemplateListView } from "@/components/dashboard/template-list-view";
 import { TemplateGridViewSkeleton } from "@/components/dashboard/template-grid-view-skeleton";
+import { TemplateListView } from "@/components/dashboard/template-list-view";
 import { TemplateListViewSkeleton } from "@/components/dashboard/template-list-view-skeleton";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -40,7 +40,7 @@ function DashboardContent() {
     fetchNextPage,
     hasNextPage,
     isFetchingNextPage,
-  } = trpc.template.list.useInfiniteQuery(
+  } = trpc.template.core.list.useInfiniteQuery(
     { limit: TEMPLATES_PER_PAGE },
     {
       enabled: !!activeOrganization?.id,
@@ -56,7 +56,7 @@ function DashboardContent() {
       prevOrgIdRef.current &&
       prevOrgIdRef.current !== activeOrganization.id
     ) {
-      utils.template.list.invalidate();
+      utils.template.core.list.invalidate();
     }
     prevOrgIdRef.current = activeOrganization?.id;
   }, [activeOrganization?.id, utils]);

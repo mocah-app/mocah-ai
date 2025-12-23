@@ -50,9 +50,9 @@ export default function NewTemplatePage() {
     }
   }, [brandGuidePreference]);
 
-  const createSkeletonMutation = trpc.template.create.useMutation({
+  const createSkeletonMutation = trpc.template.core.create.useMutation({
     onSuccess: () => {
-      utils.template.list.invalidate();
+      utils.template.core.list.invalidate();
     },
   });
 

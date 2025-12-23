@@ -12,14 +12,14 @@ export const templateLibraryRouter = router({
   /**
    * Check if current user can publish templates to library
    */
-  canPublishToLibrary: protectedProcedure.query(async ({ ctx }) => {
+  canPublish: protectedProcedure.query(async ({ ctx }) => {
     return checkPublisherPermission(ctx.session.user.email);
   }),
 
   /**
    * Get library categories
    */
-  getLibraryCategories: publicProcedure.query(async ({ ctx }) => {
+  getCategories: publicProcedure.query(async ({ ctx }) => {
     const categories = await ctx.db.templateCategory.findMany({
       where: {
         deletedAt: null,
@@ -35,7 +35,7 @@ export const templateLibraryRouter = router({
   /**
    * Get library templates with search and filter
    */
-  getLibraryTemplates: publicProcedure
+  getTemplates: publicProcedure
     .input(
       z.object({
         search: z.string().optional(),
@@ -108,7 +108,7 @@ export const templateLibraryRouter = router({
   /**
    * Get library template detail with messages
    */
-  getLibraryTemplateDetail: publicProcedure
+  getDetail: publicProcedure
     .input(
       z.object({
         id: z.string(),
@@ -145,7 +145,7 @@ export const templateLibraryRouter = router({
   /**
    * Publish a template to the library
    */
-  publishToLibrary: protectedProcedure
+  publish: protectedProcedure
     .input(
       z.object({
         id: z.string(),
@@ -203,7 +203,7 @@ export const templateLibraryRouter = router({
   /**
    * Get all published templates for current organization
    */
-  getPublishedTemplates: protectedProcedure
+  getPublished: protectedProcedure
     .input(
       z.object({
         search: z.string().optional(),
@@ -278,7 +278,7 @@ export const templateLibraryRouter = router({
   /**
    * Get library entry for a specific template (check if published)
    */
-  getLibraryEntryForTemplate: protectedProcedure
+  getEntryForTemplate: protectedProcedure
     .input(
       z.object({
         templateId: z.string(),
@@ -309,7 +309,7 @@ export const templateLibraryRouter = router({
   /**
    * Update library entry metadata
    */
-  updateLibraryEntry: protectedProcedure
+  updateEntry: protectedProcedure
     .input(
       z.object({
         libraryId: z.string(),
@@ -359,7 +359,7 @@ export const templateLibraryRouter = router({
   /**
    * Update library entry from source template (sync latest changes)
    */
-  updateLibraryFromSource: protectedProcedure
+  updateFromSource: protectedProcedure
     .input(
       z.object({
         libraryId: z.string(),
@@ -410,7 +410,7 @@ export const templateLibraryRouter = router({
   /**
    * Unpublish template (soft delete from library)
    */
-  unpublishTemplate: protectedProcedure
+  unpublish: protectedProcedure
     .input(
       z.object({
         libraryId: z.string(),
@@ -441,7 +441,7 @@ export const templateLibraryRouter = router({
   /**
    * Permanently delete library entry
    */
-  deleteLibraryEntry: protectedProcedure
+  deleteEntry: protectedProcedure
     .input(
       z.object({
         libraryId: z.string(),

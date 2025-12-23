@@ -25,7 +25,7 @@ interface TemplateCardProps {
 export function TemplateCard({ template }: TemplateCardProps) {
   // Check if template is published
   const { data: libraryEntry } =
-    trpc.template.getLibraryEntryForTemplate.useQuery(
+    trpc.template.library.getEntryForTemplate.useQuery(
       { templateId: template.id },
       { retry: false }
     );

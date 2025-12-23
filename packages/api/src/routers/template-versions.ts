@@ -7,7 +7,7 @@ export const templateVersionsRouter = router({
   /**
    * Get version history for a template
    */
-  versions: protectedProcedure
+  list: protectedProcedure
     .input(
       z.object({
         templateId: z.string(),
@@ -30,7 +30,7 @@ export const templateVersionsRouter = router({
    * This snapshots the current template state before saving new changes
    * NOTE: This does NOT update template.currentVersionId - that only happens on restore
    */
-  createVersion: protectedProcedure
+  create: protectedProcedure
     .input(
       z.object({
         templateId: z.string(),

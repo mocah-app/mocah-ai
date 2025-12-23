@@ -63,7 +63,7 @@ export default function PublishedTemplatesPage() {
 
   // Check publish permission
   const { data: canPublish, isLoading: isCheckingPermission } =
-    trpc.template.canPublishToLibrary.useQuery();
+    trpc.template.library.canPublish.useQuery();
 
   // Redirect if user doesn't have publish rights
   useEffect(() => {
@@ -74,7 +74,7 @@ export default function PublishedTemplatesPage() {
 
   // Queries
   const { data: publishedTemplatesData, isLoading: isLoadingTemplates } =
-    trpc.template.getPublishedTemplates.useQuery(
+    trpc.template.library.getPublished.useQuery(
       {
         search: searchQuery || undefined,
         category: categoryFilter === "_all" ? undefined : categoryFilter,
@@ -90,17 +90,17 @@ export default function PublishedTemplatesPage() {
     | PublishedTemplateEntry[]
     | undefined;
 
-  const { data: categories } = trpc.template.getLibraryCategories.useQuery();
+  const { data: categories } = trpc.template.library.getCategories.useQuery();
 
   // Mutations
   const utils = trpc.useUtils();
 
-  const updateLibraryMutation = trpc.template.updateLibraryEntry.useMutation({
+  const updateLibraryMutation = trpc.template.library.updateEntry.useMutation({
     onSuccess: () => {
       toast.success("Library entry updated", {
         description: "Your changes are now live in the public library",
       });
-      utils.template.getPublishedTemplates.invalidate();
+      utils.template.library.getPublished.invalidate();
     },
     onError: (error: any) => {
       toast.error("Failed to update", {
@@ -110,12 +110,12 @@ export default function PublishedTemplatesPage() {
   });
 
   const updateFromSourceMutation =
-    trpc.template.updateLibraryFromSource.useMutation({
+    trpc.template.library.updateFromSource.useMutation({
       onSuccess: () => {
         toast.success("Library entry synced", {
           description: "The published version now matches your source template",
         });
-        utils.template.getPublishedTemplates.invalidate();
+        utils.template.library.getPublished.invalidate();
       },
       onError: (error: any) => {
         toast.error("Failed to sync", {
@@ -124,12 +124,12 @@ export default function PublishedTemplatesPage() {
       },
     });
 
-  const unpublishMutation = trpc.template.unpublishTemplate.useMutation({
+  const unpublishMutation = trpc.template.library.unpublish.useMutation({
     onSuccess: () => {
       toast.success("Template unpublished", {
         description: "The template has been removed from the public library",
       });
-      utils.template.getPublishedTemplates.invalidate();
+      utils.template.library.getPublished.invalidate();
     },
     onError: (error: any) => {
       toast.error("Failed to unpublish", {
@@ -138,13 +138,13 @@ export default function PublishedTemplatesPage() {
     },
   });
 
-  const deleteMutation = trpc.template.deleteLibraryEntry.useMutation({
+  const deleteMutation = trpc.template.library.deleteEntry.useMutation({
     onSuccess: () => {
       toast.success("Template deleted", {
         description:
           "The template has been permanently removed from the library",
       });
-      utils.template.getPublishedTemplates.invalidate();
+      utils.template.library.getPublished.invalidate();
     },
     onError: (error: any) => {
       toast.error("Failed to delete", {
