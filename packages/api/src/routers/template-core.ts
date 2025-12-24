@@ -725,7 +725,8 @@ export const templateCoreRouter = router({
     .mutation(async ({ ctx, input }) => {
       // Check if user is in trial - templates cannot be deleted during trial
       const trial = await getActiveTrial(ctx.session.user.id);
-      if (trial && trial.status === "active") {
+      
+      if (trial) {
         throw new TRPCError({
           code: "FORBIDDEN",
           message:

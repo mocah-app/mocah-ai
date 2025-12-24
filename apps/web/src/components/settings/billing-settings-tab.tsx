@@ -151,6 +151,7 @@ export function BillingSettingsTab({ onClose }: BillingSettingsTabProps) {
                 cancelAtPeriodEnd={subscription.cancelAtPeriodEnd}
                 paymentMethod={null} // Would need to fetch from Stripe
                 onManagePayment={handleManagePayment}
+                isManagingPayment={createPortalSessionMutation.isPending}
               />
             ) : (
               <NoPlanCard onViewPlans={handleUpgradeNow} />

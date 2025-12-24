@@ -12,6 +12,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { authClient } from "@/lib/auth-client";
 import { toast } from "sonner";
+import { trpc } from "@/utils/trpc";
 import { ArrowRight } from "lucide-react";
 import { PricingCard } from "./pricing-card";
 import { PricingToggle } from "./pricing-toggle";
@@ -43,17 +44,35 @@ export function PlanSelectionModal({
   const [isAnnual, setIsAnnual] = useState(defaultInterval === "year");
   const [loadingPlan, setLoadingPlan] = useState<string | null>(null);
 
+  // Get current subscription to check for existing subscriptionId
+  const { data: subscriptionData } = trpc.subscription.getCurrent.useQuery(
+    undefined,
+    {
+      refetchOnWindowFocus: false,
+    }
+  );
+
   // Handle plan selection using Better Auth's subscription.upgrade()
   const handleSelectPlan = async (planId: string) => {
     setLoadingPlan(planId);
     
     try {
-      const result = await authClient.subscription.upgrade({
+      // If user has an existing subscription, pass subscriptionId to upgrade instead of creating new one
+      const existingSubscription = subscriptionData?.subscription;
+      const upgradeParams: Parameters<typeof authClient.subscription.upgrade>[0] = {
         plan: planId,
         annual: isAnnual,
         successUrl: `${window.location.origin}/app?checkout=success`,
         cancelUrl: `${window.location.origin}/app`,
-      });
+      };
+
+      // Include subscriptionId if user has an active/trialing subscription to avoid duplicate creation
+      if (existingSubscription?.stripeSubscriptionId && 
+          (existingSubscription.status === "active" || existingSubscription.status === "trialing")) {
+        upgradeParams.subscriptionId = existingSubscription.stripeSubscriptionId;
+      }
+
+      const result = await authClient.subscription.upgrade(upgradeParams);
 
       if (result.error) {
         toast.error(`Failed to start checkout: ${result.error.message}`);

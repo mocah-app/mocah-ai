@@ -28,7 +28,7 @@ export interface TrialInfo {
   templatesLimit: number;
   imagesUsed: number;
   imagesLimit: number;
-  status: "active" | "converted" | "cancelled" | "expired" | null;
+  status: "active" | null;
 }
 
 export interface PlanInfo {

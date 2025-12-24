@@ -5,6 +5,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import MocahLoadingIcon from "@/components/mocah-brand/MocahLoadingIcon";
 import { authClient } from "@/lib/auth-client";
 import { toast } from "sonner";
+import { trpc } from "@/utils/trpc";
 
 // ============================================================================
 // Types
@@ -27,17 +28,35 @@ export function CheckoutLoadingModal({
 }: CheckoutLoadingModalProps) {
   const isCheckoutTriggered = useRef(false);
 
+  // Get current subscription to check for existing subscriptionId
+  const { data: subscriptionData } = trpc.subscription.getCurrent.useQuery(
+    undefined,
+    {
+      refetchOnWindowFocus: false,
+    }
+  );
+
   // Trigger checkout when modal opens using Better Auth's subscription.upgrade()
   useEffect(() => {
     if (open && plan && interval && !isCheckoutTriggered.current) {
       isCheckoutTriggered.current = true;
       
-      authClient.subscription.upgrade({
+      // If user has an existing subscription, pass subscriptionId to upgrade instead of creating new one
+      const existingSubscription = subscriptionData?.subscription;
+      const upgradeParams: Parameters<typeof authClient.subscription.upgrade>[0] = {
         plan,
         annual: interval === "year",
         successUrl: `${window.location.origin}/app?checkout=success`,
         cancelUrl: `${window.location.origin}/pricing`,
-      }).then((result) => {
+      };
+
+      // Include subscriptionId if user has an active/trialing subscription to avoid duplicate creation
+      if (existingSubscription?.stripeSubscriptionId && 
+          (existingSubscription.status === "active" || existingSubscription.status === "trialing")) {
+        upgradeParams.subscriptionId = existingSubscription.stripeSubscriptionId;
+      }
+      
+      authClient.subscription.upgrade(upgradeParams).then((result) => {
         if (result.error) {
           toast.error(`Failed to start checkout: ${result.error.message}`);
           isCheckoutTriggered.current = false;
@@ -53,7 +72,7 @@ export function CheckoutLoadingModal({
     if (!open) {
       isCheckoutTriggered.current = false;
     }
-  }, [open, plan, interval]);
+  }, [open, plan, interval, subscriptionData]);
 
   return (
     <Dialog open={open} onOpenChange={() => {}}>

@@ -1,6 +1,6 @@
 // billing.prisma
-// Monetization & Billing - Plan definitions, trials, and payment processing
-// Note: Subscriptions are managed by Better Auth Stripe plugin (see stripe.prisma)
+// Monetization & Billing - Plan definitions and payment processing
+// Note: Subscriptions and trials are managed by Better Auth Stripe plugin (see stripe.prisma)
 
 model Plan {
   id                String   @id @default(uuid())
@@ -29,44 +29,6 @@ model Plan {
   @@index([isActive])
   @@index([sortOrder])
   @@map("plan")
-}
-
-// Trial model for 7-day credit card required trials
-model Trial {
-  id                String      @id @default(uuid())
-  userId            String      @unique  // One trial per user
-  email             String
-  plan              PlanName    // The plan they're trying
-  stripeCustomerId  String      // For one-trial-per-card tracking
-  
-  // Trial period
-  startedAt         DateTime    @default(now())
-  expiresAt         DateTime    // 7 days from startedAt
-  
-  // Usage tracking during trial
-  templatesUsed     Int         @default(0)
-  imagesUsed        Int         @default(0)
-  templatesLimit    Int         @default(5)  // Trial limit: 5 templates
-  imagesLimit       Int         @default(5)  // Trial limit: 5 images
-  
-  // Trial outcome
-  status            TrialStatus @default(active)
-  convertedAt       DateTime?   // When they upgraded
-  cancelledAt       DateTime?   // When they cancelled
-  
-  // Metadata
-  lastSyncedAt      DateTime    @default(now())
-  createdAt         DateTime    @default(now())
-  updatedAt         DateTime    @updatedAt
-
-  // Relations
-  user              User        @relation(fields: [userId], references: [id], onDelete: Cascade)
-
-  @@index([userId])
-  @@index([stripeCustomerId])
-  @@index([status])
-  @@index([expiresAt])
-  @@map("trial")
 }
 
 // Cancellation feedback for improving retention

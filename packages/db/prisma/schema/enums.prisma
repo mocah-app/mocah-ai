@@ -7,13 +7,6 @@ enum PlanName {
   scale
 }
 
-enum TrialStatus {
-  active
-  converted
-  cancelled
-  expired
-}
-
 enum GenerationType {
   text
   image

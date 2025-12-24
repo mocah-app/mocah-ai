@@ -91,24 +91,15 @@ export function TrialBanner({
       {/* Header */}
       <div className="flex items-start justify-between gap-4">
         <div className="flex items-center gap-2">
-          <Sparkles className={cn("h-5 w-5", color)} />
+          <Sparkles className={cn("h-4 w-4", color)} />
           <div>
-            <h3 className="font-semibold">Free Trial</h3>
-            <p className="text-sm text-muted-foreground">
-              {daysRemaining > 0 ? (
-                <>
-                  {daysRemaining} {daysRemaining === 1 ? "day" : "days"} remaining
-                </>
-              ) : (
-                "Expires today"
-              )}
-            </p>
+            <h3 className="font-semibold">Free Trial Ends in {daysRemaining} days</h3>
           </div>
         </div>
         
         <Badge
           variant={urgency === "urgent" ? "destructive" : urgency === "warning" ? "outline" : "secondary"}
-          className="shrink-0"
+          className="shrink-0 text-sm"
         >
           <Clock className="mr-1 h-3 w-3" />
           Ends {formatExpiryDate(expiresAt)}

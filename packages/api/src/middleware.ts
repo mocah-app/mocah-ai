@@ -115,9 +115,8 @@ export const requireTemplateGenerationQuota = t.middleware(async ({ ctx, next })
   const usageCheck = await checkUsageLimit(userId, "templateGeneration");
 
   if (!usageCheck.allowed) {
-    const trial = await getActiveTrial(userId);
     throw new UsageLimitError({
-      code: trial ? "TRIAL_LIMIT_REACHED" : "QUOTA_EXCEEDED",
+      code: usageCheck.isTrialUser ? "TRIAL_LIMIT_REACHED" : "QUOTA_EXCEEDED",
       remaining: usageCheck.remaining,
       limit: usageCheck.limit,
       resetDate: usageCheck.resetDate,
@@ -151,9 +150,8 @@ export const requireImageGenerationQuota = t.middleware(async ({ ctx, next }) =>
   const usageCheck = await checkUsageLimit(userId, "imageGeneration");
 
   if (!usageCheck.allowed) {
-    const trial = await getActiveTrial(userId);
     throw new UsageLimitError({
-      code: trial ? "TRIAL_LIMIT_REACHED" : "QUOTA_EXCEEDED",
+      code: usageCheck.isTrialUser ? "TRIAL_LIMIT_REACHED" : "QUOTA_EXCEEDED",
       remaining: usageCheck.remaining,
       limit: usageCheck.limit,
       resetDate: usageCheck.resetDate,
@@ -184,9 +182,11 @@ export const requireTrialNotActive = t.middleware(async ({ ctx, next }) => {
   }
 
   const userId = ctx.session.user.id;
+  
+  // Check if user is in trial
   const trial = await getActiveTrial(userId);
 
-  if (trial && trial.status === "active") {
+  if (trial) {
     throw new TRPCError({
       code: "FORBIDDEN",
       message:

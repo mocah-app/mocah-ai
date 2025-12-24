@@ -58,7 +58,6 @@ export const CACHE_KEYS = {
   rateLimit: (identifier: string, window: string) =>
     `ratelimit:${identifier}:${window}`,
   // Usage tracking keys (account-level)
-  trial: (userId: string) => `trial:${userId}`,
   usage: (userId: string, month: string) => `usage:${userId}:${month}`,
   planLimits: (userId: string) => `plan:${userId}`,
 } as const;

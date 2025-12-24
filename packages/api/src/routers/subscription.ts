@@ -14,7 +14,12 @@ import { TRPCError } from "@trpc/server";
 import Stripe from "stripe";
 import { z } from "zod";
 import { protectedProcedure, publicProcedure, router } from "../index";
-import { getActiveTrial, getUserUsageStats } from "../lib/usage-tracking";
+import { getUserUsageStats } from "../lib/usage-tracking";
+
+
+const TEMPLATES_LIMIT = 5; // TRIAL_LIMITS.templatesLimit
+const IMAGES_LIMIT = 5; // TRIAL_LIMITS.imagesLimit
+
 
 // Initialize Stripe client
 const stripe = new Stripe(serverEnv.STRIPE_SECRET_KEY, {
@@ -68,10 +73,25 @@ export const subscriptionRouter = router({
       orderBy: { sortOrder: "asc" },
     });
 
+    // Format trial data from subscription if in trial
+    const trial = subscription?.status === "trialing" && subscription.trialEnd
+      ? {
+          plan: subscription.plan,
+          status: "active" as const,
+          startedAt: subscription.trialStart || subscription.createdAt || new Date(),
+          expiresAt: subscription.trialEnd,
+          templatesUsed: subscription.trialTemplatesUsed,
+          templatesLimit: 5, // TRIAL_LIMITS.templatesLimit
+          imagesUsed: subscription.trialImagesUsed,
+          imagesLimit: 5, // TRIAL_LIMITS.imagesLimit
+        }
+      : null;
+
     return {
       subscription: subscription
         ? {
             id: subscription.id,
+            stripeSubscriptionId: subscription.stripeSubscriptionId,
             plan: subscription.plan,
             status: subscription.status,
             periodStart: subscription.periodStart,
@@ -81,18 +101,7 @@ export const subscriptionRouter = router({
             trialEnd: subscription.trialEnd,
           }
         : null,
-      trial: usageStats.trial
-        ? {
-            plan: usageStats.trial.plan,
-            status: usageStats.trial.status,
-            startedAt: usageStats.trial.startedAt,
-            expiresAt: usageStats.trial.expiresAt,
-            templatesUsed: usageStats.trial.templatesUsed,
-            templatesLimit: usageStats.trial.templatesLimit,
-            imagesUsed: usageStats.trial.imagesUsed,
-            imagesLimit: usageStats.trial.imagesLimit,
-          }
-        : null,
+      trial,
       usage: {
         templates: usageStats.templateUsage,
         images: usageStats.imageUsage,
@@ -258,35 +267,40 @@ export const subscriptionRouter = router({
 
   /**
    * Get trial status
-   * Note: Trial creation is handled by Better Auth's subscription.upgrade() with freeTrial config
+   * Note: Trial is tracked directly in Subscription model
    */
   getTrialStatus: protectedProcedure.query(async ({ ctx }) => {
     const userId = ctx.session.user.id;
-    const trial = await getActiveTrial(userId);
+    
+    const subscription = await prisma.subscription.findFirst({
+      where: {
+        referenceId: userId,
+        status: "trialing",
+      },
+    });
 
-    if (!trial) {
+    if (!subscription || !subscription.trialEnd) {
       return null;
     }
 
     const daysRemaining = Math.ceil(
-      (trial.expiresAt.getTime() - Date.now()) / (1000 * 60 * 60 * 24)
+      (subscription.trialEnd.getTime() - Date.now()) / (1000 * 60 * 60 * 24)
     );
 
+
+
     return {
-      plan: trial.plan,
-      status: trial.status,
-      startedAt: trial.startedAt,
-      expiresAt: trial.expiresAt,
+      plan: subscription.plan,
+      status: "active" as const,
+      startedAt: subscription.trialStart || subscription.createdAt || new Date(),
+      expiresAt: subscription.trialEnd,
       daysRemaining: Math.max(0, daysRemaining),
-      templatesUsed: trial.templatesUsed,
-      templatesLimit: trial.templatesLimit,
-      templatesRemaining: Math.max(
-        0,
-        trial.templatesLimit - trial.templatesUsed
-      ),
-      imagesUsed: trial.imagesUsed,
-      imagesLimit: trial.imagesLimit,
-      imagesRemaining: Math.max(0, trial.imagesLimit - trial.imagesUsed),
+      templatesUsed: subscription.trialTemplatesUsed,
+      templatesLimit: TEMPLATES_LIMIT,
+      templatesRemaining: Math.max(0, TEMPLATES_LIMIT - subscription.trialTemplatesUsed),
+      imagesUsed: subscription.trialImagesUsed,
+      imagesLimit: IMAGES_LIMIT,
+      imagesRemaining: Math.max(0, IMAGES_LIMIT - subscription.trialImagesUsed),
     };
   }),
 });

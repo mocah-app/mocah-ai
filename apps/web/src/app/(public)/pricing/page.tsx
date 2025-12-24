@@ -48,12 +48,22 @@ export default function PricingPage() {
     setLoadingPlan(planId);
     
     try {
-      const result = await authClient.subscription.upgrade({
+      // If user has an existing subscription, pass subscriptionId to upgrade instead of creating new one
+      const existingSubscription = subscriptionData?.subscription;
+      const upgradeParams: Parameters<typeof authClient.subscription.upgrade>[0] = {
         plan: planId,
         annual: isAnnual,
         successUrl: `${window.location.origin}/app?checkout=success`,
         cancelUrl: `${window.location.origin}/pricing`,
-      });
+      };
+
+      // Include subscriptionId if user has an active/trialing subscription to avoid duplicate creation
+      if (existingSubscription?.stripeSubscriptionId && 
+          (existingSubscription.status === "active" || existingSubscription.status === "trialing")) {
+        upgradeParams.subscriptionId = existingSubscription.stripeSubscriptionId;
+      }
+
+      const result = await authClient.subscription.upgrade(upgradeParams);
 
       if (result.error) {
         toast.error(`Failed to start checkout: ${result.error.message}`);

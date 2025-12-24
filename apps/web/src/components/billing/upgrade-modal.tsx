@@ -14,6 +14,7 @@ import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 import { authClient } from "@/lib/auth-client";
 import { toast } from "sonner";
+import { trpc } from "@/utils/trpc";
 import { 
   AlertTriangle, 
   ArrowRight, 
@@ -78,6 +79,14 @@ export function UpgradeModal({
   const router = useRouter();
   const [loadingPlan, setLoadingPlan] = useState<string | null>(null);
 
+  // Get current subscription to check for existing subscriptionId
+  const { data: subscriptionData } = trpc.subscription.getCurrent.useQuery(
+    undefined,
+    {
+      refetchOnWindowFocus: false,
+    }
+  );
+
   // Filter to show upgrade options only
   const upgradePlans = PLANS.filter((plan) => {
     const planIndex = PLANS.findIndex((p) => p.id === plan.id);
@@ -90,12 +99,22 @@ export function UpgradeModal({
     setLoadingPlan(planId);
     
     try {
-      const result = await authClient.subscription.upgrade({
+      // If user has an existing subscription, pass subscriptionId to upgrade instead of creating new one
+      const existingSubscription = subscriptionData?.subscription;
+      const upgradeParams: Parameters<typeof authClient.subscription.upgrade>[0] = {
         plan: planId,
         annual: false, // Default to monthly for upgrade modal
         successUrl: `${window.location.origin}/app?checkout=success`,
         cancelUrl: `${window.location.origin}/app`,
-      });
+      };
+
+      // Include subscriptionId if user has an active/trialing subscription to avoid duplicate creation
+      if (existingSubscription?.stripeSubscriptionId && 
+          (existingSubscription.status === "active" || existingSubscription.status === "trialing")) {
+        upgradeParams.subscriptionId = existingSubscription.stripeSubscriptionId;
+      }
+
+      const result = await authClient.subscription.upgrade(upgradeParams);
 
       if (result.error) {
         toast.error(`Failed to start checkout: ${result.error.message}`);

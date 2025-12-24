@@ -9,6 +9,7 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Spinner } from "@/components/ui/spinner";
 import { cn } from "@/lib/utils";
 import {
   Crown,
@@ -37,6 +38,7 @@ interface CurrentPlanCardProps {
   onManagePayment?: () => void;
   onCancelSubscription?: () => void;
   isLoading?: boolean;
+  isManagingPayment?: boolean;
 }
 
 // ============================================================================
@@ -84,6 +86,7 @@ export function CurrentPlanCard({
   onManagePayment,
   onCancelSubscription,
   isLoading,
+  isManagingPayment = false,
 }: CurrentPlanCardProps) {
   const PlanIcon = getPlanIcon(planName);
   const planColor = getPlanColor(planName);
@@ -171,8 +174,10 @@ export function CurrentPlanCard({
               variant="outline"
               size="sm"
               onClick={onManagePayment}
+              disabled={isManagingPayment}
             >
-              Manage Payment
+              {isManagingPayment && <Spinner className="mr-2" />}
+              {isManagingPayment ? "Loading..." : "Manage Payment"}
             </Button>
           )}
         </div>

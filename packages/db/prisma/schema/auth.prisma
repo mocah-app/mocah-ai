@@ -16,7 +16,6 @@ model User {
   aiPrompts     AIPrompt[]
   usageQuotas   UsageQuota[]
   imageAssets   ImageAsset[]
-  trial         Trial?       // One trial per user (optional)
 
   @@unique([email])
   @@map("user")
