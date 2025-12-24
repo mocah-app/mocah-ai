@@ -17,6 +17,8 @@ import { TrialBanner } from "@/components/billing/trial-banner";
 import { UsageMeter } from "@/components/billing/usage-meter";
 import { InvoiceTable } from "@/components/billing/invoice-table";
 import { PlanSelectionModal } from "@/components/pricing/plan-selection-modal";
+import { Button } from "@/components/ui/button";
+import { TrendingUp } from "lucide-react";
 
 
 // ============================================================================
@@ -60,6 +62,17 @@ export function BillingSettingsTab({ onClose }: BillingSettingsTabProps) {
     },
   });
 
+  const endTrialEarlyMutation = trpc.subscription.endTrialEarly.useMutation({
+    onSuccess: () => {
+      toast.success("Trial ended successfully. Your subscription is now active!");
+      // Refetch subscription data to update UI
+      utils.subscription.getCurrent.invalidate();
+    },
+    onError: (error) => {
+      toast.error(`Failed to upgrade: ${error.message}`);
+    },
+  });
+
   // Handlers
   const handleManagePayment = () => {
     createPortalSessionMutation.mutate({
@@ -68,7 +81,13 @@ export function BillingSettingsTab({ onClose }: BillingSettingsTabProps) {
   };
 
   const handleUpgradeNow = () => {
-    setShowPlanModal(true);
+    // If user is on trial, end it early and upgrade immediately
+    if (isTrialUser && subscription?.stripeSubscriptionId) {
+      endTrialEarlyMutation.mutate();
+    } else {
+      // Otherwise, show plan selection modal
+      setShowPlanModal(true);
+    }
   };
 
   // Derived state
@@ -111,6 +130,26 @@ export function BillingSettingsTab({ onClose }: BillingSettingsTabProps) {
     hostedUrl: inv.hostedInvoiceUrl,
   }));
 
+  // Calculate usage status to determine if upgrade button should show
+  const templatePercentage = usage && limits && limits.templatesLimit > 0 
+    ? Math.min((usage.templates.used / limits.templatesLimit) * 100, 100) 
+    : 0;
+  const imagePercentage = usage && limits && limits.imagesLimit > 0 
+    ? Math.min((usage.images.used / limits.imagesLimit) * 100, 100) 
+    : 0;
+  
+  const templateStatus = templatePercentage >= 100 ? "exceeded" 
+    : templatePercentage >= 95 ? "critical" 
+    : templatePercentage >= 80 ? "warning" 
+    : "normal";
+  const imageStatus = imagePercentage >= 100 ? "exceeded" 
+    : imagePercentage >= 95 ? "critical" 
+    : imagePercentage >= 80 ? "warning" 
+    : "normal";
+  
+  const showUpgradeButton = templateStatus === "warning" || templateStatus === "critical" || templateStatus === "exceeded" ||
+    imageStatus === "warning" || imageStatus === "critical" || imageStatus === "exceeded";
+
   return (
     <div className="space-y-6">
       {/* Trial Banner */}
@@ -123,6 +162,7 @@ export function BillingSettingsTab({ onClose }: BillingSettingsTabProps) {
           imagesLimit={trial.imagesLimit}
           expiresAt={new Date(trial.expiresAt)}
           onUpgradeNow={handleUpgradeNow}
+          isUpgrading={endTrialEarlyMutation.isPending}
         />
       )}
 
@@ -163,11 +203,22 @@ export function BillingSettingsTab({ onClose }: BillingSettingsTabProps) {
       {/* Usage */}
       {(hasActiveSubscription || isTrialUser) && usage && limits && (
         <Card className="rounded-none border-none">
-          <CardHeader>
-            <CardTitle>Usage This Period</CardTitle>
-            <CardDescription>
-              Track your template and image generation usage
-            </CardDescription>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-4">
+            <div>
+              <CardTitle>Usage This Period</CardTitle>
+              <CardDescription>
+                Track your template and image generation usage
+              </CardDescription>
+            </div>
+            {showUpgradeButton && (
+              <Button
+                onClick={handleUpgradeNow}
+                size="sm"
+              >
+                <TrendingUp className="h-3 w-3 mr-1" />
+                Upgrade for more
+              </Button>
+            )}
           </CardHeader>
           <CardContent className="space-y-6 px-0">
             <div className="px-6 space-y-6">
@@ -176,14 +227,12 @@ export function BillingSettingsTab({ onClose }: BillingSettingsTabProps) {
                 used={usage.templates.used}
                 limit={limits.templatesLimit}
                 resetDate={resetDate}
-                onUpgradeClick={handleUpgradeNow}
               />
               <UsageMeter
                 label="Images Generated"
                 used={usage.images.used}
                 limit={limits.imagesLimit}
                 resetDate={resetDate}
-                onUpgradeClick={handleUpgradeNow}
               />
             </div>
           </CardContent>

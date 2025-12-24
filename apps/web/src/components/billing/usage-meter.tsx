@@ -2,7 +2,7 @@
 
 import { cn } from "@/lib/utils";
 import { Progress } from "@/components/ui/progress";
-import { AlertTriangle, TrendingUp } from "lucide-react";
+import { AlertTriangle } from "lucide-react";
 
 // ============================================================================
 // Types
@@ -14,8 +14,6 @@ interface UsageMeterProps {
   limit: number;
   unit?: string;
   resetDate?: Date;
-  showUpgradePrompt?: boolean;
-  onUpgradeClick?: () => void;
 }
 
 // ============================================================================
@@ -77,8 +75,6 @@ export function UsageMeter({
   limit,
   unit = "",
   resetDate,
-  showUpgradePrompt = true,
-  onUpgradeClick,
 }: UsageMeterProps) {
   const percentage = limit > 0 ? Math.min((used / limit) * 100, 100) : 0;
   const remaining = Math.max(0, limit - used);
@@ -96,15 +92,11 @@ export function UsageMeter({
       </div>
 
       {/* Progress Bar */}
-      <div className={cn("relative h-2 w-full overflow-hidden rounded-full", bgColor)}>
-        <div
-          className={cn(
-            "h-full transition-all duration-300 ease-out rounded-full",
-            indicatorColor
-          )}
-          style={{ width: `${percentage}%` }}
-        />
-      </div>
+      <Progress
+        value={percentage}
+        className={cn("h-2", bgColor)}
+        indicatorClassName={indicatorColor}
+      />
 
       {/* Footer */}
       <div className="flex items-center justify-between text-xs text-muted-foreground">
@@ -128,22 +120,6 @@ export function UsageMeter({
           <span>Resets {formatResetDate(resetDate)}</span>
         )}
       </div>
-
-      {/* Upgrade Prompt */}
-      {showUpgradePrompt && (status === "warning" || status === "critical" || status === "exceeded") && onUpgradeClick && (
-        <button
-          onClick={onUpgradeClick}
-          className={cn(
-            "flex items-center gap-1 text-xs font-medium transition-colors",
-            status === "warning" 
-              ? "text-amber-600 hover:text-amber-700 dark:text-amber-500 dark:hover:text-amber-400"
-              : "text-destructive hover:text-destructive/80"
-          )}
-        >
-          <TrendingUp className="h-3 w-3" />
-          Upgrade for more
-        </button>
-      )}
     </div>
   );
 }

@@ -44,13 +44,19 @@ export function PlanSelectionModal({
   const [isAnnual, setIsAnnual] = useState(defaultInterval === "year");
   const [loadingPlan, setLoadingPlan] = useState<string | null>(null);
 
-  // Get current subscription to check for existing subscriptionId
+  // Get current subscription to check for existing subscriptionId and current plan
   const { data: subscriptionData } = trpc.subscription.getCurrent.useQuery(
     undefined,
     {
       refetchOnWindowFocus: false,
     }
   );
+
+  // Determine current plan and if user has an existing subscription
+  const currentPlanId = subscriptionData?.subscription?.plan;
+  const hasExistingPlan = !!subscriptionData?.subscription && 
+    (subscriptionData.subscription.status === "active" || 
+     subscriptionData.subscription.status === "trialing");
 
   // Handle plan selection using Better Auth's subscription.upgrade()
   const handleSelectPlan = async (planId: string) => {
@@ -104,10 +110,12 @@ export function PlanSelectionModal({
             {/* Main Content */}
             <div className="w-full flex flex-col items-center justify-center mb-8">
               <h2 className="text-xl lg:text-2xl font-bold flex items-center gap-2">
-                Choose a Subscription Plan
+                {hasExistingPlan ? "Upgrade Your Plan" : "Choose a Subscription Plan"}
               </h2>
               <p className="text-sm lg:text-base text-muted-foreground mt-1">
-                Start your 7-day free trial with any plan
+                {hasExistingPlan 
+                  ? "Upgrade to unlock more templates and images"
+                  : "Start your 7-day free trial with any plan"}
               </p>
             </div>
             <div className="max-w-6xl mx-auto space-y-8">
@@ -127,6 +135,8 @@ export function PlanSelectionModal({
                     key={plan.id}
                     plan={plan}
                     isAnnual={isAnnual}
+                    isCurrentPlan={currentPlanId === plan.id}
+                    hasExistingPlan={hasExistingPlan}
                     isLoading={loadingPlan === plan.id}
                     onSelect={handleSelectPlan}
                   />

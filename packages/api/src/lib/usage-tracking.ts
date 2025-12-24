@@ -81,12 +81,6 @@ const CACHE_TTL = {
   planLimits: 5 * 60, // 5 minutes
 } as const;
 
-// Sync thresholds
-const SYNC_THRESHOLD = {
-  usageIncrements: 10, // Sync to DB every 10 increments
-  maxSyncInterval: 5 * 60 * 1000, // 5 minutes max between syncs
-} as const;
-
 
 // ============================================================================
 // Error Classes
@@ -507,7 +501,26 @@ export async function incrementUsage(
 
   if (redis && isRedisAvailable()) {
     try {
-      const cached = await redis.get<string>(cacheKey);
+      let cached = await redis.get<string>(cacheKey);
+      
+      // If cache is empty, populate from database first
+      if (!cached) {
+        const quotaData = await getCurrentQuota(userId);
+        cached = JSON.stringify({
+          userId: quotaData.userId,
+          plan: quotaData.plan,
+          templatesUsed: quotaData.templatesUsed,
+          templatesLimit: quotaData.templatesLimit,
+          imagesUsed: quotaData.imagesUsed,
+          imagesLimit: quotaData.imagesLimit,
+          periodStart: quotaData.periodStart.toISOString(),
+          periodEnd: quotaData.periodEnd.toISOString(),
+          lastSyncedAt: quotaData.lastSyncedAt.toISOString(),
+        });
+        // Set cache with TTL
+        await redis.set(cacheKey, cached);
+        await redis.expireat(cacheKey, getEndOfMonthTimestamp() + 86400);
+      }
       
       if (cached) {
         const quota = typeof cached === "string" ? JSON.parse(cached) : cached;
@@ -530,12 +543,10 @@ export async function incrementUsage(
         // Update cache (TTL managed by expireat)
         await redis.set(cacheKey, JSON.stringify(quota));
 
-        // Async sync to database every N increments
-        if (newUsage % SYNC_THRESHOLD.usageIncrements === 0) {
-          syncUsageToDatabase(userId).catch((err) =>
-            logger.error("Usage sync error", err as Error)
-          );
-        }
+        // Always sync to database (async, non-blocking)
+        syncUsageToDatabase(userId).catch((err) =>
+          logger.error("Usage sync error", err as Error)
+        );
         
         return newUsage;
       }
@@ -603,15 +614,28 @@ export async function syncUsageToDatabase(userId: string): Promise<void> {
     if (!cached) return;
 
     const quota = typeof cached === "string" ? JSON.parse(cached) : cached;
+    const limits = await getPlanLimits(userId);
 
-    await prisma.usageQuota.update({
+    // Use upsert to handle case where record doesn't exist
+    await prisma.usageQuota.upsert({
       where: {
         userId_periodStart: {
           userId,
           periodStart: new Date(quota.periodStart),
         },
       },
-      data: {
+      create: {
+        userId,
+        plan: limits.plan,
+        periodStart: new Date(quota.periodStart),
+        periodEnd: new Date(quota.periodEnd),
+        templatesUsed: quota.templatesUsed || 0,
+        templatesLimit: limits.templatesLimit,
+        imagesUsed: quota.imagesUsed || 0,
+        imagesLimit: limits.imagesLimit,
+        lastSyncedAt: new Date(),
+      },
+      update: {
         templatesUsed: quota.templatesUsed,
         imagesUsed: quota.imagesUsed,
         lastSyncedAt: new Date(),

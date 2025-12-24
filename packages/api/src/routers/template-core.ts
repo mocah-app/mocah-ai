@@ -476,6 +476,33 @@ export const templateCoreRouter = router({
       // Verify access
       await verifyTemplateAccess(ctx.db, ctx.session.user.id, id);
 
+      // Check if this is a first-time generation (template being saved after streaming)
+      // We increment usage when:
+      // 1. reactEmailCode is being set (not empty)
+      // 2. AND template didn't have reactEmailCode before (or had empty string)
+      // 3. AND status is being set to ACTIVE
+      let shouldIncrementUsage = false;
+      if (updateData.reactEmailCode && updateData.reactEmailCode.trim().length > 0) {
+        const existingTemplate = await ctx.db.template.findUnique({
+          where: { id },
+          select: { status: true, reactEmailCode: true },
+        });
+
+        // Increment if:
+        // - Template didn't have reactEmailCode before (empty or null) - first generation
+        // - AND status is being set to ACTIVE
+        const isFirstGeneration =
+          existingTemplate &&
+          (!existingTemplate.reactEmailCode ||
+            existingTemplate.reactEmailCode.trim().length === 0);
+
+        const isBeingActivated = updateData.status === "ACTIVE";
+
+        if (isFirstGeneration && isBeingActivated) {
+          shouldIncrementUsage = true;
+        }
+      }
+
       // Validate React Email code if provided
       if (updateData.reactEmailCode) {
         // Find span tags in the code for debugging
@@ -544,6 +571,20 @@ export const templateCoreRouter = router({
         where: { id },
         data: updateData,
       });
+
+      // Increment usage after successful first generation
+      if (shouldIncrementUsage && ctx.session?.user?.id) {
+        await incrementUsage(ctx.session.user.id, "templateGeneration").catch(
+          (err) => {
+            logger.error("Failed to increment template usage", {
+              error: err,
+              userId: ctx.session.user.id,
+              templateId: id,
+            });
+            // Don't fail the request if usage tracking fails, but log it
+          }
+        );
+      }
 
       return updatedTemplate;
     }),

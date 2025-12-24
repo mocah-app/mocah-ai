@@ -303,4 +303,79 @@ export const subscriptionRouter = router({
       imagesRemaining: Math.max(0, IMAGES_LIMIT - subscription.trialImagesUsed),
     };
   }),
+
+  /**
+   * End trial early and upgrade to paid subscription immediately
+   * Updates the Stripe subscription to end the trial period now, which will:
+   * - Immediately end the trial
+   * - Trigger billing for the paid plan
+   * - Reset the billing cycle to start from that moment
+   */
+  endTrialEarly: protectedProcedure.mutation(async ({ ctx }) => {
+    const userId = ctx.session.user.id;
+
+    // Get the current trialing subscription
+    const subscription = await prisma.subscription.findFirst({
+      where: {
+        referenceId: userId,
+        status: "trialing",
+      },
+    });
+
+    if (!subscription) {
+      throw new TRPCError({
+        code: "NOT_FOUND",
+        message: "No active trial found.",
+      });
+    }
+
+    if (!subscription.stripeSubscriptionId) {
+      throw new TRPCError({
+        code: "BAD_REQUEST",
+        message: "Subscription does not have a Stripe subscription ID.",
+      });
+    }
+
+    try {
+      // Update Stripe subscription to end trial immediately
+      // Setting trial_end to 'now' will:
+      // - End the trial immediately
+      // - Create and charge an invoice
+      // - Change status from 'trialing' to 'active'
+      const updatedSubscription = await stripe.subscriptions.update(
+        subscription.stripeSubscriptionId,
+        {
+          trial_end: "now",
+          proration_behavior: "none", // No prorations since we're ending a free trial
+        }
+      );
+
+      logger.info(
+        `Trial ended early for user ${userId}, subscription ${subscription.stripeSubscriptionId}`
+      );
+
+      // The webhook will handle updating the database subscription status
+      // But we can return success immediately
+      return {
+        success: true,
+        subscriptionId: updatedSubscription.id,
+        status: updatedSubscription.status,
+      };
+    } catch (error) {
+      logger.error("Failed to end trial early", error as Error);
+      
+      // Handle Stripe-specific errors
+      if (error instanceof Stripe.errors.StripeError) {
+        throw new TRPCError({
+          code: "INTERNAL_SERVER_ERROR",
+          message: `Stripe error: ${error.message}`,
+        });
+      }
+
+      throw new TRPCError({
+        code: "INTERNAL_SERVER_ERROR",
+        message: "Failed to end trial early. Please try again.",
+      });
+    }
+  }),
 });

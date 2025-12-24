@@ -1,7 +1,7 @@
 "use client";
 
 import React, { createContext, useContext, useState, useCallback } from "react";
-import { UpgradeModal } from "@/components/billing/upgrade-modal";
+import { PlanSelectionModal } from "@/components/pricing/plan-selection-modal";
 
 // ============================================================================
 // Types
@@ -70,11 +70,10 @@ export function UpgradeModalProvider({ children }: UpgradeModalProviderProps) {
       }}
     >
       {children}
-      <UpgradeModal
+      <PlanSelectionModal
         open={isOpen}
         onOpenChange={handleOpenChange}
-        limitType={limitType}
-        currentPlan={currentPlan}
+        defaultPlan={currentPlan}
       />
     </UpgradeModalContext.Provider>
   );

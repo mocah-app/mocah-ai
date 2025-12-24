@@ -76,8 +76,11 @@ export default function PricingPage() {
     }
   };
 
-  // Determine current plan
-  const currentPlanId = subscriptionData?.limits?.plan?.toLowerCase();
+  // Determine current plan and if user has an existing subscription
+  const currentPlanId = subscriptionData?.subscription?.plan;
+  const hasExistingPlan = !!subscriptionData?.subscription && 
+    (subscriptionData.subscription.status === "active" || 
+     subscriptionData.subscription.status === "trialing");
 
   return (
     <div className="min-h-screen bg-linear-to-b from-background via-background to-muted/30">
@@ -85,12 +88,13 @@ export default function PricingPage() {
       <section className="pt-16 pb-8 px-4">
         <div className="max-w-4xl mx-auto text-center">
           <h1 className="text-xl md:text-2xl font-bold tracking-tight mb-4">
-            Simple, Transparent Pricing
+            {hasExistingPlan ? "Upgrade Your Plan" : "Simple, Transparent Pricing"}
           </h1>
 
           <p className="text-lg text-balance text-muted-foreground max-w-2xl mx-auto mb-8">
-            Create beautiful, on-brand email templates in minutes. Start free,
-            upgrade when you&apos;re ready.
+            {hasExistingPlan 
+              ? "Upgrade to unlock more templates and images"
+              : "Create beautiful, on-brand email templates in minutes. Start free, upgrade when you're ready."}
           </p>
 
           {/* Billing Toggle */}
@@ -108,6 +112,7 @@ export default function PricingPage() {
                 plan={plan}
                 isAnnual={isAnnual}
                 isCurrentPlan={currentPlanId === plan.id}
+                hasExistingPlan={hasExistingPlan}
                 isLoading={loadingPlan === plan.id}
                 onSelect={handleSelectPlan}
               />
@@ -142,7 +147,7 @@ export default function PricingPage() {
               onClick={() => handleSelectPlan("pro")}
               disabled={loadingPlan === "pro"}
             >
-              Start Your Free Trial
+              {hasExistingPlan ? "Upgrade to Pro" : "Start Your Free Trial"}
               <ArrowRight className="ml-2 h-4 w-4" />
             </Button>
             <Button

@@ -39,7 +39,8 @@ export function ImageStudioModal() {
   const { state: templateState } = useTemplate();
   const { activeOrganization } = useOrganization();
   const { triggerUpgrade } = useUpgradeModal();
-  const { checkQuota, isNearLimit, getUsagePercentage, plan, usage } = useUsageTracking();
+  const { checkQuota, isNearLimit, getUsagePercentage, plan, usage } =
+    useUsageTracking();
   const {
     onImageSelect,
     initialImageUrl,
@@ -52,7 +53,7 @@ export function ImageStudioModal() {
   } = useImageStudio();
 
   const isOpen = searchParams.get("imageStudio") === "open";
-  
+
   // Check if user is near or at image limit
   const isNearImageLimit = isNearLimit("image");
   const imageUsagePercentage = getUsagePercentage("image");
@@ -116,7 +117,11 @@ export function ImageStudioModal() {
   });
 
   // Generation hook (with cancellation support)
-  const { generate, cancel: cancelGeneration, isGenerating } = useImageGeneration({
+  const {
+    generate,
+    cancel: cancelGeneration,
+    isGenerating,
+  } = useImageGeneration({
     organizationId,
     templateId,
     versionId,
@@ -229,7 +234,7 @@ export function ImageStudioModal() {
       triggerUpgrade("image", plan?.name);
       return;
     }
-    
+
     setSelectedImage(null);
 
     await generate({
@@ -237,7 +242,10 @@ export function ImageStudioModal() {
       model,
       aspectRatio,
       outputFormat,
-      imageUrls: useReferenceImages && referenceImages.length > 0 ? referenceImages : undefined,
+      imageUrls:
+        useReferenceImages && referenceImages.length > 0
+          ? referenceImages
+          : undefined,
       numImages: 1,
       includeBrandGuide,
     });
@@ -395,38 +403,41 @@ export function ImageStudioModal() {
           </Button>
         </DialogHeader>
 
-        {/* Usage Warning Banner */}
-        <UsageWarningBanner
-          type="image"
-          percentage={imageUsagePercentage}
-          remaining={usage?.imagesRemaining}
-          variant="alert"
-          className="mx-4 mt-2"
-        />
-
         {/* Main Content */}
         <div className="flex flex-1 overflow-hidden">
           {/* Left Panel - Controls */}
           <ImageStudioControls {...controlProps} />
 
-          {/* Right Panel - Preview & Results */}
-          <ImageStudioPreview
-            selectedImage={selectedImage}
-            generatedImages={generatedImages}
-            loadingImages={loadingImages}
-            isGenerating={isGenerating}
-            isCopied={isCopied}
-            zoomLevel={zoomLevel}
-            onZoomLevelChange={setZoomLevel}
-            onSelectImage={setSelectedImage}
-            onUseAsReference={handleUseAsReference}
-            onUseImage={handleUseImage}
-            onCopyImageUrl={handleCopyImageUrl}
-            onClearImages={handleClearImages}
-            onImageLoad={handleImageLoad}
-            onImageLoadStart={handleImageLoadStart}
-            onImageError={handleImageError}
-          />
+          <div className="flex-1 flex flex-col gap-2">
+            {/* Usage Warning Banner */}
+            <div className="flex justify-center h-auto">
+            <UsageWarningBanner
+              type="image"
+              percentage={imageUsagePercentage}
+              remaining={usage?.imagesRemaining}
+              variant="alert"
+              className="mx-4 mt-2"
+              />
+              </div>
+            {/* Right Panel - Preview & Results */}
+            <ImageStudioPreview
+              selectedImage={selectedImage}
+              generatedImages={generatedImages}
+              loadingImages={loadingImages}
+              isGenerating={isGenerating}
+              isCopied={isCopied}
+              zoomLevel={zoomLevel}
+              onZoomLevelChange={setZoomLevel}
+              onSelectImage={setSelectedImage}
+              onUseAsReference={handleUseAsReference}
+              onUseImage={handleUseImage}
+              onCopyImageUrl={handleCopyImageUrl}
+              onClearImages={handleClearImages}
+              onImageLoad={handleImageLoad}
+              onImageLoadStart={handleImageLoadStart}
+              onImageError={handleImageError}
+            />
+          </div>
         </div>
       </DialogContent>
     </Dialog>

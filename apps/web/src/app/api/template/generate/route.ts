@@ -4,6 +4,7 @@ import {
   buildReactEmailPrompt,
   reactEmailGenerationSchema,
 } from "@mocah/api/lib/prompts";
+import { checkUsageLimit } from "@mocah/api/lib/usage-tracking";
 import { auth } from "@mocah/auth";
 import prisma from "@mocah/db";
 import { logger } from "@mocah/shared";
@@ -99,10 +100,31 @@ export async function POST(req: NextRequest) {
       });
     }
 
-    // 4. Build React Email prompt (without image URLs in text - they'll be sent as message parts)
+    // 4. Check usage quota before generation (but don't increment yet)
+    const usageCheck = await checkUsageLimit(userId, "templateGeneration");
+    if (!usageCheck.allowed) {
+      return new Response(
+        JSON.stringify({
+          error: "Quota exceeded",
+          message: usageCheck.isTrialUser
+            ? `You've used all ${usageCheck.limit} generations in your trial. Upgrade to unlock full access.`
+            : `You've reached your generation limit this month (${usageCheck.limit} used). Upgrade to continue.`,
+          remaining: usageCheck.remaining,
+          limit: usageCheck.limit,
+          resetDate: usageCheck.resetDate,
+        }),
+        {
+          status: 403,
+          headers: { "Content-Type": "application/json" },
+        }
+      );
+    }
+
+    // 5. Build React Email prompt (without image URLs in text - they'll be sent as message parts)
     const promptText = buildReactEmailPrompt(prompt, brandKit as any);
 
-    // 5. Start streaming with AI SDK (enhanced reliability)
+    // 6. Start streaming with AI SDK (enhanced reliability)
+    // Note: Usage will be incremented in the update mutation when template is successfully saved
     const result = aiClient.streamStructured(
       reactEmailGenerationSchema,
       promptText,
@@ -125,7 +147,7 @@ export async function POST(req: NextRequest) {
       }
     );
 
-    // 6. Return streaming response
+    // 8. Return streaming response
     return result.toTextStreamResponse();
   } catch (error) {
     logger.error("Template generation error:", { error });

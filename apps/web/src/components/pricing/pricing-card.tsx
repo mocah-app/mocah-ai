@@ -15,6 +15,7 @@ interface PricingCardProps {
   plan: Plan;
   isAnnual: boolean;
   isCurrentPlan?: boolean;
+  hasExistingPlan?: boolean;
   isLoading?: boolean;
   onSelect: (planId: string) => void;
 }
@@ -49,6 +50,7 @@ export function PricingCard({
   plan,
   isAnnual,
   isCurrentPlan,
+  hasExistingPlan,
   isLoading,
   onSelect,
 }: PricingCardProps) {
@@ -57,6 +59,14 @@ export function PricingCard({
   const annualTotal = plan.annualPrice * 12;
   const monthlyTotal = plan.monthlyPrice * 12;
   const savings = monthlyTotal - annualTotal;
+
+  // Determine CTA text
+  const getCtaText = () => {
+    if (isCurrentPlan) return "Current Plan";
+    if (isLoading) return "Processing...";
+    if (hasExistingPlan) return `Upgrade to ${plan.name}`;
+    return plan.cta;
+  };
 
   return (
     <motion.div
@@ -153,7 +163,7 @@ export function PricingCard({
         variant={plan.popular ? "default" : "outline"}
         className="w-full"
       >
-        {isCurrentPlan ? "Current Plan" : isLoading ? "Processing..." : plan.cta}
+        {getCtaText()}
       </Button>
     </motion.div>
   );

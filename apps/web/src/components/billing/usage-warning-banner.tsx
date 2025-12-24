@@ -1,12 +1,13 @@
 "use client";
 
-import { Alert, AlertDescription } from "@/components/ui/alert";
+import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { AlertTriangle, TrendingUp } from "lucide-react";
 import Link from "next/link";
 import type { Route } from "next";
 import type { UsageType } from "@/hooks/use-usage-tracking";
+import { PlanSelectionModal } from "@/components/pricing/plan-selection-modal";
 
 // ============================================================================
 // Types
@@ -35,56 +36,150 @@ export function UsageWarningBanner({
   upgradeHref = "/pricing",
   className,
 }: UsageWarningBannerProps) {
+  const [isModalOpen, setIsModalOpen] = useState(false);
+
   // Only show if percentage is >= 80%
   if (percentage < 80) return null;
 
-  const isCritical = percentage >= 95;
+  const isExhausted = percentage >= 100;
+  const isCritical = percentage >= 95 && percentage < 100;
   const typeLabel = type === "template" ? "template" : "image";
 
-  // Alert variant (matches current implementation)
+  const handleUpgradeClick = () => {
+    if (onUpgradeClick) {
+      onUpgradeClick();
+    } else {
+      setIsModalOpen(true);
+    }
+  };
+
+  // Alert variant (improved design)
   if (variant === "alert") {
     return (
-      <Alert
-        variant="default"
-        className={cn(
-          "border-yellow-500/50 bg-yellow-50 dark:bg-yellow-950/20",
-          isCritical && "border-red-500/50 bg-red-50 dark:bg-red-950/20",
-          className
-        )}
-      >
-        <AlertTriangle
+      <>
+        <div
           className={cn(
-            "h-4 w-4",
-            isCritical ? "text-red-600" : "text-yellow-600"
-          )}
-        />
-        <AlertDescription
-          className={cn(
-            isCritical
-              ? "text-red-800 dark:text-red-200"
-              : "text-yellow-800 dark:text-yellow-200"
+            "relative rounded-lg border p-5 shadow-sm transition-all",
+            "bg-linear-to-br from-amber-50/50 to-amber-100/30 dark:from-amber-950/30 dark:to-amber-900/20",
+            (isCritical || isExhausted) &&
+              "from-red-50/50 to-red-100/30 dark:from-red-950/30 dark:to-red-900/20",
+            isExhausted &&
+              "from-red-100/50 to-red-200/30 dark:from-red-900/40 dark:to-red-950/30",
+            "border-amber-200/60 dark:border-amber-800/40",
+            (isCritical || isExhausted) && "border-red-200/60 dark:border-red-800/40",
+            isExhausted && "border-red-300/80 dark:border-red-700/60",
+            className
           )}
         >
-          You&apos;ve used {Math.round(percentage)}% of your {typeLabel} quota
-          this month.{" "}
-          {onUpgradeClick ? (
-            <button
-              onClick={onUpgradeClick}
-              className="font-medium underline underline-offset-4 hover:opacity-80"
+          {/* Decorative gradient overlay */}
+          <div
+            className={cn(
+              "absolute inset-0 rounded-lg opacity-5",
+              isExhausted
+                ? "bg-linear-to-br from-red-600 to-red-700"
+                : isCritical
+                ? "bg-linear-to-br from-red-500 to-red-600"
+                : "bg-linear-to-br from-amber-500 to-amber-600"
+            )}
+          />
+
+          <div className="relative flex items-start gap-4">
+            {/* Icon */}
+            <div
+              className={cn(
+                "flex h-10 w-10 shrink-0 items-center justify-center rounded-full",
+                isExhausted
+                  ? "bg-red-200 dark:bg-red-800/40"
+                  : isCritical
+                  ? "bg-red-100 dark:bg-red-900/30"
+                  : "bg-amber-100 dark:bg-amber-900/30"
+              )}
             >
-              Upgrade your plan
-            </button>
-          ) : (
-            <Link
-              href={upgradeHref as Route}
-              className="font-medium underline underline-offset-4 hover:opacity-80"
-            >
-              Upgrade your plan
-            </Link>
-          )}{" "}
-          for more {typeLabel}s.
-        </AlertDescription>
-      </Alert>
+              <AlertTriangle
+                className={cn(
+                  "h-5 w-5",
+                  isExhausted
+                    ? "text-red-700 dark:text-red-300"
+                    : isCritical
+                    ? "text-red-600 dark:text-red-400"
+                    : "text-amber-600 dark:text-amber-400"
+                )}
+              />
+            </div>
+
+            {/* Content */}
+            <div className="flex-1 flex flex-col md:flex-row justify-between w-full gap-4 space-y-3">
+              <div>
+                <h3
+                  className={cn(
+                    "font-semibold text-sm",
+                    isExhausted
+                      ? "text-red-950 dark:text-red-50"
+                      : isCritical
+                      ? "text-red-900 dark:text-red-100"
+                      : "text-amber-900 dark:text-amber-100"
+                  )}
+                >
+                  {isExhausted
+                    ? "Quota Exhausted"
+                    : isCritical
+                    ? "Quota Almost Exhausted"
+                    : "Quota Warning"}
+                </h3>
+                <p
+                  className={cn(
+                    "text-sm mt-1",
+                    isExhausted
+                      ? "text-red-900/95 dark:text-red-100/95"
+                      : isCritical
+                      ? "text-red-800/90 dark:text-red-200/90"
+                      : "text-amber-800/90 dark:text-amber-200/90"
+                  )}
+                >
+                  {isExhausted ? (
+                    <>
+                      You&apos;ve used <span className="font-semibold">all</span> of your {typeLabel} quota this month. Upgrade to continue creating.
+                    </>
+                  ) : (
+                    <>
+                      You&apos;ve used <span className="font-semibold">{Math.round(percentage)}%</span> of
+                      your {typeLabel} quota this month.
+                      {remaining !== undefined && remaining > 0 && (
+                        <> Only <span className="font-semibold">{remaining}</span> {typeLabel}{remaining === 1 ? "" : "s"} remaining.</>
+                      )}
+                    </>
+                  )}
+                </p>
+              </div>
+
+              {/* CTA Button */}
+              <Button
+                onClick={handleUpgradeClick}
+                size="sm"
+                className={cn(
+                  "mt-2",
+                  isExhausted
+                    ? "bg-red-700 hover:bg-red-800 text-white dark:bg-red-800 dark:hover:bg-red-900 shadow-md"
+                    : isCritical
+                    ? "bg-red-600 hover:bg-red-700 text-white dark:bg-red-700 dark:hover:bg-red-800"
+                    : "bg-amber-600 hover:bg-amber-700 text-white dark:bg-amber-700 dark:hover:bg-amber-800"
+                )}
+              >
+                <TrendingUp className="mr-2 h-4 w-4" />
+                Upgrade Plan
+              </Button>
+            </div>
+          </div>
+        </div>
+
+        {/* Plan Selection Modal */}
+        {!onUpgradeClick && (
+          <PlanSelectionModal
+            open={isModalOpen}
+            onOpenChange={setIsModalOpen}
+          />
+        )}
+      </>
     );
   }
 
