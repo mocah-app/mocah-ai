@@ -4,7 +4,7 @@ import { organization } from "better-auth/plugins";
 import { stripe } from "@better-auth/stripe";
 import { prismaAdapter } from "better-auth/adapters/prisma";
 import Stripe from "stripe";
-import { subscriptionPlans } from "./subscription-plans";
+import { subscriptionPlans, TRIAL_LIMITS, getPlanNameFromPriceId, type PlanName } from "./subscription-plans";
 import { EmailService } from "./email-service";
 import {
   syncStripeSubscriptionToCache,
@@ -12,9 +12,9 @@ import {
   setUserCustomerMapping,
   getUserIdByCustomerId,
 } from "./stripe-sync";
-import prisma, { PlanName } from "@mocah/db";
+import prisma from "@mocah/db";
 import { serverEnv } from "@mocah/config/env";
-import { getRedis, CACHE_KEYS } from "@mocah/shared/redis";
+import { getRedis, CACHE_KEYS, isRedisAvailable } from "@mocah/shared/redis";
 import { logger } from "@mocah/shared/logger";
 
 const stripeClient = new Stripe(serverEnv.STRIPE_SECRET_KEY, {
@@ -388,26 +388,202 @@ const authInstance = betterAuth({
           }
 
           case "customer.subscription.created": {
-            // Additional sync when subscription created
             const subscription = event.data.object as Stripe.Subscription;
             const customerId = subscription.customer as string;
+
             await syncStripeSubscriptionToCache(customerId);
-            logger.info(`Synced new subscription to cache`, { subscriptionId: subscription.id });
+
+            const user = await getUserByCustomerId(customerId);
+            if (!user) {
+              logger.warn(`User not found for subscription creation`, { customerId });
+              break;
+            }
+
+            const firstItem = subscription.items.data[0];
+            const priceId = firstItem?.price?.id;
+            const planName = priceId ? getPlanNameFromPriceId(priceId) : undefined;
+
+            // Update subscription status from "incomplete" (Better Auth initial state) to actual Stripe status
+            await prisma.subscription.updateMany({
+              where: {
+                referenceId: user.id,
+                status: "incomplete",
+              },
+              data: {
+                stripeSubscriptionId: subscription.id,
+                stripeCustomerId: customerId,
+                status: subscription.status,
+                plan: planName,
+                periodStart: firstItem?.current_period_start
+                  ? new Date(firstItem.current_period_start * 1000)
+                  : new Date(),
+                periodEnd: firstItem?.current_period_end
+                  ? new Date(firstItem.current_period_end * 1000)
+                  : null,
+                cancelAtPeriodEnd: subscription.cancel_at_period_end,
+                trialStart: subscription.trial_start
+                  ? new Date(subscription.trial_start * 1000)
+                  : null,
+                trialEnd: subscription.trial_end
+                  ? new Date(subscription.trial_end * 1000)
+                  : null,
+                updatedAt: new Date(),
+              },
+            });
+
+            logger.info(`Updated subscription status`, {
+              userId: user.id,
+              subscriptionId: subscription.id,
+              status: subscription.status,
+              planName,
+            });
+
+            // Create Trial record if subscription is trialing
+            if (subscription.status === "trialing" && planName) {
+              const userRecord = await prisma.user.findUnique({
+                where: { id: user.id },
+                select: { email: true },
+              });
+
+              if (!userRecord) {
+                logger.warn(`User record not found`, { userId: user.id });
+                break;
+              }
+
+              // Check one-trial-per-card rule (existing trial in last 90 days)
+              const ninetyDaysAgo = new Date();
+              ninetyDaysAgo.setDate(ninetyDaysAgo.getDate() - 90);
+
+              const existingTrial = await prisma.trial.findFirst({
+                where: {
+                  stripeCustomerId: customerId,
+                  createdAt: { gte: ninetyDaysAgo },
+                },
+              });
+
+              if (existingTrial) {
+                logger.warn(`Trial already exists for customer`, {
+                  userId: user.id,
+                  customerId,
+                  existingTrialId: existingTrial.id,
+                });
+              } else {
+                const now = new Date();
+                const expiresAt = new Date(now);
+                expiresAt.setDate(expiresAt.getDate() + TRIAL_LIMITS.durationDays);
+
+                const trial = await prisma.trial.create({
+                  data: {
+                    userId: user.id,
+                    email: userRecord.email,
+                    plan: planName,
+                    stripeCustomerId: customerId,
+                    startedAt: now,
+                    expiresAt,
+                    templatesUsed: 0,
+                    imagesUsed: 0,
+                    templatesLimit: TRIAL_LIMITS.templatesLimit,
+                    imagesLimit: TRIAL_LIMITS.imagesLimit,
+                    status: "active",
+                  },
+                });
+
+                // Cache trial data in Redis
+                if (redis && isRedisAvailable()) {
+                  try {
+                    const trialData = {
+                      userId: trial.userId,
+                      plan: trial.plan,
+                      templatesUsed: trial.templatesUsed,
+                      imagesUsed: trial.imagesUsed,
+                      templatesLimit: trial.templatesLimit,
+                      imagesLimit: trial.imagesLimit,
+                      startedAt: trial.startedAt.toISOString(),
+                      expiresAt: trial.expiresAt.toISOString(),
+                      status: trial.status,
+                      stripeCustomerId: trial.stripeCustomerId,
+                    };
+
+                    const expirationTs = Math.floor(expiresAt.getTime() / 1000) + 86400;
+                    await redis.set(CACHE_KEYS.trial(user.id), JSON.stringify(trialData));
+                    await redis.expireat(CACHE_KEYS.trial(user.id), expirationTs);
+                  } catch (error) {
+                    logger.error("Failed to cache trial data", error as Error);
+                  }
+                }
+
+                logger.info(`Trial record created`, {
+                  userId: user.id,
+                  planName,
+                  trialId: trial.id,
+                  expiresAt: trial.expiresAt.toISOString(),
+                });
+              }
+            }
+
+            // Clear user cache to refresh limits
+            if (redis && isRedisAvailable()) {
+              await redis.del(CACHE_KEYS.planLimits(user.id));
+              const currentMonth = new Date().toISOString().slice(0, 7);
+              await redis.del(CACHE_KEYS.usage(user.id, currentMonth));
+            }
+
             break;
           }
 
           case "customer.subscription.updated": {
-            // Sync subscription updates
             const subscription = event.data.object as Stripe.Subscription;
             const customerId = subscription.customer as string;
             await syncStripeSubscriptionToCache(customerId);
-            
+
             const user = await getUserByCustomerId(customerId);
-            if (user && redis) {
-              // Clear plan limits cache so fresh limits are fetched
+            if (!user) {
+              logger.warn(`User not found for subscription update`, { customerId, subscriptionId: subscription.id });
+              break;
+            }
+
+            const firstItem = subscription.items.data[0];
+            const priceId = firstItem?.price?.id;
+            const planName = priceId ? getPlanNameFromPriceId(priceId) : undefined;
+
+            // Update subscription record
+            await prisma.subscription.updateMany({
+              where: { stripeSubscriptionId: subscription.id },
+              data: {
+                status: subscription.status,
+                plan: planName,
+                periodStart: firstItem?.current_period_start
+                  ? new Date(firstItem.current_period_start * 1000)
+                  : null,
+                periodEnd: firstItem?.current_period_end
+                  ? new Date(firstItem.current_period_end * 1000)
+                  : null,
+                cancelAtPeriodEnd: subscription.cancel_at_period_end,
+                trialStart: subscription.trial_start
+                  ? new Date(subscription.trial_start * 1000)
+                  : null,
+                trialEnd: subscription.trial_end
+                  ? new Date(subscription.trial_end * 1000)
+                  : null,
+                updatedAt: new Date(),
+              },
+            });
+
+            // Mark trial as cancelled if subscription is trialing and cancelled
+            if (subscription.status === "trialing" && subscription.cancel_at_period_end) {
+              await prisma.trial.updateMany({
+                where: { userId: user.id, status: "active" },
+                data: {
+                  status: "cancelled",
+                  cancelledAt: new Date(),
+                  updatedAt: new Date(),
+                },
+              });
+            }
+
+            if (redis) {
               await redis.del(CACHE_KEYS.planLimits(user.id));
             }
-            logger.info(`Synced subscription update to cache`, { subscriptionId: subscription.id });
             break;
           }
 

@@ -24,9 +24,30 @@ const autofillStyles =
 
 function SignInFormContent({ callbackUrl }: { callbackUrl: string }) {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const plan = searchParams.get("plan");
+  const interval = searchParams.get("interval");
   const { isPending } = authClient.useSession();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
+
+  // Build register link with preserved params
+  const buildRegisterLink = (): Route => {
+    if (plan && interval) {
+      const params = new URLSearchParams({ plan, interval });
+      return `/register?${params.toString()}` as Route;
+    }
+    return "/register" as Route;
+  };
+
+  // Build callback URL - if we have plan/interval, redirect to register to complete checkout
+  const getFinalCallbackUrl = () => {
+    if (plan && interval) {
+      const params = new URLSearchParams({ plan, interval });
+      return `/register?${params.toString()}`;
+    }
+    return callbackUrl;
+  };
   
   const form = useForm({
     defaultValues: {
@@ -40,7 +61,7 @@ function SignInFormContent({ callbackUrl }: { callbackUrl: string }) {
           {
             email: value.email,
             password: value.password,
-            callbackURL: callbackUrl, // Use Better Auth's built-in redirect
+            callbackURL: getFinalCallbackUrl(), // Redirect to register with plan params if present
           },
           {
             onSuccess: () => {
@@ -72,7 +93,7 @@ function SignInFormContent({ callbackUrl }: { callbackUrl: string }) {
   const handleGoogleSignIn = async () => {
     await authClient.signIn.social({
       provider: "google",
-      callbackURL: callbackUrl,
+      callbackURL: getFinalCallbackUrl(), // Redirect to register with plan params if present
     });
   };
 
@@ -231,7 +252,7 @@ function SignInFormContent({ callbackUrl }: { callbackUrl: string }) {
         <p className="text-sm text-muted-foreground">
           Don't have an account?{" "}
           <Link
-            href="/register"
+            href={buildRegisterLink()}
             className="text-primary underline hover:text-primary/80"
           >
             Create an account

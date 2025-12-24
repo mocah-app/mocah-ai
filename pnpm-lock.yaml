@@ -418,6 +418,9 @@ importers:
       sharp:
         specifier: ^0.34.5
         version: 0.34.5
+      stripe:
+        specifier: 'catalog:'
+        version: 20.0.0(@types/node@25.0.1)
       typescript:
         specifier: ^5
         version: 5.9.3

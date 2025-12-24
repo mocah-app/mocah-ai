@@ -9,18 +9,34 @@ import { Button } from "../ui/button";
 import { Input } from "../ui/input";
 import { Label } from "../ui/label";
 import Link from "next/link";
+import type { Route } from "next";
 import { Card } from "../ui/card";
 import { cn } from "@/lib/utils";
-import { useState } from "react";
+import { useState, Suspense } from "react";
 import { VerificationEmailSent } from "./verification-email-sent";
 import EdgeRayLoader from "../EdgeLoader";
 import MocahIcon from "../mocah-brand/MocahIcon";
 import { Eye, EyeOff } from "lucide-react";
+import { useSearchParams } from "next/navigation";
 
 const autofillStyles =
   "[&:-webkit-autofill]:bg-white [&:-webkit-autofill]:shadow-[0_0_0_30px_white_inset] [&:-webkit-autofill]:[-webkit-text-fill-color:black] [&:-webkit-autofill]:text-black dark:[&:-webkit-autofill]:bg-gray-900 dark:[&:-webkit-autofill]:shadow-[0_0_0_30px_rgb(17_24_39)_inset] dark:[&:-webkit-autofill]:[-webkit-text-fill-color:white] dark:[&:-webkit-autofill]:text-white";
 
-export default function SignUpForm() {
+function SignUpFormContent() {
+  const searchParams = useSearchParams();
+  const plan = searchParams.get("plan");
+  const interval = searchParams.get("interval");
+  
+  // Build callback URL with plan/interval params if present
+  const buildCallbackUrl = () => {
+    const baseUrl = "/brand-setup";
+    if (plan && interval) {
+      const params = new URLSearchParams({ plan, interval });
+      return `${baseUrl}?${params.toString()}`;
+    }
+    return baseUrl;
+  };
+
   const { isPending } = authClient.useSession();
   const [emailSent, setEmailSent] = useState(false);
   const [userEmail, setUserEmail] = useState("");
@@ -40,7 +56,7 @@ export default function SignUpForm() {
             email: value.email,
             password: value.password,
             name: value.email.split("@")[0] || "User",
-            callbackURL: "/brand-setup", // Redirect to brand setup page after email verification
+            callbackURL: buildCallbackUrl(), // Redirect with plan/interval params if present
           },
           {
             onSuccess: () => {
@@ -75,7 +91,7 @@ export default function SignUpForm() {
       await authClient.sendVerificationEmail(
         {
           email: userEmail,
-          callbackURL: "/brand-setup",
+          callbackURL: buildCallbackUrl(),
         },
         {
           onSuccess: () => {
@@ -96,8 +112,17 @@ export default function SignUpForm() {
   const handleGoogleSignUp = async () => {
     await authClient.signIn.social({
       provider: "google",
-      callbackURL: "/brand-setup", // Redirect to onboarding
+      callbackURL: buildCallbackUrl(), // Redirect with plan/interval params if present
     });
+  };
+
+  // Build login link with preserved params
+  const buildLoginLink = (): Route => {
+    if (plan && interval) {
+      const params = new URLSearchParams({ plan, interval });
+      return `/login?${params.toString()}` as Route;
+    }
+    return "/login" as Route;
   };
 
   if (emailSent) {
@@ -263,7 +288,7 @@ export default function SignUpForm() {
         <p className="text-sm text-muted-foreground">
           Already have an account?{" "}
           <Link
-            href="/login"
+            href={buildLoginLink()}
             className="text-primary underline hover:text-primary/80"
           >
             Sign in
@@ -283,5 +308,14 @@ export default function SignUpForm() {
         .
       </div>
     </Card>
+  );
+}
+
+// Export with Suspense boundary
+export default function SignUpForm() {
+  return (
+    <Suspense fallback={null}>
+      <SignUpFormContent />
+    </Suspense>
   );
 }

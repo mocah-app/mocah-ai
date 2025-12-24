@@ -38,8 +38,33 @@ export const TRIAL_LIMITS = {
   hasPremiumImageModel: false, // No premium images during trial
 } as const;
 
+export type PlanName = keyof typeof PLAN_LIMITS;
+
+/**
+ * Price ID to Plan Name mapping
+ * Used to reliably determine plan from Stripe price ID in webhooks
+ */
+export function getPlanNameFromPriceId(priceId: string): PlanName | undefined {
+  const priceIdToPlan: Record<string, PlanName> = {
+    // Monthly prices
+    [serverEnv.STRIPE_PRICE_ID_STARTER_MONTHLY || ""]: "starter",
+    [serverEnv.STRIPE_PRICE_ID_PRO_MONTHLY || ""]: "pro",
+    [serverEnv.STRIPE_PRICE_ID_SCALE_MONTHLY || ""]: "scale",
+    // Annual prices
+    [serverEnv.STRIPE_PRICE_ID_STARTER_ANNUAL || ""]: "starter",
+    [serverEnv.STRIPE_PRICE_ID_PRO_ANNUAL || ""]: "pro",
+    [serverEnv.STRIPE_PRICE_ID_SCALE_ANNUAL || ""]: "scale",
+  };
+
+  return priceIdToPlan[priceId];
+}
+
 /**
  * Subscription plans for Better Auth Stripe plugin
+ * 
+ * Note: Trial record creation is handled in the webhook handler (packages/auth/src/index.ts)
+ * when the `customer.subscription.created` event is received with status "trialing".
+ * Better Auth's `onTrialStart` callback wasn't triggering reliably.
  */
 export const subscriptionPlans = [
   {
@@ -82,5 +107,3 @@ export const subscriptionPlans = [
     },
   },
 ];
-
-export type PlanName = keyof typeof PLAN_LIMITS;

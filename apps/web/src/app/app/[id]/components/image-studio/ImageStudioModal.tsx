@@ -11,8 +11,11 @@ import {
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 import { Sparkles, X } from "lucide-react";
+import { UsageWarningBanner } from "@/components/billing/usage-warning-banner";
 import { useTemplate } from "../providers/TemplateProvider";
 import { useOrganization } from "@/contexts/organization-context";
+import { useUpgradeModal } from "@/contexts/upgrade-modal-context";
+import { useUsageTracking } from "@/hooks/use-usage-tracking";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useImageStudio } from "./ImageStudioContext";
 import { ImageStudioControls } from "./ImageStudioControls";
@@ -35,6 +38,8 @@ export function ImageStudioModal() {
   const searchParams = useSearchParams();
   const { state: templateState } = useTemplate();
   const { activeOrganization } = useOrganization();
+  const { triggerUpgrade } = useUpgradeModal();
+  const { checkQuota, isNearLimit, getUsagePercentage, plan, usage } = useUsageTracking();
   const {
     onImageSelect,
     initialImageUrl,
@@ -47,6 +52,11 @@ export function ImageStudioModal() {
   } = useImageStudio();
 
   const isOpen = searchParams.get("imageStudio") === "open";
+  
+  // Check if user is near or at image limit
+  const isNearImageLimit = isNearLimit("image");
+  const imageUsagePercentage = getUsagePercentage("image");
+  const canGenerateImage = checkQuota("image");
 
   // ============================================================================
   // State
@@ -214,6 +224,12 @@ export function ImageStudioModal() {
   // ============================================================================
 
   const handleGenerate = useCallback(async () => {
+    // Check usage quota before generating
+    if (!canGenerateImage) {
+      triggerUpgrade("image", plan?.name);
+      return;
+    }
+    
     setSelectedImage(null);
 
     await generate({
@@ -226,6 +242,9 @@ export function ImageStudioModal() {
       includeBrandGuide,
     });
   }, [
+    canGenerateImage,
+    triggerUpgrade,
+    plan?.name,
     generate,
     prompt,
     model,
@@ -375,6 +394,15 @@ export function ImageStudioModal() {
             <X className="size-4" />
           </Button>
         </DialogHeader>
+
+        {/* Usage Warning Banner */}
+        <UsageWarningBanner
+          type="image"
+          percentage={imageUsagePercentage}
+          remaining={usage?.imagesRemaining}
+          variant="alert"
+          className="mx-4 mt-2"
+        />
 
         {/* Main Content */}
         <div className="flex flex-1 overflow-hidden">

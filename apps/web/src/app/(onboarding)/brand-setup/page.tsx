@@ -367,7 +367,18 @@ function BrandSetupContent() {
 
       toast.success("Workspace setup complete!");
       await refreshOrganizations(newOrg.id);
-      router.push("/app");
+      
+      // Check if there are plan params from registration flow
+      const plan = searchParams.get("plan");
+      const interval = searchParams.get("interval");
+      
+      if (plan && interval) {
+        // New user from pricing flow - redirect with new-user flag
+        router.push(`/app?new-user=true&plan=${plan}&interval=${interval}`);
+      } else {
+        // Regular onboarding
+        router.push("/app");
+      }
     } catch (error: any) {
       toast.error(error.message || "Failed to complete setup");
     } finally {

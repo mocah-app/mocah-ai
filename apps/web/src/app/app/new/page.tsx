@@ -13,11 +13,14 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { useOrganization } from "@/contexts/organization-context";
+import { useUpgradeModal } from "@/contexts/upgrade-modal-context";
+import { useUsageTracking } from "@/hooks/use-usage-tracking";
 import type { Attachment } from "@/types/images";
 import { useTemplateCreation } from "@/utils/store-prompt-in-session";
 import { trpc } from "@/utils/trpc";
 import { CircleChevronUp } from "lucide-react";
 import { useRouter } from "next/navigation";
+import { UsageWarningBanner } from "@/components/billing/usage-warning-banner";
 import React, { useCallback, useRef, useState, useEffect } from "react";
 import { toast } from "sonner";
 import PromptInput from "./components/PromptInput";
@@ -27,12 +30,19 @@ export default function NewTemplatePage() {
   const utils = trpc.useUtils();
   const { activeOrganization } = useOrganization();
   const { setPrompt: setCreationPrompt } = useTemplateCreation();
+  const { triggerUpgrade } = useUpgradeModal();
+  const { checkQuota, isNearLimit, getUsagePercentage, plan, usage } = useUsageTracking();
   const [prompt, setPrompt] = useState("");
   const [attachments, setAttachments] = useState<Attachment[]>([]);
   const [isUrlDialogOpen, setIsUrlDialogOpen] = useState(false);
   const [urlInput, setUrlInput] = useState("");
   const [includeBrandGuide, setIncludeBrandGuide] = useState(true);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  
+  // Check if user is near or at template limit
+  const isNearTemplateLimit = isNearLimit("template");
+  const templateUsagePercentage = getUsagePercentage("template");
+  const canGenerateTemplate = checkQuota("template");
 
   // Fetch brand guide preference
   const { data: brandGuidePreference } = trpc.brandGuide.getPreference.useQuery(
@@ -224,6 +234,12 @@ export default function NewTemplatePage() {
       return;
     }
 
+    // Check usage quota before generating
+    if (!canGenerateTemplate) {
+      triggerUpgrade("template", plan?.name);
+      return;
+    }
+
     setIsCreating(true);
 
     // Generate UUID client-side
@@ -307,6 +323,15 @@ export default function NewTemplatePage() {
       {/* gradient shape background */}
       <div className="absolute w-2xl h-1/2 bg-linear-to-b z-0 from-primary-transparent dark:from-primary-foreground/40 to-blue-500/30 dark:to-blue-950 rounded-full blur-3xl left-1/2 -translate-x-1/2 top-0"></div>
       <div className="w-full max-w-4xl space-y-8 z-10 flex flex-col items-center justify-center px-4">
+        {/* Usage Warning Banner */}
+        <UsageWarningBanner
+          type="template"
+          percentage={templateUsagePercentage}
+          remaining={usage?.templatesRemaining}
+          variant="alert"
+          className="max-w-2xl"
+        />
+
         {/* Header */}
         <div className="text-center space-y-4 pt-8">
           <h1 className="text-2xl md:text-4xl text-balance font-bold text-foreground tracking-tight">

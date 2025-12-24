@@ -37,6 +37,7 @@
     "dotenv": "catalog:",
     "jsonrepair": "^3.13.1",
     "next": "catalog:",
+    "stripe": "catalog:",
     "zod": "catalog:"
   }
 }
