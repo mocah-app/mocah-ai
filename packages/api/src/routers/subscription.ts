@@ -210,7 +210,7 @@ export const subscriptionRouter = router({
         id: inv.id,
         number: inv.number,
         status: inv.status,
-        amount: inv.amount_paid / 100, // Convert from cents
+        amount: inv.total / 100, // Convert from cents to dollars (total invoice amount)
         currency: inv.currency,
         created: new Date(inv.created * 1000),
         periodStart: inv.period_start

@@ -50,7 +50,7 @@ function formatAmount(amount: number, currency: string): string {
   return new Intl.NumberFormat("en-US", {
     style: "currency",
     currency: currency.toUpperCase(),
-  }).format(amount / 100);
+  }).format(amount);
 }
 
 function getStatusBadge(status: Invoice["status"]) {

@@ -404,21 +404,53 @@ export async function getCurrentQuota(userId: string): Promise<UsageQuotaData> {
     },
   });
 
+  // Get current plan limits to check for sync issues
+  const currentLimits = await getPlanLimits(userId);
+
   // Create new quota record if none exists
   if (!quota) {
-    const limits = await getPlanLimits(userId);
     quota = await prisma.usageQuota.create({
       data: {
         userId,
-        plan: limits.plan,
+        plan: currentLimits.plan,
         periodStart: start,
         periodEnd: end,
         templatesUsed: 0,
-        templatesLimit: limits.templatesLimit,
+        templatesLimit: currentLimits.templatesLimit,
         imagesUsed: 0,
-        imagesLimit: limits.imagesLimit,
+        imagesLimit: currentLimits.imagesLimit,
       },
     });
+  } 
+  // Safety check: If quota limits don't match current subscription plan, update them
+  else if (
+    quota.plan !== currentLimits.plan ||
+    quota.templatesLimit !== currentLimits.templatesLimit ||
+    quota.imagesLimit !== currentLimits.imagesLimit
+  ) {
+    logger.warn("Usage quota out of sync with subscription plan, updating", {
+      userId,
+      quotaPlan: quota.plan,
+      currentPlan: currentLimits.plan,
+      quotaLimits: { templates: quota.templatesLimit, images: quota.imagesLimit },
+      currentLimits: { templates: currentLimits.templatesLimit, images: currentLimits.imagesLimit },
+    });
+
+    // Update quota with current plan limits (keep usage counters)
+    quota = await prisma.usageQuota.update({
+      where: { id: quota.id },
+      data: {
+        plan: currentLimits.plan,
+        templatesLimit: currentLimits.templatesLimit,
+        imagesLimit: currentLimits.imagesLimit,
+        lastSyncedAt: new Date(),
+      },
+    });
+
+    // Clear cache to force refresh
+    if (redis && isRedisAvailable()) {
+      await redis.del(cacheKey);
+    }
   }
 
   const quotaData: UsageQuotaData = {

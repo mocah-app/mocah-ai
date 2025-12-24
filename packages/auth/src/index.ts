@@ -4,7 +4,7 @@ import { organization } from "better-auth/plugins";
 import { stripe } from "@better-auth/stripe";
 import { prismaAdapter } from "better-auth/adapters/prisma";
 import Stripe from "stripe";
-import { subscriptionPlans, PLAN_LIMITS, getPlanNameFromPriceId, type PlanName } from "./subscription-plans";
+import { subscriptionPlans, getPlanNameFromPriceId, type PlanName } from "./subscription-plans";
 import { EmailService } from "./email-service";
 import {
   syncStripeSubscriptionToCache,
@@ -12,6 +12,7 @@ import {
   setUserCustomerMapping,
   getUserIdByCustomerId,
 } from "./stripe-sync";
+import { updateUsageQuotaLimits } from "./usage-quota";
 import prisma from "@mocah/db";
 import { serverEnv } from "@mocah/config/env";
 import { getRedis, CACHE_KEYS, isRedisAvailable } from "@mocah/shared/redis";
@@ -144,9 +145,13 @@ const authInstance = betterAuth({
           const redis = getRedis();
           logger.info(`Subscription updated for user ${userId}`);
 
-          if (redis) {
-            // Clear plan limits cache so fresh limits are fetched
-            await redis.del(CACHE_KEYS.planLimits(userId));
+          if (redis && isRedisAvailable()) {
+            // Clear both plan limits AND usage cache for complete refresh
+            const currentMonth = new Date().toISOString().slice(0, 7);
+            await Promise.all([
+              redis.del(CACHE_KEYS.planLimits(userId)),
+              redis.del(CACHE_KEYS.usage(userId, currentMonth)),
+            ]);
           }
 
           // Get customerId from user record to sync cache
@@ -239,42 +244,17 @@ const authInstance = betterAuth({
             },
           });
 
-          // Create fresh usage quota for billing period
-          const limits = PLAN_LIMITS[planName as keyof typeof PLAN_LIMITS];
-          if (limits) {
-            try {
-              // Extract period from subscription items
-              const firstItem = stripeSubscription.items.data[0] as {
-                current_period_start: number;
-                current_period_end: number;
-              };
+          // Extract period from subscription items
+          const firstItem = stripeSubscription.items.data[0] as {
+            current_period_start: number;
+            current_period_end: number;
+          };
 
-              await prisma.usageQuota.create({
-                data: {
-                  userId,
-                  plan: planName as PlanName,
-                  periodStart: new Date(firstItem.current_period_start * 1000),
-                  periodEnd: new Date(firstItem.current_period_end * 1000),
-                  templatesUsed: 0,  // Fresh start
-                  templatesLimit: limits.templatesLimit,
-                  imagesUsed: 0,
-                  imagesLimit: limits.imagesLimit,
-                },
-              });
-            } catch (error) {
-              // UsageQuota might already exist, that's ok
-              logger.warn(`UsageQuota already exists for user`, { userId, error });
-            }
-          }
+          const periodStart = new Date(firstItem.current_period_start * 1000);
+          const periodEnd = new Date(firstItem.current_period_end * 1000);
 
-          // Clear caches
-          if (redis && isRedisAvailable()) {
-            const currentMonth = new Date().toISOString().slice(0, 7);
-            await Promise.all([
-              redis.del(CACHE_KEYS.usage(userId, currentMonth)),
-              redis.del(CACHE_KEYS.planLimits(userId)),
-            ]);
-          }
+          // Update usage quota with new limits
+          await updateUsageQuotaLimits(userId, planName as PlanName, periodStart, periodEnd);
 
           logger.info(`Trial converted to active subscription`, {
             userId,
@@ -499,7 +479,10 @@ const authInstance = betterAuth({
           case "customer.subscription.updated": {
             const subscription = event.data.object as Stripe.Subscription;
             const customerId = subscription.customer as string;
-            const previousAttributes = (event.data as any).previous_attributes as { status?: string } | undefined;
+            const previousAttributes = (event.data as any).previous_attributes as { 
+              status?: string;
+              items?: any;
+            } | undefined;
             const cachedSub = await syncStripeSubscriptionToCache(customerId);
 
             const user = await getUserByCustomerId(customerId);
@@ -512,6 +495,14 @@ const authInstance = betterAuth({
             const priceId = firstItem?.price?.id;
             const planName = priceId ? getPlanNameFromPriceId(priceId) : undefined;
 
+            // Extract billing period
+            const periodStart = cachedSub.status !== "none" && cachedSub.currentPeriodStart
+              ? new Date(cachedSub.currentPeriodStart * 1000)
+              : new Date();
+            const periodEnd = cachedSub.status !== "none" && cachedSub.currentPeriodEnd
+              ? new Date(cachedSub.currentPeriodEnd * 1000)
+              : new Date();
+
             // Detect trial → active conversion
             if (previousAttributes?.status === "trialing" && subscription.status === "active") {
               logger.info(`Trial converting to active`, {
@@ -520,6 +511,27 @@ const authInstance = betterAuth({
                 planName,
               });
               await handleTrialConversion(user.id, subscription, planName);
+            } 
+            // Detect plan change (upgrade/downgrade) - check if price changed
+            else if (previousAttributes?.items && planName) {
+              const previousItems = previousAttributes.items as { data?: Array<{ price?: { id?: string } }> };
+              const previousPriceId = previousItems?.data?.[0]?.price?.id;
+              const currentPriceId = firstItem?.price?.id;
+
+              if (previousPriceId && currentPriceId && previousPriceId !== currentPriceId) {
+                const previousPlan = getPlanNameFromPriceId(previousPriceId);
+                logger.info(`Plan change detected`, {
+                  userId: user.id,
+                  subscriptionId: subscription.id,
+                  previousPlan,
+                  newPlan: planName,
+                  previousPriceId,
+                  currentPriceId,
+                });
+
+                // Update usage quota with new limits (Option A: keep usage, update limits)
+                await updateUsageQuotaLimits(user.id, planName as PlanName, periodStart, periodEnd);
+              }
             }
 
             // Update subscription record
@@ -528,12 +540,8 @@ const authInstance = betterAuth({
               data: {
                 status: subscription.status,
                 plan: planName,
-                periodStart: cachedSub.status !== "none" && cachedSub.currentPeriodStart
-                  ? new Date(cachedSub.currentPeriodStart * 1000)
-                  : null,
-                periodEnd: cachedSub.status !== "none" && cachedSub.currentPeriodEnd
-                  ? new Date(cachedSub.currentPeriodEnd * 1000)
-                  : null,
+                periodStart,
+                periodEnd,
                 cancelAtPeriodEnd: subscription.cancel_at_period_end ?? false,
                 trialStart: subscription.trial_start
                   ? new Date(subscription.trial_start * 1000)
@@ -549,6 +557,7 @@ const authInstance = betterAuth({
               },
             });
 
+            // Always clear plan limits cache on any subscription update
             if (redis) {
               await redis.del(CACHE_KEYS.planLimits(user.id));
             }
