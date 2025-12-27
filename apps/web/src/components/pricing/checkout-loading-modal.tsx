@@ -4,6 +4,7 @@ import { useEffect, useRef } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import MocahLoadingIcon from "@/components/mocah-brand/MocahLoadingIcon";
 import { authClient } from "@/lib/auth-client";
+import { useOptionalAuth } from "@/lib/use-auth";
 import { toast } from "sonner";
 import { trpc } from "@/utils/trpc";
 
@@ -26,12 +27,14 @@ export function CheckoutLoadingModal({
   plan,
   interval,
 }: CheckoutLoadingModalProps) {
+  const { session } = useOptionalAuth();
   const isCheckoutTriggered = useRef(false);
 
   // Get current subscription to check for existing subscriptionId
   const { data: subscriptionData } = trpc.subscription.getCurrent.useQuery(
     undefined,
     {
+      enabled: !!session?.user, // Only fetch when authenticated
       refetchOnWindowFocus: false,
     }
   );

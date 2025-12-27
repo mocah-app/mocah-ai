@@ -11,6 +11,7 @@ import {
 import { Skeleton } from "@/components/ui/skeleton";
 import { trpc } from "@/utils/trpc";
 import { toast } from "sonner";
+import { useOptionalAuth } from "@/lib/use-auth";
 
 import { CurrentPlanCard, NoPlanCard } from "@/components/billing/current-plan-card";
 import { TrialBanner } from "@/components/billing/trial-banner";
@@ -34,19 +35,22 @@ interface BillingSettingsTabProps {
 // ============================================================================
 
 export function BillingSettingsTab({ onClose }: BillingSettingsTabProps) {
+  const { session } = useOptionalAuth();
   const utils = trpc.useUtils();
   
   // State
   const [showPlanModal, setShowPlanModal] = useState(false);
 
-  // Queries
+  // Queries - only fetch when authenticated
   const { data: subscriptionData, isLoading: isLoadingSubscription } = 
     trpc.subscription.getCurrent.useQuery(undefined, {
+      enabled: !!session?.user,
       refetchOnWindowFocus: false,
     });
 
   const { data: invoicesData, isLoading: isLoadingInvoices } = 
     trpc.subscription.getInvoices.useQuery(undefined, {
+      enabled: !!session?.user,
       refetchOnWindowFocus: false,
     });
 

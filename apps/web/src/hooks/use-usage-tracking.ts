@@ -2,6 +2,7 @@
 
 import { useMemo } from "react";
 import { trpc } from "@/utils/trpc";
+import { useOptionalAuth } from "@/lib/use-auth";
 
 // ============================================================================
 // Types
@@ -64,16 +65,21 @@ export interface UseUsageTrackingResult {
 // ============================================================================
 
 export function useUsageTracking(): UseUsageTrackingResult {
+  const { session, isLoading: isAuthLoading } = useOptionalAuth();
+  
   const {
     data: subscriptionData,
-    isLoading,
+    isLoading: isQueryLoading,
     isError,
     refetch,
   } = trpc.subscription.getCurrent.useQuery(undefined, {
+    enabled: !!session?.user, // Only fetch when authenticated
     refetchInterval: 60000, // Refetch every 60 seconds
     refetchOnWindowFocus: true,
     staleTime: 30000, // Consider data stale after 30 seconds
   });
+
+  const isLoading = isAuthLoading || isQueryLoading;
 
   // Compute usage stats
   const usage = useMemo<UsageStats | null>(() => {

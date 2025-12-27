@@ -26,6 +26,7 @@ import {
 } from "lucide-react";
 import { PLANS } from "@/components/pricing/pricing-data";
 import type { UsageType } from "@/hooks/use-usage-tracking";
+import { useOptionalAuth } from "@/lib/use-auth";
 
 // ============================================================================
 // Types
@@ -77,12 +78,14 @@ export function UpgradeModal({
   currentPlan = "starter",
 }: UpgradeModalProps) {
   const router = useRouter();
+  const { session } = useOptionalAuth();
   const [loadingPlan, setLoadingPlan] = useState<string | null>(null);
 
   // Get current subscription to check for existing subscriptionId
   const { data: subscriptionData } = trpc.subscription.getCurrent.useQuery(
     undefined,
     {
+      enabled: !!session?.user, // Only fetch when authenticated
       refetchOnWindowFocus: false,
     }
   );

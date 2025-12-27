@@ -18,6 +18,7 @@ import { PricingCard } from "./pricing-card";
 import { PricingToggle } from "./pricing-toggle";
 import { PLANS } from "./pricing-data";
 import * as motion from "motion/react-client";
+import { useOptionalAuth } from "@/lib/use-auth";
 
 // ============================================================================
 // Types
@@ -41,6 +42,7 @@ export function PlanSelectionModal({
   defaultInterval = "year",
 }: PlanSelectionModalProps) {
   const router = useRouter();
+  const { session } = useOptionalAuth();
   const [isAnnual, setIsAnnual] = useState(defaultInterval === "year");
   const [loadingPlan, setLoadingPlan] = useState<string | null>(null);
 
@@ -48,6 +50,7 @@ export function PlanSelectionModal({
   const { data: subscriptionData } = trpc.subscription.getCurrent.useQuery(
     undefined,
     {
+      enabled: !!session?.user, // Only fetch when authenticated
       refetchOnWindowFocus: false,
     }
   );
