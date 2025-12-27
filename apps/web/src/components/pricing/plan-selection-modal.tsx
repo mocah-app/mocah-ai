@@ -56,7 +56,12 @@ export function PlanSelectionModal({
   );
 
   // Determine current plan and if user has an existing subscription
-  const currentPlanId = subscriptionData?.subscription?.plan;
+  // Only show a plan as "current" if the subscription is active or trialing (not incomplete)
+  const currentPlanId = (subscriptionData?.subscription && 
+    (subscriptionData.subscription.status === "active" || 
+     subscriptionData.subscription.status === "trialing"))
+    ? subscriptionData.subscription.plan
+    : undefined;
   const hasExistingPlan = !!subscriptionData?.subscription && 
     (subscriptionData.subscription.status === "active" || 
      subscriptionData.subscription.status === "trialing");

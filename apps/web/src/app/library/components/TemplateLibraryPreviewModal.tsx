@@ -58,7 +58,10 @@ export function TemplateLibraryPreviewModal({
     }
   );
   
-  const hasNoSubscription = !subscriptionData?.subscription;
+  // Determine if user has any active subscription (including trial)
+  const hasNoSubscription = !subscriptionData?.subscription || 
+    (subscriptionData.subscription.status !== "active" && 
+     subscriptionData.subscription.status !== "trialing");
 
   // Fetch template detail - explicitly type to break inference chain
   const { data: templateData, isLoading } =

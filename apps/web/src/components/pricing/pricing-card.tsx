@@ -120,7 +120,7 @@ export function PricingCard({
 
       {/* Limits Highlight */}
       <div className="mb-6 p-3 rounded-lg bg-background/50 border border-border/50">
-        <div className="grid grid-cols-2 gap-3 text-sm">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-3 text-sm">
           <div>
             <span className="font-semibold">{plan.templatesLimit}</span>
             <span className="text-muted-foreground ml-1">templates/mo</span>

@@ -71,7 +71,7 @@ export function NoSubscriptionBanner({
             {/* Icon */}
             <div
               className={cn(
-                "flex h-10 w-10 shrink-0 items-center justify-center rounded-full",
+                "hidden md:flex h-10 w-10 shrink-0 items-center justify-center rounded-full",
                 "bg-blue-200 dark:bg-blue-800/40"
               )}
             >
@@ -82,10 +82,10 @@ export function NoSubscriptionBanner({
             <div className="flex-1 flex flex-col md:flex-row justify-between w-full gap-4 space-y-3">
               <div>
                 <h3 className="font-semibold text-sm text-blue-950 dark:text-blue-50">
-                  Subscription Required
+                  Upgrade your Account
                 </h3>
                 <p className="text-sm mt-1 text-blue-900/95 dark:text-blue-100/95">
-                  Start your 7-day free trial to create {typeLabel}s. No credit card required.
+                  Start your 7-day free trial to create {typeLabel}s.
                 </p>
               </div>
 

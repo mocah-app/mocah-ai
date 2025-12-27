@@ -154,12 +154,14 @@ const authInstance = betterAuth({
             ]);
           }
 
-          // Get customerId from user record to sync cache
+          // Get customerId from user record to sync cache and ensure mapping exists
           const user = await prisma.user.findUnique({
             where: { id: userId },
             select: { stripeCustomerId: true },
           });
           if (user?.stripeCustomerId) {
+            // Refresh the mapping to handle Redis restarts or missing mappings
+            await setUserCustomerMapping(userId, user.stripeCustomerId);
             await syncStripeSubscriptionToCache(user.stripeCustomerId);
           }
         },

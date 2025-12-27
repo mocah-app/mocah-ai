@@ -17,21 +17,8 @@ export async function proxy(request: NextRequest) {
 
   // Redirect authenticated users away from auth pages
   if (sessionCookie && authRoutes.includes(request.nextUrl.pathname)) {
-    const appUrl = new URL("/app", request.url);
-    
-    // Preserve query params (e.g., plan and interval from pricing flow)
-    const searchParams = request.nextUrl.searchParams;
-    const plan = searchParams.get("plan");
-    const interval = searchParams.get("interval");
-    
-    if (plan && interval) {
-      // Existing user from pricing flow
-      appUrl.searchParams.set("existing-user", "true");
-      appUrl.searchParams.set("plan", plan);
-      appUrl.searchParams.set("interval", interval);
-    }
-    
-    return NextResponse.redirect(appUrl);
+    // Simply redirect to /app - subscription check now happens in the app page
+    return NextResponse.redirect(new URL("/app", request.url));
   }
 
   return NextResponse.next();

@@ -1,36 +1,53 @@
 "use client";
 import { authClient } from "@/lib/auth-client";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useRouter } from "next/navigation";
 import { useEffect, useState, Suspense } from "react";
 import Dashboard from "./dashboard";
 import MocahLoadingIcon from "@/components/mocah-brand/MocahLoadingIcon";
 import dynamic from "next/dynamic";
-
+import { trpc } from "@/utils/trpc";
+import { NoSubscriptionBanner } from "@/components/billing/usage-warning-banner";
+import { logger } from "@mocah/shared";
 
 const PlanSelectionModal = dynamic(() =>
   import("@/components/pricing/plan-selection-modal").then(
     (mod) => mod.PlanSelectionModal
   )
 );
-const CheckoutLoadingModal = dynamic(() =>
-  import("@/components/pricing/checkout-loading-modal").then(
-    (mod) => mod.CheckoutLoadingModal
-  )
-);
 
 function DashboardPageContent() {
   const { data: session, isPending } = authClient.useSession();
   const router = useRouter();
-  const searchParams = useSearchParams();
-
-  // Check if this is a new user from onboarding or existing user from login
-  const isNewUser = searchParams.get("new-user") === "true";
-  const isExistingUser = searchParams.get("existing-user") === "true";
-  const planFromParams = searchParams.get("plan");
-  const intervalFromParams = searchParams.get("interval");
-
   const [showPlanModal, setShowPlanModal] = useState(false);
-  const [showCheckoutModal, setShowCheckoutModal] = useState(false);
+
+  // Check subscription status
+  const { data: subscriptionData, isLoading: isLoadingSubscription } = trpc.subscription.getCurrent.useQuery(
+    undefined,
+    {
+      enabled: !!session?.user,
+      refetchOnWindowFocus: false,
+    }
+  );
+
+  // Only allow active or trialing subscriptions
+  // Stripe statuses: active, trialing, incomplete, incomplete_expired, past_due, canceled, unpaid
+  const hasActiveSubscription = 
+    subscriptionData?.subscription?.status === "active" || 
+    subscriptionData?.subscription?.status === "trialing";
+  
+  const hasNoSubscription = !hasActiveSubscription;
+
+  // Debug log
+  useEffect(() => {
+    if (subscriptionData) {
+      logger.debug("Subscription Status", {
+        exists: !!subscriptionData.subscription,
+        status: subscriptionData.subscription?.status,
+        isActive: hasActiveSubscription,
+        shouldShowModal: hasNoSubscription,
+      });
+    }
+  }, [subscriptionData, hasActiveSubscription, hasNoSubscription]);
 
   useEffect(() => {
     if (!isPending && !session?.user) {
@@ -38,46 +55,14 @@ function DashboardPageContent() {
     }
   }, [session, isPending, router]);
 
-  // Show plan selection modal for new users from pricing flow
+  // Auto-show plan selection modal for users without subscription
   useEffect(() => {
-    if (
-      !isPending &&
-      session?.user &&
-      isNewUser &&
-      planFromParams &&
-      intervalFromParams
-    ) {
+    if (!isPending && !isLoadingSubscription && session?.user && hasNoSubscription) {
       setShowPlanModal(true);
     }
-  }, [isPending, session, isNewUser, planFromParams, intervalFromParams]);
+  }, [isPending, isLoadingSubscription, session, hasNoSubscription]);
 
-  // Show checkout loading modal for existing users from pricing flow
-  useEffect(() => {
-    if (
-      !isPending &&
-      session?.user &&
-      isExistingUser &&
-      planFromParams &&
-      intervalFromParams
-    ) {
-      setShowCheckoutModal(true);
-    }
-  }, [isPending, session, isExistingUser, planFromParams, intervalFromParams]);
-
-  // Handle modal close - remove params from URL
-  const handleModalClose = (open: boolean) => {
-    setShowPlanModal(open);
-    if (!open) {
-      // Clean up URL params
-      const params = new URLSearchParams(searchParams.toString());
-      params.delete("new-user");
-      params.delete("plan");
-      params.delete("interval");
-      router.replace(`/app?${params.toString()}`, { scroll: false });
-    }
-  };
-
-  if (isPending) {
+  if (isPending || isLoadingSubscription) {
     return (
       <div className="flex flex-1 items-center justify-center min-h-full h-full">
         <MocahLoadingIcon isLoading={true} size="sm" />
@@ -89,23 +74,23 @@ function DashboardPageContent() {
     <>
       <div className="p-1 w-full">
         <div className="py-4 border border-border">
+          {/* Show banner if no subscription */}
+          {hasNoSubscription && (
+            <div className="px-4 pb-4">
+              <NoSubscriptionBanner
+                type="template"
+                variant="alert"
+              />
+            </div>
+          )}
           <Dashboard />
         </div>
       </div>
 
-      {/* Plan Selection Modal for New Users */}
+      {/* Auto-show Plan Selection Modal for users without subscription */}
       <PlanSelectionModal
         open={showPlanModal}
-        onOpenChange={handleModalClose}
-        defaultPlan={planFromParams || undefined}
-        defaultInterval={(intervalFromParams as "month" | "year") || "year"}
-      />
-
-      {/* Checkout Loading Modal for Existing Users */}
-      <CheckoutLoadingModal
-        open={showCheckoutModal}
-        plan={planFromParams || ""}
-        interval={(intervalFromParams as "month" | "year") || "year"}
+        onOpenChange={setShowPlanModal}
       />
     </>
   );

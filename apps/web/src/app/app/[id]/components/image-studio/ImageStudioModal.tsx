@@ -357,6 +357,7 @@ export function ImageStudioModal() {
       isUploading,
       activeTab,
       setActiveTab,
+      hasPremiumImageModel: plan?.hasPremiumImageModel ?? false,
     }),
     [
       prompt,
@@ -372,6 +373,7 @@ export function ImageStudioModal() {
       isGenerating,
       isUploading,
       activeTab,
+      plan?.hasPremiumImageModel,
     ]
   );
 

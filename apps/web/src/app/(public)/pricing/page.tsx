@@ -36,11 +36,10 @@ export default function PricingPage() {
 
   // Handle plan selection using Better Auth's subscription.upgrade()
   const handleSelectPlan = async (planId: string) => {
-    // If not logged in, redirect to login with plan param
+    // If not logged in, redirect to login
+    // The subscription check will happen automatically in /app after login
     if (!session?.user) {
-      router.push(
-        `/login?plan=${planId}&interval=${isAnnual ? "year" : "month"}`
-      );
+      router.push("/login");
       return;
     }
 

@@ -48,11 +48,11 @@ export default function NewTemplatePage() {
     }
   );
 
-  // Determine if user has any subscription (including trial)
-  const hasNoSubscription = !subscriptionData?.subscription;
+  // Determine if user has any active subscription (including trial)
   const hasActiveSubscription = subscriptionData?.subscription && 
     (subscriptionData.subscription.status === "active" || 
      subscriptionData.subscription.status === "trialing");
+  const hasNoSubscription = !hasActiveSubscription;
 
   // Show plan selection modal on mount if no subscription
   const [showPlanModal, setShowPlanModal] = useState(false);

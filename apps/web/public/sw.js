@@ -45,12 +45,21 @@ self.addEventListener("fetch", (event) => {
   // Skip cross-origin requests
   if (!event.request.url.startsWith(self.location.origin)) return;
 
-  // Skip API requests and auth routes - always fetch fresh
+  // Skip API requests, auth routes, and Next.js internal files
   const url = new URL(event.request.url);
   if (
     url.pathname.startsWith("/api/") ||
     url.pathname.startsWith("/auth/") ||
-    url.pathname.startsWith("/trpc/")
+    url.pathname.startsWith("/trpc/") ||
+    url.pathname.startsWith("/_next/") ||
+    url.pathname.includes("/_next/") ||
+    url.pathname.includes("/turbopack") ||
+    url.pathname.includes("__turbopack") ||
+    url.pathname.includes("%5Bturbopack%5D") ||
+    url.pathname.includes("hmr-client") ||
+    url.pathname.includes("webpack") ||
+    url.pathname.includes(".hot-update.") ||
+    url.pathname.endsWith(".map")
   ) {
     return;
   }

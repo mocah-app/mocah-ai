@@ -534,9 +534,59 @@ export async function checkUsageLimit(
   const { getCachedSubscriptionByUserId } = await import("@mocah/auth/stripe-sync");
   const subscription = await getCachedSubscriptionByUserId(userId);
 
-  // Throw error if no subscription exists or not active
-  if (!subscription || subscription.status === "none" || 
-      (subscription.status !== "active" && subscription.status !== "trialing")) {
+  // If Stripe cache returns null, fall back to database subscription check
+  // This handles cases where Redis mapping is missing but subscription exists in DB
+  if (!subscription) {
+    const dbSubscription = await prisma.subscription.findFirst({
+      where: {
+        referenceId: userId,
+        status: { in: ["active", "trialing"] },
+      },
+      orderBy: {
+        createdAt: "desc",
+      },
+    });
+
+    // Only throw error if no active subscription exists in database either
+    if (!dbSubscription) {
+      throw new TRPCError({
+        code: "FORBIDDEN",
+        message: "Active subscription required. Start your free trial to continue.",
+        cause: {
+          subscriptionRequired: true,
+          upgradeUrl: "/pricing",
+        },
+      });
+    }
+
+    // If DB subscription exists, reconstruct user-customer mapping
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+      select: { stripeCustomerId: true },
+    });
+
+    if (user?.stripeCustomerId) {
+      // Restore the mapping to prevent future cache misses
+      const { setUserCustomerMapping, syncStripeSubscriptionToCache } = await import("@mocah/auth/stripe-sync");
+      await setUserCustomerMapping(userId, user.stripeCustomerId);
+      await syncStripeSubscriptionToCache(user.stripeCustomerId);
+      logger.info("Restored missing user-customer mapping", { userId, customerId: user.stripeCustomerId });
+    }
+  }
+
+  // Check if subscription status is valid (after fallback)
+  if (subscription && subscription.status === "none") {
+    throw new TRPCError({
+      code: "FORBIDDEN",
+      message: "Active subscription required. Start your free trial to continue.",
+      cause: {
+        subscriptionRequired: true,
+        upgradeUrl: "/pricing",
+      },
+    });
+  }
+
+  if (subscription && subscription.status !== "active" && subscription.status !== "trialing") {
     throw new TRPCError({
       code: "FORBIDDEN",
       message: "Active subscription required. Start your free trial to continue.",
@@ -561,7 +611,7 @@ export async function checkUsageLimit(
     percentage: calculatePercentage(used, limit),
     resetDate: quota.periodEnd,
     isTrialUser: false,
-    subscription, // Pass subscription for reuse in getPlanLimits
+    subscription: subscription ?? undefined, // Pass subscription for reuse in getPlanLimits
   };
 }
 
@@ -768,8 +818,47 @@ export async function getUserUsageStats(userId: string): Promise<{
     quota = await getCurrentQuota(userId);
   }
 
-  const templateUsage = await checkUsageLimit(userId, "templateGeneration");
-  const imageUsage = await checkUsageLimit(userId, "imageGeneration");
+  // Try to get usage, but don't throw if no subscription (for read-only queries)
+  let templateUsage: UsageCheckResult;
+  let imageUsage: UsageCheckResult;
+  
+  try {
+    templateUsage = await checkUsageLimit(userId, "templateGeneration");
+  } catch (error: any) {
+    // If no subscription, return default blocked state
+    if (error.cause?.subscriptionRequired) {
+      templateUsage = {
+        allowed: false,
+        used: 0,
+        limit: 0,
+        remaining: 0,
+        percentage: 0,
+        resetDate: new Date(),
+        isTrialUser: false,
+      };
+    } else {
+      throw error;
+    }
+  }
+
+  try {
+    imageUsage = await checkUsageLimit(userId, "imageGeneration");
+  } catch (error: any) {
+    // If no subscription, return default blocked state
+    if (error.cause?.subscriptionRequired) {
+      imageUsage = {
+        allowed: false,
+        used: 0,
+        limit: 0,
+        remaining: 0,
+        percentage: 0,
+        resetDate: new Date(),
+        isTrialUser: false,
+      };
+    } else {
+      throw error;
+    }
+  }
 
   return {
     trial,
