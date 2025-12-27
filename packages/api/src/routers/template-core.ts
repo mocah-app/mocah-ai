@@ -638,19 +638,19 @@ export const templateCoreRouter = router({
       const isPublicOrInLibrary = template.isPublic || template.libraryTemplates.length > 0;
       let targetOrganizationId = template.organizationId;
 
+      // Check usage limit for ALL template duplications (prevents quota bypass)
+      const usageCheck = await checkUsageLimit(ctx.session.user.id, "templateGeneration");
+      
+      if (!usageCheck.allowed) {
+        throw new UsageLimitError({
+          code: usageCheck.isTrialUser ? "TRIAL_LIMIT_REACHED" : "QUOTA_EXCEEDED",
+          remaining: usageCheck.remaining,
+          limit: usageCheck.limit,
+          resetDate: usageCheck.resetDate,
+        });
+      }
+
       if (isPublicOrInLibrary) {
-        // For public/library templates, require active subscription
-        const usageCheck = await checkUsageLimit(ctx.session.user.id, "templateGeneration");
-        
-        if (!usageCheck.allowed) {
-          throw new UsageLimitError({
-            code: usageCheck.isTrialUser ? "TRIAL_LIMIT_REACHED" : "QUOTA_EXCEEDED",
-            remaining: usageCheck.remaining,
-            limit: usageCheck.limit,
-            resetDate: usageCheck.resetDate,
-          });
-        }
-        
         // For public/library templates, duplicate into user's active organization
         if (!ctx.activeOrganization) {
           throw new TRPCError({
@@ -764,6 +764,20 @@ export const templateCoreRouter = router({
           data: imagesToCreate,
         });
       }
+
+      // Increment usage for ALL template duplications (prevents quota bypass)
+      // All remixes count against quota, regardless of source (public/private)
+      await incrementUsage(ctx.session.user.id, "templateGeneration").catch(
+        (err) => {
+          logger.error("Failed to increment remix usage", {
+            error: err,
+            userId: ctx.session.user.id,
+            templateId: input.id,
+            duplicatedTemplateId: duplicatedTemplate.id,
+          });
+          // Don't fail the request if usage tracking fails, but log it
+        }
+      );
 
       return duplicatedTemplate;
     }),
