@@ -54,11 +54,11 @@ export function LibraryGrid() {
   }, []);
 
   // Fetch categories
-  const { data: categoriesData } = trpc.template.getLibraryCategories.useQuery();
+  const { data: categoriesData } = trpc.template.library.getCategories.useQuery();
   const categories = categoriesData || [];
 
   // Fetch templates
-  const { data, isLoading } = trpc.template.getLibraryTemplates.useQuery({
+  const { data, isLoading } = trpc.template.library.getTemplates.useQuery({
     search: search || undefined,
     categorySlug: selectedCategory,
     limit: 50,

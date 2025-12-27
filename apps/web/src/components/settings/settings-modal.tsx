@@ -1,6 +1,7 @@
 "use client";
 
 import { BrandSettingsTab } from "@/components/settings/brand-settings-tab";
+import { BillingSettingsTab } from "@/components/settings/billing-settings-tab";
 import { SettingsNav, type SectionId } from "@/components/settings/settings-nav";
 import { Button } from "@/components/ui/button";
 import {
@@ -228,19 +229,7 @@ export function SettingsModal() {
                       data-section="billing"
                       className="space-y-4"
                     >
-                      <Card className="rounded-none border-none">
-                        <CardHeader>
-                          <CardTitle>Billing</CardTitle>
-                          <CardDescription>
-                            Manage your subscription and payment methods
-                          </CardDescription>
-                        </CardHeader>
-                        <CardContent>
-                          <p className="text-muted-foreground">
-                            Billing settings coming soon...
-                          </p>
-                        </CardContent>
-                      </Card>
+                      <BillingSettingsTab onClose={handleClose} />
                     </div>
                   </div>
                 </div>

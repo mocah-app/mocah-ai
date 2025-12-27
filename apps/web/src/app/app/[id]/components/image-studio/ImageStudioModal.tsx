@@ -11,8 +11,11 @@ import {
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 import { Sparkles, X } from "lucide-react";
+import { UsageWarningBanner } from "@/components/billing/usage-warning-banner";
 import { useTemplate } from "../providers/TemplateProvider";
 import { useOrganization } from "@/contexts/organization-context";
+import { useUpgradeModal } from "@/contexts/upgrade-modal-context";
+import { useUsageTracking } from "@/hooks/use-usage-tracking";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useImageStudio } from "./ImageStudioContext";
 import { ImageStudioControls } from "./ImageStudioControls";
@@ -35,6 +38,9 @@ export function ImageStudioModal() {
   const searchParams = useSearchParams();
   const { state: templateState } = useTemplate();
   const { activeOrganization } = useOrganization();
+  const { triggerUpgrade } = useUpgradeModal();
+  const { checkQuota, isNearLimit, getUsagePercentage, plan, usage } =
+    useUsageTracking();
   const {
     onImageSelect,
     initialImageUrl,
@@ -47,6 +53,11 @@ export function ImageStudioModal() {
   } = useImageStudio();
 
   const isOpen = searchParams.get("imageStudio") === "open";
+
+  // Check if user is near or at image limit
+  const isNearImageLimit = isNearLimit("image");
+  const imageUsagePercentage = getUsagePercentage("image");
+  const canGenerateImage = checkQuota("image");
 
   // ============================================================================
   // State
@@ -106,7 +117,11 @@ export function ImageStudioModal() {
   });
 
   // Generation hook (with cancellation support)
-  const { generate, cancel: cancelGeneration, isGenerating } = useImageGeneration({
+  const {
+    generate,
+    cancel: cancelGeneration,
+    isGenerating,
+  } = useImageGeneration({
     organizationId,
     templateId,
     versionId,
@@ -214,6 +229,12 @@ export function ImageStudioModal() {
   // ============================================================================
 
   const handleGenerate = useCallback(async () => {
+    // Check usage quota before generating
+    if (!canGenerateImage) {
+      triggerUpgrade("image", plan?.name);
+      return;
+    }
+
     setSelectedImage(null);
 
     await generate({
@@ -221,11 +242,17 @@ export function ImageStudioModal() {
       model,
       aspectRatio,
       outputFormat,
-      imageUrls: useReferenceImages && referenceImages.length > 0 ? referenceImages : undefined,
+      imageUrls:
+        useReferenceImages && referenceImages.length > 0
+          ? referenceImages
+          : undefined,
       numImages: 1,
       includeBrandGuide,
     });
   }, [
+    canGenerateImage,
+    triggerUpgrade,
+    plan?.name,
     generate,
     prompt,
     model,
@@ -330,6 +357,7 @@ export function ImageStudioModal() {
       isUploading,
       activeTab,
       setActiveTab,
+      hasPremiumImageModel: plan?.hasPremiumImageModel ?? false,
     }),
     [
       prompt,
@@ -345,6 +373,7 @@ export function ImageStudioModal() {
       isGenerating,
       isUploading,
       activeTab,
+      plan?.hasPremiumImageModel,
     ]
   );
 
@@ -381,24 +410,36 @@ export function ImageStudioModal() {
           {/* Left Panel - Controls */}
           <ImageStudioControls {...controlProps} />
 
-          {/* Right Panel - Preview & Results */}
-          <ImageStudioPreview
-            selectedImage={selectedImage}
-            generatedImages={generatedImages}
-            loadingImages={loadingImages}
-            isGenerating={isGenerating}
-            isCopied={isCopied}
-            zoomLevel={zoomLevel}
-            onZoomLevelChange={setZoomLevel}
-            onSelectImage={setSelectedImage}
-            onUseAsReference={handleUseAsReference}
-            onUseImage={handleUseImage}
-            onCopyImageUrl={handleCopyImageUrl}
-            onClearImages={handleClearImages}
-            onImageLoad={handleImageLoad}
-            onImageLoadStart={handleImageLoadStart}
-            onImageError={handleImageError}
-          />
+          <div className="flex-1 flex flex-col gap-2">
+            {/* Usage Warning Banner */}
+            <div className="flex justify-center h-auto">
+            <UsageWarningBanner
+              type="image"
+              percentage={imageUsagePercentage}
+              remaining={usage?.imagesRemaining}
+              variant="alert"
+              className="mx-4 mt-2"
+              />
+              </div>
+            {/* Right Panel - Preview & Results */}
+            <ImageStudioPreview
+              selectedImage={selectedImage}
+              generatedImages={generatedImages}
+              loadingImages={loadingImages}
+              isGenerating={isGenerating}
+              isCopied={isCopied}
+              zoomLevel={zoomLevel}
+              onZoomLevelChange={setZoomLevel}
+              onSelectImage={setSelectedImage}
+              onUseAsReference={handleUseAsReference}
+              onUseImage={handleUseImage}
+              onCopyImageUrl={handleCopyImageUrl}
+              onClearImages={handleClearImages}
+              onImageLoad={handleImageLoad}
+              onImageLoadStart={handleImageLoadStart}
+              onImageError={handleImageError}
+            />
+          </div>
         </div>
       </DialogContent>
     </Dialog>

@@ -1,24 +1,25 @@
 // billing.prisma
 // Monetization & Billing - Plan definitions and payment processing
-// Note: Subscriptions are managed by Better Auth Stripe plugin (see stripe.prisma)
+// Note: Subscriptions and trials are managed by Better Auth Stripe plugin (see stripe.prisma)
 
 model Plan {
   id                String   @id @default(uuid())
-  name              String   @unique // free, starter, pro, scale (must match Better Auth plan names)
+  name              String   @unique // starter, pro, scale (must match Better Auth plan names)
   displayName       String
   description       String?  @db.Text
   price             Decimal  @db.Decimal(10, 2) // Monthly price in USD
+  annualPrice       Decimal? @db.Decimal(10, 2) // Annual price per month (discounted)
   interval          String   @default("month") // month, year
-  stripePriceId     String?  @unique
-  stripeProductId   String?  @unique
-  annualDiscountPriceId String? // For annual billing discount
+  stripePriceIdMonthly  String?  @unique
+  stripePriceIdAnnual   String?  @unique
+  stripeProductId       String?  @unique
   features          Json?    // Feature flags and limits
   limits            Json?    // Plan limits (matches Better Auth limits format)
-  maxWorkspaces     Int      @default(1)
-  maxTextGenerations Int?    // null = unlimited
-  maxImageGenerations Int?
-  maxTokens         Int?
+  templatesLimit    Int      @default(75)  // Monthly template generation limit
+  imagesLimit       Int      @default(20)  // Monthly image generation limit
   allowedExportFormats String[] // Array of allowed export formats
+  hasPremiumImageModel Boolean  @default(false) // Access to premium image generation models
+  hasPriorityQueue     Boolean  @default(false) // Priority processing queue
   isActive          Boolean  @default(true)
   sortOrder         Int      @default(0)
   createdAt         DateTime @default(now())
@@ -28,6 +29,21 @@ model Plan {
   @@index([isActive])
   @@index([sortOrder])
   @@map("plan")
+}
+
+// Cancellation feedback for improving retention
+model CancellationFeedback {
+  id                String    @id @default(uuid())
+  userId            String
+  subscriptionId    String?
+  reason            String?   @db.Text
+  feedback          String?   @db.Text
+  wouldRecommend    Boolean?
+  createdAt         DateTime  @default(now())
+
+  @@index([userId])
+  @@index([createdAt])
+  @@map("cancellation_feedback")
 }
 
 // Note: Invoices and Payment Methods are managed by Stripe

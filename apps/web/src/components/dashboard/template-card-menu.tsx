@@ -74,17 +74,17 @@ export function TemplateCardMenu({
 
   // Check if user can publish to library
   const { data: canPublish, isLoading: isCheckingPermission } =
-    trpc.template.canPublishToLibrary.useQuery();
+    trpc.template.library.canPublish.useQuery();
 
   const isPublished = !!libraryEntry;
 
   // Publish mutation
   // Note: Using `any` for callback parameters to prevent "Type instantiation is excessively deep" error
-  const publishMutation = trpc.template.publishToLibrary.useMutation({
+  const publishMutation = trpc.template.library.publish.useMutation({
     onSuccess: () => {
       setPublishStage("success");
-      utils.template.list.invalidate();
-      utils.template.getLibraryEntryForTemplate.invalidate({ templateId });
+      utils.template.core.list.invalidate();
+      utils.template.library.getEntryForTemplate.invalidate({ templateId });
       // Auto-close after 2 seconds on success
       setTimeout(() => {
         setShowPublishDialog(false);
@@ -98,11 +98,11 @@ export function TemplateCardMenu({
   });
 
   // Unpublish mutation
-  const unpublishMutation = trpc.template.unpublishTemplate.useMutation({
+  const unpublishMutation = trpc.template.library.unpublish.useMutation({
     onSuccess: () => {
       toast.success("Template unpublished from library");
-      utils.template.list.invalidate();
-      utils.template.getLibraryEntryForTemplate.invalidate({ templateId });
+      utils.template.core.list.invalidate();
+      utils.template.library.getEntryForTemplate.invalidate({ templateId });
       setShowUnpublishDialog(false);
     },
     onError: (error: any) => {

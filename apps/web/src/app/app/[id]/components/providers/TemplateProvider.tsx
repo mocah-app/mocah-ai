@@ -498,31 +498,31 @@ export function TemplateProvider({
   const utils = trpc.useUtils();
 
   // tRPC mutations
-  const regenerateMutation = trpc.template.regenerate.useMutation();
-  const generateMutation = trpc.template.generate.useMutation({
+  const regenerateMutation = trpc.template.core.regenerate.useMutation();
+  const generateMutation = trpc.template.core.generate.useMutation({
     onSuccess: () => {
-      utils.template.list.invalidate();
+      utils.template.core.list.invalidate();
     },
   });
-  const createMutation = trpc.template.create.useMutation({
+  const createMutation = trpc.template.core.create.useMutation({
     onSuccess: () => {
-      utils.template.list.invalidate();
+      utils.template.core.list.invalidate();
     },
   });
-  const updateMutation = trpc.template.update.useMutation({
+  const updateMutation = trpc.template.core.update.useMutation({
     onSuccess: () => {
       // Invalidate the specific template query to ensure fresh data on refetch
       if (templateId) {
-        utils.template.get.invalidate({ id: templateId });
+        utils.template.core.get.invalidate({ id: templateId });
       }
     },
   });
 
-  const createVersionMutation = trpc.template.createVersion.useMutation({
+  const createVersionMutation = trpc.template.versions.create.useMutation({
     onSuccess: () => {
       // Invalidate versions cache so VersionHistoryPanel updates immediately
       if (templateId) {
-        utils.template.versions.invalidate({ templateId });
+        utils.template.versions.list.invalidate({ templateId });
       }
     },
   });
@@ -534,7 +534,7 @@ export function TemplateProvider({
     isLoading: isQueryLoading,
     refetch,
     error: queryError,
-  } = trpc.template.get.useQuery(
+  } = trpc.template.core.get.useQuery(
     { id: templateId! },
     {
       enabled: !!templateId,
@@ -686,7 +686,7 @@ export function TemplateProvider({
 
       try {
         // Get all versions to find the one we want to switch to
-        const templateData = await utils.template.get.fetch({ id: templateId }) as any;
+        const templateData = await utils.template.core.get.fetch({ id: templateId }) as any;
         const version = templateData?.versions?.find((v: any) => v.id === versionId);
 
         if (!version) {

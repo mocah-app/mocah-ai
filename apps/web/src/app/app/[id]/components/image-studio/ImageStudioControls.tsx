@@ -14,7 +14,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Loader2, Sparkles, Upload, Trash2, Plus, ImageIcon, X, Palette } from "lucide-react";
+import { Loader2, Sparkles, Upload, Trash2, Plus, ImageIcon, X, Palette, Crown } from "lucide-react";
 import { cn } from "@/lib/utils";
 import Loader from "@/components/loader";
 import {
@@ -62,6 +62,8 @@ interface ImageStudioControlsProps {
   isUploading: boolean;
   activeTab: string;
   setActiveTab: (tab: string) => void;
+  // Plan access
+  hasPremiumImageModel?: boolean;
 }
 
 // ============================================================================
@@ -91,16 +93,34 @@ export const ImageStudioControls = memo(function ImageStudioControls({
   isUploading,
   activeTab,
   setActiveTab,
+  hasPremiumImageModel = false,
 }: ImageStudioControlsProps) {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [isDragging, setIsDragging] = useState(false);
   const [formErrors, setFormErrors] = useState<GenerateFormErrors>({});
   const [newReferenceUrl, setNewReferenceUrl] = useState("");
 
-  // Filter models based on reference images toggle
+  // Filter models based on reference images toggle and plan access
   const availableModels = useReferenceImages
-    ? AI_MODELS.filter((m) => isEditModel(m.value))
-    : AI_MODELS;
+    ? AI_MODELS.filter((m) => {
+        const isEdit = isEditModel(m.value);
+        const hasAccess = m.tier === "standard" || hasPremiumImageModel;
+        return isEdit && hasAccess;
+      })
+    : AI_MODELS.filter((m) => m.tier === "standard" || hasPremiumImageModel);
+
+  // Auto-switch to available model if current model is not accessible
+  const currentModelAvailable = availableModels.some((m) => m.value === model);
+  React.useEffect(() => {
+    if (!currentModelAvailable && availableModels.length > 0) {
+      // Switch to first available model (or "auto" if available)
+      const autoModel = availableModels.find((m) => m.value === MODEL_AUTO);
+      const fallbackModel = autoModel || availableModels[0];
+      if (fallbackModel) {
+        setModel(fallbackModel.value);
+      }
+    }
+  }, [currentModelAvailable, availableModels, model, setModel]);
 
   // Brand guide preference mutation
   const utils = trpc.useUtils();
@@ -563,9 +583,14 @@ export const ImageStudioControls = memo(function ImageStudioControls({
                   <SelectItem
                     key={m.value}
                     value={m.value}
-                    displayValue={m.label}
                     className="flex flex-col items-start gap-0.5"
                   >
+                    <div className="flex items-center gap-1.5">
+                      <span>{m.label}</span>
+                      {m.tier === "premium" && (
+                        <Crown className="size-3 text-amber-500" />
+                      )}
+                    </div>
                     <span className="text-[10px] text-muted-foreground">
                       {m.description}
                     </span>

@@ -17,6 +17,7 @@ export async function proxy(request: NextRequest) {
 
   // Redirect authenticated users away from auth pages
   if (sessionCookie && authRoutes.includes(request.nextUrl.pathname)) {
+    // Simply redirect to /app - subscription check now happens in the app page
     return NextResponse.redirect(new URL("/app", request.url));
   }
 

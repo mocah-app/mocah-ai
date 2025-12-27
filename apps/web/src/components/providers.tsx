@@ -7,6 +7,7 @@ import { ThemeProvider } from "./theme-provider";
 import { Toaster } from "./ui/sonner";
 import { SidebarProvider } from "./ui/sidebar";
 import { OrganizationProvider } from "@/contexts/organization-context";
+import { UpgradeModalProvider } from "@/contexts/upgrade-modal-context";
 import { useState } from "react";
 
 export default function Providers({ children }: { children: React.ReactNode }) {
@@ -23,8 +24,10 @@ export default function Providers({ children }: { children: React.ReactNode }) {
         <trpc.Provider client={trpcClientInstance} queryClient={queryClient}>
           <QueryClientProvider client={queryClient}>
             <OrganizationProvider>
-              {children}
-              <ReactQueryDevtools />
+              <UpgradeModalProvider>
+                {children}
+                <ReactQueryDevtools />
+              </UpgradeModalProvider>
             </OrganizationProvider>
           </QueryClientProvider>
         </trpc.Provider>

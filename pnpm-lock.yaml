@@ -418,6 +418,9 @@ importers:
       sharp:
         specifier: ^0.34.5
         version: 0.34.5
+      stripe:
+        specifier: 'catalog:'
+        version: 20.0.0(@types/node@25.0.1)
       typescript:
         specifier: ^5
         version: 5.9.3
@@ -440,6 +443,9 @@ importers:
       '@mocah/db':
         specifier: workspace:*
         version: link:../db
+      '@mocah/shared':
+        specifier: workspace:*
+        version: link:../shared
       better-auth:
         specifier: 'catalog:'
         version: 1.4.6(next@16.0.10(@opentelemetry/api@1.9.0)(babel-plugin-react-compiler@1.0.0)(react-dom@19.2.3(react@19.2.3))(react@19.2.3))(react-dom@19.2.3(react@19.2.3))(react@19.2.3)

@@ -4,6 +4,7 @@ import {
   buildReactEmailRegenerationPrompt,
   reactEmailGenerationSchema,
 } from "@mocah/api/lib/prompts";
+import { checkUsageLimit } from "@mocah/api/lib/usage-tracking";
 import { auth } from "@mocah/auth";
 import prisma from "@mocah/db";
 import { logger } from "@mocah/shared";
@@ -116,7 +117,47 @@ export async function POST(req: NextRequest) {
       });
     }
 
-    // 5. Build React Email regeneration prompt with current template code
+    // 5. Check usage quota (validates subscription exists internally)
+    let usageCheck;
+    try {
+      usageCheck = await checkUsageLimit(userId, "templateGeneration");
+    } catch (error: any) {
+      // Handle subscription requirement error
+      if (error.cause?.subscriptionRequired) {
+        return new Response(
+          JSON.stringify({
+            error: "Subscription required",
+            message: error.message,
+            subscriptionRequired: true,
+          }),
+          {
+            status: 403,
+            headers: { "Content-Type": "application/json" },
+          }
+        );
+      }
+      throw error;
+    }
+    
+    if (!usageCheck.allowed) {
+      return new Response(
+        JSON.stringify({
+          error: "Quota exceeded",
+          message: usageCheck.isTrialUser
+            ? `You've used all ${usageCheck.limit} generations in your trial. Upgrade to unlock full access.`
+            : `You've reached your generation limit this month (${usageCheck.limit} used). Upgrade to continue.`,
+          remaining: usageCheck.remaining,
+          limit: usageCheck.limit,
+          resetDate: usageCheck.resetDate,
+        }),
+        {
+          status: 403,
+          headers: { "Content-Type": "application/json" },
+        }
+      );
+    }
+
+    // 6. Build React Email regeneration prompt with current template code
     const promptText = buildReactEmailRegenerationPrompt(
       prompt,
       template.reactEmailCode || "",  // Current template code for context

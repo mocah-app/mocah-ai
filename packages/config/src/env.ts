@@ -26,11 +26,14 @@ export const serverEnv = createEnv({
     // Stripe
     STRIPE_SECRET_KEY: z.string().min(1),
     STRIPE_WEBHOOK_SECRET: z.string().min(1),
-    STRIPE_PRICE_ID_FREE: z.string().optional(),
-    STRIPE_PRICE_ID_STARTER: z.string().optional(),
-    STRIPE_PRICE_ID_PRO: z.string().optional(),
+    // Starter Plan:
+    STRIPE_PRICE_ID_STARTER_MONTHLY: z.string().optional(),
+    STRIPE_PRICE_ID_STARTER_ANNUAL: z.string().optional(),
+    // Pro Plan:
+    STRIPE_PRICE_ID_PRO_MONTHLY: z.string().optional(),
     STRIPE_PRICE_ID_PRO_ANNUAL: z.string().optional(),
-    STRIPE_PRICE_ID_SCALE: z.string().optional(),
+    // Scale Plan:
+    STRIPE_PRICE_ID_SCALE_MONTHLY: z.string().optional(),
     STRIPE_PRICE_ID_SCALE_ANNUAL: z.string().optional(),
 
     // Better Auth

@@ -367,6 +367,8 @@ function BrandSetupContent() {
 
       toast.success("Workspace setup complete!");
       await refreshOrganizations(newOrg.id);
+      
+      // Redirect to /app - subscription check now happens automatically
       router.push("/app");
     } catch (error: any) {
       toast.error(error.message || "Failed to complete setup");

@@ -31,6 +31,8 @@ export default function UserMenu() {
     );
   }
 
+  // const stripeCustomerId = (session.user as { stripeCustomerId?: string | null }).stripeCustomerId;
+
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild className="">

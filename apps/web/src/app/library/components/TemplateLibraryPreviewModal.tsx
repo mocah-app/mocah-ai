@@ -14,6 +14,8 @@ import { useOrganization } from "@/contexts/organization-context";
 import MocahLoadingIcon from "@/components/mocah-brand/MocahLoadingIcon";
 import Image from "next/image";
 import { authClient } from "@/lib/auth-client";
+import { useState } from "react";
+import { PlanSelectionModal } from "@/components/pricing/plan-selection-modal";
 
 // Type-safe message interface matching Prisma ChatMessage schema
 interface TemplateMessage {
@@ -43,10 +45,27 @@ export function TemplateLibraryPreviewModal({
   const { data: session } = authClient.useSession();
   const { activeOrganization } = useOrganization();
   const utils = trpc.useUtils();
+  
+  // Modal state
+  const [showPlanModal, setShowPlanModal] = useState(false);
+  
+  // Check subscription status
+  const { data: subscriptionData } = trpc.subscription.getCurrent.useQuery(
+    undefined,
+    {
+      enabled: !!session, // Only fetch if logged in
+      refetchOnWindowFocus: false,
+    }
+  );
+  
+  // Determine if user has any active subscription (including trial)
+  const hasNoSubscription = !subscriptionData?.subscription || 
+    (subscriptionData.subscription.status !== "active" && 
+     subscriptionData.subscription.status !== "trialing");
 
   // Fetch template detail - explicitly type to break inference chain
   const { data: templateData, isLoading } =
-    trpc.template.getLibraryTemplateDetail.useQuery(
+    trpc.template.library.getDetail.useQuery(
       { id: templateId! },
       { enabled: !!templateId && open }
     );
@@ -72,10 +91,10 @@ export function TemplateLibraryPreviewModal({
   } | undefined;
 
   // Remix mutation
-  const remixMutation = trpc.template.duplicate.useMutation({
+  const remixMutation = trpc.template.core.duplicate.useMutation({
     onSuccess: (data: { id: string }) => {
       toast.success("Template remixed successfully");
-      utils.template.list.invalidate();
+      utils.template.core.list.invalidate();
       onOpenChange(false);
       router.push(`/app/${data.id}`);
     },
@@ -89,6 +108,12 @@ export function TemplateLibraryPreviewModal({
     if (!session) {
       const callbackUrl = encodeURIComponent(`/library?template=${templateId}`);
       router.push(`/login?callbackUrl=${callbackUrl}`);
+      return;
+    }
+    
+    // Block if no subscription - show modal
+    if (hasNoSubscription) {
+      setShowPlanModal(true);
       return;
     }
 
@@ -130,6 +155,7 @@ export function TemplateLibraryPreviewModal({
   const userImageUrls = userMessage?.metadata?.imageUrls || [];
 
   return (
+    <>
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent
         className="max-w-full sm:max-w-full w-full rounded-none h-dvh p-0 gap-0 flex flex-col lg:flex-row"
@@ -272,13 +298,19 @@ export function TemplateLibraryPreviewModal({
               size="lg"
               onClick={handleRemix}
               disabled={
-                remixMutation.isPending || !template?.sourceTemplate?.id
+                remixMutation.isPending || 
+                !template?.sourceTemplate?.id
               }
             >
               {!session ? (
                 <>
                   <LogIn className="size-4 mr-2" />
                   Login to Remix
+                </>
+              ) : hasNoSubscription ? (
+                <>
+                  <Copy className="size-4 mr-2" />
+                  Start Trial to Remix
                 </>
               ) : (
                 <>
@@ -299,6 +331,8 @@ export function TemplateLibraryPreviewModal({
         </div>
       </DialogContent>
     </Dialog>
+    <PlanSelectionModal open={showPlanModal} onOpenChange={setShowPlanModal} />
+    </>
   );
 }
 

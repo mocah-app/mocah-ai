@@ -20,7 +20,6 @@ model Organization {
   templateLibraries WorkspaceTemplateLibrary[]
   generationHistory GenerationHistory[]
   aiPrompts   AIPrompt[]
-  usageQuotas UsageQuota[]
   integrations Integration[]
   imageAssets ImageAsset[]
 

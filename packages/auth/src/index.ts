@@ -4,10 +4,19 @@ import { organization } from "better-auth/plugins";
 import { stripe } from "@better-auth/stripe";
 import { prismaAdapter } from "better-auth/adapters/prisma";
 import Stripe from "stripe";
-import { subscriptionPlans } from "./subscription-plans";
+import { subscriptionPlans, getPlanNameFromPriceId, type PlanName } from "./subscription-plans";
 import { EmailService } from "./email-service";
+import {
+  syncStripeSubscriptionToCache,
+  invalidateAllStripeCache,
+  setUserCustomerMapping,
+  getUserIdByCustomerId,
+} from "./stripe-sync";
+import { updateUsageQuotaLimits } from "./usage-quota";
 import prisma from "@mocah/db";
 import { serverEnv } from "@mocah/config/env";
+import { getRedis, CACHE_KEYS, isRedisAvailable } from "@mocah/shared/redis";
+import { logger } from "@mocah/shared/logger";
 
 const stripeClient = new Stripe(serverEnv.STRIPE_SECRET_KEY, {
   apiVersion: "2025-11-17.clover",
@@ -107,6 +116,486 @@ const authInstance = betterAuth({
           }
           return true;
         },
+        // Subscription lifecycle hooks for usage tracking
+        onSubscriptionComplete: async ({ subscription, plan }) => {
+          const userId = subscription.referenceId;
+          const redis = getRedis();
+          logger.info(`Subscription created for user ${userId}, plan: ${plan.name}`);
+
+          if (redis) {
+            // Clear plan limits cache so fresh limits are fetched
+            await redis.del(CACHE_KEYS.planLimits(userId));
+          }
+
+          // Get customerId from user record to sync cache and set mapping
+          const user = await prisma.user.findUnique({
+            where: { id: userId },
+            select: { stripeCustomerId: true },
+          });
+          if (user?.stripeCustomerId) {
+            // Store bidirectional mapping for fast lookups
+            await setUserCustomerMapping(userId, user.stripeCustomerId);
+            await syncStripeSubscriptionToCache(user.stripeCustomerId);
+          }
+
+          logger.info(`Subscription complete hook finished for user ${userId}`);
+        },
+        onSubscriptionUpdate: async ({ subscription }) => {
+          const userId = subscription.referenceId;
+          const redis = getRedis();
+          logger.info(`Subscription updated for user ${userId}`);
+
+          if (redis && isRedisAvailable()) {
+            // Clear both plan limits AND usage cache for complete refresh
+            const currentMonth = new Date().toISOString().slice(0, 7);
+            await Promise.all([
+              redis.del(CACHE_KEYS.planLimits(userId)),
+              redis.del(CACHE_KEYS.usage(userId, currentMonth)),
+            ]);
+          }
+
+          // Get customerId from user record to sync cache and ensure mapping exists
+          const user = await prisma.user.findUnique({
+            where: { id: userId },
+            select: { stripeCustomerId: true },
+          });
+          if (user?.stripeCustomerId) {
+            // Refresh the mapping to handle Redis restarts or missing mappings
+            await setUserCustomerMapping(userId, user.stripeCustomerId);
+            await syncStripeSubscriptionToCache(user.stripeCustomerId);
+          }
+        },
+        onSubscriptionCancel: async ({ subscription }) => {
+          const userId = subscription.referenceId;
+          const redis = getRedis();
+          logger.info(`Subscription cancelled for user ${userId}`);
+
+          if (redis) {
+            // Clear caches
+            await redis.del(CACHE_KEYS.planLimits(userId));
+          }
+
+          // Get customerId from user record to sync cache
+          const user = await prisma.user.findUnique({
+            where: { id: userId },
+            select: { stripeCustomerId: true },
+          });
+          if (user?.stripeCustomerId) {
+            await syncStripeSubscriptionToCache(user.stripeCustomerId);
+          }
+        },
+        onSubscriptionDeleted: async ({ subscription }) => {
+          const userId = subscription.referenceId;
+          const redis = getRedis();
+          logger.info(`Subscription deleted for user ${userId}`);
+
+          if (redis) {
+            // Clear all user caches
+            await redis.del(CACHE_KEYS.planLimits(userId));
+
+            // Clear usage cache for current month
+            const currentMonth = new Date().toISOString().slice(0, 7);
+            await redis.del(CACHE_KEYS.usage(userId, currentMonth));
+          }
+
+          // Get customerId from user record to invalidate caches
+          const user = await prisma.user.findUnique({
+            where: { id: userId },
+            select: { stripeCustomerId: true },
+          });
+          if (user?.stripeCustomerId) {
+            await invalidateAllStripeCache(user.stripeCustomerId);
+          }
+        },
+      },
+      // Handle additional Stripe events
+      onEvent: async (event) => {
+        const redis = getRedis();
+
+        // Helper to get user from customerId (try cache first, then DB)
+        const getUserByCustomerId = async (customerId: string) => {
+          // Try cached lookup first
+          const cachedUserId = await getUserIdByCustomerId(customerId);
+          if (cachedUserId) {
+            return { id: cachedUserId };
+          }
+          // Fall back to database
+          return prisma.user.findFirst({
+            where: { stripeCustomerId: customerId },
+            select: { id: true },
+          });
+        };
+
+        // Helper to handle trial conversion to active subscription
+        const handleTrialConversion = async (
+          userId: string,
+          stripeSubscription: Stripe.Subscription,
+          planName?: string
+        ) => {
+          if (!planName) {
+            logger.warn(`Cannot handle trial conversion without plan name`, { userId, subscriptionId: stripeSubscription.id });
+            return;
+          }
+
+          // Update subscription with conversion data
+          await prisma.subscription.updateMany({
+            where: { stripeSubscriptionId: stripeSubscription.id },
+            data: {
+              trialConverted: true,
+              trialConvertedAt: new Date(),
+            },
+          });
+
+          // Extract period from subscription items
+          const firstItem = stripeSubscription.items.data[0] as {
+            current_period_start: number;
+            current_period_end: number;
+          };
+
+          const periodStart = new Date(firstItem.current_period_start * 1000);
+          const periodEnd = new Date(firstItem.current_period_end * 1000);
+
+          // Update usage quota with new limits
+          await updateUsageQuotaLimits(userId, planName as PlanName, periodStart, periodEnd);
+
+          logger.info(`Trial converted to active subscription`, {
+            userId,
+            planName,
+            subscriptionId: stripeSubscription.id,
+          });
+        };
+
+        switch (event.type) {
+          case "customer.created": {
+            // Store user-customer mapping when Stripe customer is created
+            const customer = event.data.object as Stripe.Customer;
+            const customerId = customer.id;
+            // Better Auth stores user ID in customer metadata
+            const userId = customer.metadata?.userId;
+
+            if (userId) {
+              await setUserCustomerMapping(userId, customerId);
+              logger.info(`Stored user-customer mapping`, { userId, customerId });
+            }
+            break;
+          }
+
+          case "customer.updated": {
+            // Invalidate customer cache when updated
+            const customer = event.data.object as Stripe.Customer;
+            await invalidateAllStripeCache(customer.id);
+            break;
+          }
+
+          case "invoice.payment_succeeded": {
+            // Invoice type from Stripe SDK
+            const invoice = event.data.object;
+            const customerId =
+              typeof invoice.customer === "string"
+                ? invoice.customer
+                : invoice.customer?.id;
+
+            if (!customerId) break;
+
+            // Find user by stripe customer ID (uses cached mapping if available)
+            const user = await getUserByCustomerId(customerId);
+
+            if (user) {
+              logger.info(`Payment succeeded for user ${user.id}`);
+
+              // Check if this is a new billing period (reset usage)
+              // subscription can be string, Subscription object, or null
+              const invoiceData = invoice as unknown as {
+                subscription?: string | { id: string } | null;
+              };
+              const subscriptionId =
+                typeof invoiceData.subscription === "string"
+                  ? invoiceData.subscription
+                  : invoiceData.subscription?.id;
+
+              if (subscriptionId) {
+                const stripeSubscription = await stripeClient.subscriptions.retrieve(
+                  subscriptionId,
+                  { expand: ["default_payment_method"] }
+                );
+
+                // Extract billing period from subscription items
+                // Pattern: subscription.items.data[0].current_period_start/end
+                const firstItem = stripeSubscription.items.data[0] as {
+                  current_period_start: number;
+                  current_period_end: number;
+                };
+
+                const periodStart = new Date(firstItem.current_period_start * 1000);
+                const periodEnd = new Date(firstItem.current_period_end * 1000);
+
+                // Check if we need to create a new usage quota for this period
+                const existingQuota = await prisma.usageQuota.findFirst({
+                  where: {
+                    userId: user.id,
+                    periodStart: { gte: periodStart },
+                  },
+                });
+
+                if (!existingQuota) {
+                  // Get plan from subscription
+                  const subscription = await prisma.subscription.findFirst({
+                    where: { stripeSubscriptionId: subscriptionId },
+                  });
+
+                  if (subscription) {
+                    const planLimitsMap = {
+                      starter: { templates: 75, images: 20 },
+                      pro: { templates: 200, images: 100 },
+                      scale: { templates: 500, images: 300 },
+                    };
+                    const limits =
+                      planLimitsMap[
+                        subscription.plan as keyof typeof planLimitsMap
+                      ] || planLimitsMap.starter;
+
+                    await prisma.usageQuota.create({
+                      data: {
+                        userId: user.id,
+                        plan: subscription.plan as PlanName,
+                        periodStart,
+                        periodEnd,
+                        templatesUsed: 0,
+                        templatesLimit: limits.templates,
+                        imagesUsed: 0,
+                        imagesLimit: limits.images,
+                      },
+                    });
+
+                    // Clear old usage cache
+                    if (redis) {
+                      const currentMonth = new Date().toISOString().slice(0, 7);
+                      await redis.del(CACHE_KEYS.usage(user.id, currentMonth));
+                    }
+
+                    logger.info(
+                      `Created new usage quota for user ${user.id}, period: ${periodStart.toISOString()}`
+                    );
+                  }
+                }
+
+                // Sync subscription data to cache
+                await syncStripeSubscriptionToCache(customerId);
+              }
+            }
+            break;
+          }
+          case "invoice.payment_failed": {
+            const invoice = event.data.object;
+            const customerId =
+              typeof invoice.customer === "string"
+                ? invoice.customer
+                : invoice.customer?.id;
+
+            if (!customerId) break;
+
+            const user = await getUserByCustomerId(customerId);
+
+            if (user) {
+              logger.warn(`Payment failed for user ${user.id}`);
+              // TODO: Send payment failed email
+            }
+            break;
+          }
+
+          case "customer.subscription.trial_will_end": {
+            // Trial ending in 3 days - send reminder email
+            const subscription = event.data.object as Stripe.Subscription;
+            const customerId = subscription.customer as string;
+
+            const user = await getUserByCustomerId(customerId);
+
+            if (user) {
+              logger.info(`Trial ending soon for user ${user.id}`);
+              // TODO: Send trial ending email
+            }
+            break;
+          }
+
+          case "customer.subscription.created": {
+            const subscription = event.data.object as Stripe.Subscription;
+            const customerId = subscription.customer as string;
+
+            await syncStripeSubscriptionToCache(customerId);
+
+            const user = await getUserByCustomerId(customerId);
+            if (!user) {
+              logger.warn(`User not found for subscription creation`, { customerId });
+              break;
+            }
+
+            const firstItem = subscription.items.data[0];
+            const priceId = firstItem?.price?.id;
+            const planName = priceId ? getPlanNameFromPriceId(priceId) : undefined;
+
+            // Update subscription status from "incomplete" (Better Auth initial state) to actual Stripe status
+            await prisma.subscription.updateMany({
+              where: {
+                referenceId: user.id,
+                status: "incomplete",
+              },
+              data: {
+                stripeSubscriptionId: subscription.id,
+                stripeCustomerId: customerId,
+                status: subscription.status,
+                plan: planName,
+                periodStart: firstItem?.current_period_start
+                  ? new Date(firstItem.current_period_start * 1000)
+                  : new Date(),
+                periodEnd: firstItem?.current_period_end
+                  ? new Date(firstItem.current_period_end * 1000)
+                  : null,
+                cancelAtPeriodEnd: subscription.cancel_at_period_end,
+                trialStart: subscription.trial_start
+                  ? new Date(subscription.trial_start * 1000)
+                  : null,
+                trialEnd: subscription.trial_end
+                  ? new Date(subscription.trial_end * 1000)
+                  : null,
+                updatedAt: new Date(),
+              },
+            });
+
+            logger.info(`Updated subscription status`, {
+              userId: user.id,
+              subscriptionId: subscription.id,
+              status: subscription.status,
+              planName,
+            });
+
+            // Clear user cache to refresh limits
+            if (redis && isRedisAvailable()) {
+              await redis.del(CACHE_KEYS.planLimits(user.id));
+              const currentMonth = new Date().toISOString().slice(0, 7);
+              await redis.del(CACHE_KEYS.usage(user.id, currentMonth));
+            }
+
+            break;
+          }
+
+          case "customer.subscription.updated": {
+            const subscription = event.data.object as Stripe.Subscription;
+            const customerId = subscription.customer as string;
+            const previousAttributes = (event.data as any).previous_attributes as { 
+              status?: string;
+              items?: any;
+            } | undefined;
+            const cachedSub = await syncStripeSubscriptionToCache(customerId);
+
+            const user = await getUserByCustomerId(customerId);
+            if (!user) {
+              logger.warn(`User not found for subscription update`, { customerId, subscriptionId: subscription.id });
+              break;
+            }
+
+            const firstItem = subscription.items.data[0];
+            const priceId = firstItem?.price?.id;
+            const planName = priceId ? getPlanNameFromPriceId(priceId) : undefined;
+
+            // Extract billing period
+            const periodStart = cachedSub.status !== "none" && cachedSub.currentPeriodStart
+              ? new Date(cachedSub.currentPeriodStart * 1000)
+              : new Date();
+            const periodEnd = cachedSub.status !== "none" && cachedSub.currentPeriodEnd
+              ? new Date(cachedSub.currentPeriodEnd * 1000)
+              : new Date();
+
+            // Detect trial → active conversion
+            if (previousAttributes?.status === "trialing" && subscription.status === "active") {
+              logger.info(`Trial converting to active`, {
+                userId: user.id,
+                subscriptionId: subscription.id,
+                planName,
+              });
+              await handleTrialConversion(user.id, subscription, planName);
+            } 
+            // Detect plan change (upgrade/downgrade) - check if price changed
+            else if (previousAttributes?.items && planName) {
+              const previousItems = previousAttributes.items as { data?: Array<{ price?: { id?: string } }> };
+              const previousPriceId = previousItems?.data?.[0]?.price?.id;
+              const currentPriceId = firstItem?.price?.id;
+
+              if (previousPriceId && currentPriceId && previousPriceId !== currentPriceId) {
+                const previousPlan = getPlanNameFromPriceId(previousPriceId);
+                logger.info(`Plan change detected`, {
+                  userId: user.id,
+                  subscriptionId: subscription.id,
+                  previousPlan,
+                  newPlan: planName,
+                  previousPriceId,
+                  currentPriceId,
+                });
+
+                // Update usage quota with new limits (Option A: keep usage, update limits)
+                await updateUsageQuotaLimits(user.id, planName as PlanName, periodStart, periodEnd);
+              }
+            }
+
+            // Update subscription record
+            await prisma.subscription.updateMany({
+              where: { stripeSubscriptionId: subscription.id },
+              data: {
+                status: subscription.status,
+                plan: planName,
+                periodStart,
+                periodEnd,
+                cancelAtPeriodEnd: subscription.cancel_at_period_end ?? false,
+                trialStart: subscription.trial_start
+                  ? new Date(subscription.trial_start * 1000)
+                  : null,
+                trialEnd: subscription.trial_end
+                  ? new Date(subscription.trial_end * 1000)
+                  : null,
+                trialCancelled: subscription.status === "trialing" && subscription.cancel_at_period_end,
+                trialCancelledAt: subscription.status === "trialing" && subscription.cancel_at_period_end
+                  ? new Date()
+                  : null,
+                updatedAt: new Date(),
+              },
+            });
+
+            // Always clear plan limits cache on any subscription update
+            if (redis) {
+              await redis.del(CACHE_KEYS.planLimits(user.id));
+            }
+            break;
+          }
+
+          case "customer.subscription.deleted": {
+            // Clear all caches when subscription deleted
+            const subscription = event.data.object as Stripe.Subscription;
+            const customerId = subscription.customer as string;
+            
+            await invalidateAllStripeCache(customerId);
+            
+            const user = await getUserByCustomerId(customerId);
+            if (user && redis) {
+              await redis.del(CACHE_KEYS.planLimits(user.id));
+              const currentMonth = new Date().toISOString().slice(0, 7);
+              await redis.del(CACHE_KEYS.usage(user.id, currentMonth));
+            }
+            logger.info(`Cleared caches for deleted subscription`, { subscriptionId: subscription.id });
+            break;
+          }
+
+          case "charge.dispute.created": {
+            // Log dispute for monitoring - important for fraud prevention
+            const dispute = event.data.object as Stripe.Dispute;
+            logger.warn(`Dispute created`, {
+              disputeId: dispute.id,
+              chargeId: dispute.charge,
+              amount: dispute.amount,
+              reason: dispute.reason,
+            });
+            // TODO: Send alert to admin
+            break;
+          }
+        }
       },
     }),
   ],

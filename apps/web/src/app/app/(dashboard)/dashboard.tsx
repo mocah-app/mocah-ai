@@ -1,11 +1,12 @@
 "use client";
 
 import BrandKitSetupBanner from "@/components/brand-kit/BrandKitSetupBanner";
+import { UsageWarningBanner } from "@/components/billing/usage-warning-banner";
 import { EmptyState } from "@/components/dashboard/empty-state";
 import { NoBrandState } from "@/components/dashboard/no-brand-state";
 import { TemplateGridView } from "@/components/dashboard/template-grid-view";
-import { TemplateListView } from "@/components/dashboard/template-list-view";
 import { TemplateGridViewSkeleton } from "@/components/dashboard/template-grid-view-skeleton";
+import { TemplateListView } from "@/components/dashboard/template-list-view";
 import { TemplateListViewSkeleton } from "@/components/dashboard/template-list-view-skeleton";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -13,6 +14,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { DashboardProvider, useDashboard } from "@/contexts/dashboard-context";
 import { useOrganization } from "@/contexts/organization-context";
+import { useUsageTracking } from "@/hooks/use-usage-tracking";
 import { trpc } from "@/utils/trpc";
 import { Grid3x3, List, Plus } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
@@ -28,6 +30,7 @@ function DashboardContent() {
     isLoading: orgLoading,
   } = useOrganization();
   const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
+  const { usage } = useUsageTracking();
 
   // Show first organization if we have orgs but no active one set yet
   const displayOrg =
@@ -40,7 +43,7 @@ function DashboardContent() {
     fetchNextPage,
     hasNextPage,
     isFetchingNextPage,
-  } = trpc.template.list.useInfiniteQuery(
+  } = trpc.template.core.list.useInfiniteQuery(
     { limit: TEMPLATES_PER_PAGE },
     {
       enabled: !!activeOrganization?.id,
@@ -56,7 +59,7 @@ function DashboardContent() {
       prevOrgIdRef.current &&
       prevOrgIdRef.current !== activeOrganization.id
     ) {
-      utils.template.list.invalidate();
+      utils.template.core.list.invalidate();
     }
     prevOrgIdRef.current = activeOrganization?.id;
   }, [activeOrganization?.id, utils]);
@@ -93,6 +96,16 @@ function DashboardContent() {
   return (
     <div className="space-y-2 relative">
       <h1 className="sr-only">{displayOrg?.name}</h1>
+
+      {/* Usage Warning Banners */}
+      <div className="space-y-2">
+        <UsageWarningBanner
+          type="template"
+          percentage={usage?.templatesPercentage ?? 0}
+          remaining={usage?.templatesRemaining}
+          variant="alert"
+        />
+      </div>
 
       {/* Brand Kit Setup Banner */}
       {!orgLoading && !hasKeyBrandData && (
