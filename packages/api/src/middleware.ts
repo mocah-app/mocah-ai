@@ -4,7 +4,7 @@ import {
   checkUsageLimit,
   getActiveTrial,
   getPlanLimits,
-  UsageLimitError
+  UsageLimitError,
 } from "./lib/usage-tracking";
 
 /**
@@ -102,6 +102,7 @@ export const adminProcedure = protectedProcedure.use(
 /**
  * Middleware that requires template generation quota
  * Use this for template generation endpoints
+ * NOTE: checkUsageLimit validates subscription and returns it for reuse
  */
 export const requireTemplateGenerationQuota = t.middleware(async ({ ctx, next }) => {
   if (!ctx.session?.user?.id) {
@@ -112,6 +113,8 @@ export const requireTemplateGenerationQuota = t.middleware(async ({ ctx, next })
   }
 
   const userId = ctx.session.user.id;
+
+  // Check usage quota (validates subscription exists internally)
   const usageCheck = await checkUsageLimit(userId, "templateGeneration");
 
   if (!usageCheck.allowed) {
@@ -123,7 +126,8 @@ export const requireTemplateGenerationQuota = t.middleware(async ({ ctx, next })
     });
   }
 
-  const planLimits = await getPlanLimits(userId);
+  // Reuse subscription from usageCheck to avoid second DB query
+  const planLimits = await getPlanLimits(userId, usageCheck.subscription);
 
   return next({
     ctx: {
@@ -137,6 +141,7 @@ export const requireTemplateGenerationQuota = t.middleware(async ({ ctx, next })
 /**
  * Middleware that requires image generation quota
  * Use this for image generation endpoints
+ * NOTE: checkUsageLimit validates subscription and returns it for reuse
  */
 export const requireImageGenerationQuota = t.middleware(async ({ ctx, next }) => {
   if (!ctx.session?.user?.id) {
@@ -147,6 +152,8 @@ export const requireImageGenerationQuota = t.middleware(async ({ ctx, next }) =>
   }
 
   const userId = ctx.session.user.id;
+
+  // Check usage quota (validates subscription exists internally)
   const usageCheck = await checkUsageLimit(userId, "imageGeneration");
 
   if (!usageCheck.allowed) {
@@ -158,7 +165,8 @@ export const requireImageGenerationQuota = t.middleware(async ({ ctx, next }) =>
     });
   }
 
-  const planLimits = await getPlanLimits(userId);
+  // Reuse subscription from usageCheck to avoid second DB query
+  const planLimits = await getPlanLimits(userId, usageCheck.subscription);
 
   return next({
     ctx: {

@@ -100,8 +100,28 @@ export async function POST(req: NextRequest) {
       });
     }
 
-    // 4. Check usage quota before generation (but don't increment yet)
-    const usageCheck = await checkUsageLimit(userId, "templateGeneration");
+    // 4. Check usage quota (also validates subscription exists internally)
+    let usageCheck;
+    try {
+      usageCheck = await checkUsageLimit(userId, "templateGeneration");
+    } catch (error: any) {
+      // Handle subscription requirement error
+      if (error.cause?.subscriptionRequired) {
+        return new Response(
+          JSON.stringify({
+            error: "Subscription required",
+            message: error.message,
+            subscriptionRequired: true,
+          }),
+          {
+            status: 403,
+            headers: { "Content-Type": "application/json" },
+          }
+        );
+      }
+      throw error; // Re-throw other errors
+    }
+    
     if (!usageCheck.allowed) {
       return new Response(
         JSON.stringify({

@@ -31,8 +31,7 @@ export default function UserMenu() {
     );
   }
 
-  // stripeCustomerId exists in DB but isn't in Better Auth's inferred session type
-  const stripeCustomerId = (session.user as { stripeCustomerId?: string | null }).stripeCustomerId;
+  // const stripeCustomerId = (session.user as { stripeCustomerId?: string | null }).stripeCustomerId;
 
   return (
     <DropdownMenu>
@@ -47,11 +46,6 @@ export default function UserMenu() {
           <span className="text-xs text-muted-foreground/70">
             {session.user.email}
           </span>
-          {stripeCustomerId && (
-            <span className="text-xs text-muted-foreground/70">
-              {stripeCustomerId}
-            </span>
-          )}
         </DropdownMenuLabel>
         <DropdownMenuSeparator />
         <DropdownMenuItem asChild>

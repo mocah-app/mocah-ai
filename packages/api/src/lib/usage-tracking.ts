@@ -16,6 +16,7 @@ import prisma from "@mocah/db";
 import { logger } from "@mocah/shared/logger";
 import { getRedis, isRedisAvailable } from "@mocah/shared/redis";
 import { TRPCError } from "@trpc/server";
+import type { StripeSubscriptionCache } from "@mocah/auth/stripe-sync";
 
 // ============================================================================
 // Types & Interfaces
@@ -40,6 +41,7 @@ export interface UsageCheckResult {
   percentage: number;
   resetDate?: Date;
   isTrialUser?: boolean;
+  subscription?: StripeSubscriptionCache; // For reuse in getPlanLimits
 }
 
 export interface TrialData {
@@ -291,8 +293,12 @@ async function incrementTrialUsage(
 
 /**
  * Get plan limits for a user
+ * Optionally accepts a subscription from Stripe cache to avoid re-querying
  */
-export async function getPlanLimits(userId: string): Promise<PlanLimits> {
+export async function getPlanLimits(
+  userId: string,
+  subscription?: StripeSubscriptionCache
+): Promise<PlanLimits> {
   const redis = getRedis();
 
   // Check cache first
@@ -330,18 +336,48 @@ export async function getPlanLimits(userId: string): Promise<PlanLimits> {
     return limits;
   }
 
-  // Query subscription for active users
-  const subscription = await prisma.subscription.findFirst({
-    where: {
-      referenceId: userId,
-    },
-    orderBy: {
-      createdAt: "desc",
-    },
-  });
+  // Query database for subscription if not provided
+  if (subscription === undefined) {
+    const dbSubscription = await prisma.subscription.findFirst({
+      where: {
+        referenceId: userId,
+      },
+      orderBy: {
+        createdAt: "desc",
+      },
+    });
+    
+    const planName = (dbSubscription?.plan as PlanName) || "starter";
+    const planConfig = PLAN_LIMITS[planName] || PLAN_LIMITS.starter;
 
-  // Active subscription limits
-  const planName = (subscription?.plan as PlanName) || "starter";
+    const limits: PlanLimits = {
+      templatesLimit: planConfig.templatesLimit,
+      imagesLimit: planConfig.imagesLimit,
+      plan: planName,
+      hasPremiumImageModel: planConfig.hasPremiumImageModel,
+      hasPriorityQueue: planConfig.hasPriorityQueue,
+    };
+
+    // Cache plan limits
+    if (redis && isRedisAvailable()) {
+      try {
+        await redis.setex(
+          USAGE_CACHE_KEYS.planLimits(userId),
+          CACHE_TTL.planLimits,
+          JSON.stringify(limits)
+        );
+      } catch (error) {
+        logger.error("Failed to cache plan limits", error as Error);
+      }
+    }
+
+    return limits;
+  }
+
+  // Use provided subscription from Stripe cache
+  const planName = subscription.status === "none" 
+    ? "starter"
+    : ((subscription.plan as PlanName) || "starter");
   const planConfig = PLAN_LIMITS[planName] || PLAN_LIMITS.starter;
 
   const limits: PlanLimits = {
@@ -480,6 +516,8 @@ export async function getCurrentQuota(userId: string): Promise<UsageQuotaData> {
 
 /**
  * Check if user is within usage limit (pre-check before action)
+ * Throws error if user has no subscription at all
+ * Uses existing Stripe subscription cache from @mocah/auth/stripe-sync
  */
 export async function checkUsageLimit(
   userId: string,
@@ -490,6 +528,23 @@ export async function checkUsageLimit(
   const trial = await getActiveTrial(userId);
   if (trial) {
     return checkTrialUsageLimit(userId, type);
+  }
+
+  // Get subscription from Stripe cache (webhook-driven, no TTL)
+  const { getCachedSubscriptionByUserId } = await import("@mocah/auth/stripe-sync");
+  const subscription = await getCachedSubscriptionByUserId(userId);
+
+  // Throw error if no subscription exists or not active
+  if (!subscription || subscription.status === "none" || 
+      (subscription.status !== "active" && subscription.status !== "trialing")) {
+    throw new TRPCError({
+      code: "FORBIDDEN",
+      message: "Active subscription required. Start your free trial to continue.",
+      cause: {
+        subscriptionRequired: true,
+        upgradeUrl: "/pricing",
+      },
+    });
   }
 
   // Get current quota
@@ -506,6 +561,7 @@ export async function checkUsageLimit(
     percentage: calculatePercentage(used, limit),
     resetDate: quota.periodEnd,
     isTrialUser: false,
+    subscription, // Pass subscription for reuse in getPlanLimits
   };
 }
 

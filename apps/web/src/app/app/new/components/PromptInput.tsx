@@ -24,6 +24,7 @@ export interface PromptInputProps {
   placeholder?: string;
   includeBrandGuide: boolean;
   onBrandGuideChange: (include: boolean) => void;
+  disabled?: boolean;
 }
 
 export default function PromptInput({
@@ -40,11 +41,12 @@ export default function PromptInput({
   placeholder = "Please create black friday email showing our trending products",
   includeBrandGuide,
   onBrandGuideChange,
+  disabled = false,
 }: PromptInputProps) {
   const hasUploadingAttachment = attachments.some(
     (att) => att.status === "uploading"
   );
-  const isSubmitDisabled = !value.trim() || isLoading || hasUploadingAttachment;
+  const isSubmitDisabled = !value.trim() || isLoading || hasUploadingAttachment || disabled;
 
   return (
     <div className="bg-card border border-border rounded-2xl shadow-2xl md:max-w-2xl lg:max-w-3xl w-full mx-auto has-focus-visible:border-blue-500/30 transition-colors">
@@ -55,8 +57,9 @@ export default function PromptInput({
           onKeyDown={onKeyDown}
           onPaste={onPaste}
           rows={4}
-          placeholder={placeholder}
-          className="w-full border-0 dark:bg-transparent text-foreground placeholder:text-muted-foreground px-6 py-7 h-auto pr-16 min-h-[120px] max-h-[250px] resize-none scrollbar-thin scrollbar-thumb-border scrollbar-track-transparent focus:outline-none focus:ring-0 focus-visible:ring-0 focus-visible:ring-offset-0 leading-relaxed"
+          placeholder={disabled ? "Start a free trial to create templates" : placeholder}
+          disabled={disabled}
+          className="w-full border-0 dark:bg-transparent text-foreground placeholder:text-muted-foreground px-6 py-7 h-auto pr-16 min-h-[120px] max-h-[250px] resize-none scrollbar-thin scrollbar-thumb-border scrollbar-track-transparent focus:outline-none focus:ring-0 focus-visible:ring-0 focus-visible:ring-offset-0 leading-relaxed disabled:opacity-50 disabled:cursor-not-allowed"
         />
 
         {/* Action Buttons */}
@@ -65,10 +68,10 @@ export default function PromptInput({
             <AttachmentPopover
               onUploadClick={onUploadClick}
               onPasteUrlClick={onPasteUrlClick}
-              disabled={isLoading}
+              disabled={isLoading || disabled}
             />
             <FilterPopover
-              disabled={isLoading}
+              disabled={isLoading || disabled}
               includeBrandGuide={includeBrandGuide}
               onBrandGuideChange={onBrandGuideChange}
             />

@@ -18,6 +18,8 @@ import { checkMembership } from "../lib/membership-cache";
 import {
   getActiveTrial,
   incrementUsage,
+  checkUsageLimit,
+  UsageLimitError,
 } from "../lib/usage-tracking";
 import {
   validateStyleType,
@@ -591,6 +593,7 @@ export const templateCoreRouter = router({
 
   /**
    * Duplicate a template (remix)
+   * Requires active subscription for library template remixes
    */
   duplicate: protectedProcedure
     .input(
@@ -636,6 +639,18 @@ export const templateCoreRouter = router({
       let targetOrganizationId = template.organizationId;
 
       if (isPublicOrInLibrary) {
+        // For public/library templates, require active subscription
+        const usageCheck = await checkUsageLimit(ctx.session.user.id, "templateGeneration");
+        
+        if (!usageCheck.allowed) {
+          throw new UsageLimitError({
+            code: usageCheck.isTrialUser ? "TRIAL_LIMIT_REACHED" : "QUOTA_EXCEEDED",
+            remaining: usageCheck.remaining,
+            limit: usageCheck.limit,
+            resetDate: usageCheck.resetDate,
+          });
+        }
+        
         // For public/library templates, duplicate into user's active organization
         if (!ctx.activeOrganization) {
           throw new TRPCError({

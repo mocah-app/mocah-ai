@@ -23,9 +23,127 @@ interface UsageWarningBannerProps {
   className?: string;
 }
 
+interface NoSubscriptionBannerProps {
+  type?: UsageType;
+  variant?: "alert" | "compact";
+  className?: string;
+}
+
 // ============================================================================
 // Component
 // ============================================================================
+
+/**
+ * NoSubscriptionBanner
+ * Shows when user has no subscription at all (not even trial)
+ * Blocks user from generating templates/images until they subscribe
+ */
+export function NoSubscriptionBanner({
+  type = "template",
+  variant = "alert",
+  className,
+}: NoSubscriptionBannerProps) {
+  const [isModalOpen, setIsModalOpen] = useState(false);
+
+  const typeLabel = type === "template" ? "template" : "image";
+
+  // Alert variant - prominent blocking banner
+  if (variant === "alert") {
+    return (
+      <>
+        <div
+          className={cn(
+            "relative rounded-lg border p-5 shadow-lg transition-all",
+            "bg-linear-to-br from-blue-50/50 to-blue-100/30 dark:from-blue-950/30 dark:to-blue-900/20",
+            "border-blue-200/60 dark:border-blue-800/40",
+            className
+          )}
+        >
+          {/* Decorative gradient overlay */}
+          <div
+            className={cn(
+              "absolute inset-0 rounded-lg opacity-5",
+              "bg-linear-to-br from-blue-600 to-blue-700"
+            )}
+          />
+
+          <div className="relative flex items-start gap-4">
+            {/* Icon */}
+            <div
+              className={cn(
+                "flex h-10 w-10 shrink-0 items-center justify-center rounded-full",
+                "bg-blue-200 dark:bg-blue-800/40"
+              )}
+            >
+              <AlertTriangle className="h-5 w-5 text-blue-700 dark:text-blue-300" />
+            </div>
+
+            {/* Content */}
+            <div className="flex-1 flex flex-col md:flex-row justify-between w-full gap-4 space-y-3">
+              <div>
+                <h3 className="font-semibold text-sm text-blue-950 dark:text-blue-50">
+                  Subscription Required
+                </h3>
+                <p className="text-sm mt-1 text-blue-900/95 dark:text-blue-100/95">
+                  Start your 7-day free trial to create {typeLabel}s. No credit card required.
+                </p>
+              </div>
+
+              {/* CTA Button */}
+              <Button
+                onClick={() => setIsModalOpen(true)}
+                size="sm"
+                className="mt-2 bg-blue-700 hover:bg-blue-800 text-white dark:bg-blue-800 dark:hover:bg-blue-900 shadow-md"
+              >
+                <TrendingUp className="mr-2 h-4 w-4" />
+                Start Free Trial
+              </Button>
+            </div>
+          </div>
+        </div>
+
+        {/* Plan Selection Modal */}
+        <PlanSelectionModal
+          open={isModalOpen}
+          onOpenChange={setIsModalOpen}
+        />
+      </>
+    );
+  }
+
+  // Compact variant
+  return (
+    <>
+      <div
+        className={cn(
+          "flex items-center justify-between gap-2 px-4 py-2 rounded-lg text-sm",
+          "bg-blue-500/10 text-blue-700 dark:text-blue-400",
+          className
+        )}
+      >
+        <div className="flex items-center gap-2">
+          <AlertTriangle className="h-4 w-4 shrink-0" />
+          <span>Start your free trial to create {typeLabel}s</span>
+        </div>
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={() => setIsModalOpen(true)}
+          className="shrink-0 h-7 px-2 text-blue-700 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300 hover:bg-blue-500/10"
+        >
+          <TrendingUp className="mr-1 h-3 w-3" />
+          Start Trial
+        </Button>
+      </div>
+
+      {/* Plan Selection Modal */}
+      <PlanSelectionModal
+        open={isModalOpen}
+        onOpenChange={setIsModalOpen}
+      />
+    </>
+  );
+}
 
 export function UsageWarningBanner({
   type,
