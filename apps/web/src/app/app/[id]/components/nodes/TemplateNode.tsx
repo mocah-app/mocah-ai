@@ -2,7 +2,7 @@
 
 import { Handle, Position } from "@xyflow/react";
 import { Plus } from "lucide-react";
-import React from "react";
+import React, { useRef, useState, useEffect, useCallback, useMemo } from "react";
 import { useEditorMode } from "../providers/EditorModeProvider";
 import { useDesignChanges } from "../providers/DesignChangesProvider";
 import { CodeModeContent } from "./CodeModeContent";
@@ -10,6 +10,8 @@ import { NodeHeader } from "./NodeHeader";
 import { ViewModeContent } from "./ViewModeContent";
 import MocahLoadingIcon from "@/components/mocah-brand/MocahLoadingIcon";
 import { useTemplate, GENERATION_PHASE_MESSAGES } from "../providers/TemplateProvider";
+import { CodeAlertsDrawer } from "../code-editor/CodeAlertsDrawer";
+import { validateReactEmailCode } from "@mocah/shared/validation/react-email-validator";
 
 export interface TemplateNodeData {
   version: number;
@@ -46,6 +48,90 @@ export function TemplateNode({ data, id }: TemplateNodeProps) {
   // Code editor should be blocked when smart editor has pending changes
   const hasSmartEditorPendingChanges = state.allPendingChanges.size > 0;
 
+  // Drawer state - managed at TemplateNode level so it works in both modes
+  const [isAlertsDrawerOpen, setIsAlertsDrawerOpen] = useState(false);
+  const [drawerInitialTab, setDrawerInitialTab] = useState<"linter" | "compatibility" | "test-email">("compatibility");
+  
+  // Validation state
+  const reactEmailCode = data.template.reactEmailCode || "";
+  const [validationErrors, setValidationErrors] = useState<string[]>([]);
+  const [validationWarnings, setValidationWarnings] = useState<string[]>([]);
+  
+  // Ref to get cachedHtml from CodeModeContent (optional, only available in code mode)
+  const cachedHtmlRef = useRef<{ code: string; html: string } | null>(null);
+  
+  // Ref to code editor for scrolling to lines (only available in code mode)
+  const codeEditorScrollRef = useRef<((line: number) => void) | null>(null);
+
+  // Run validation when code changes
+  useEffect(() => {
+    if (reactEmailCode) {
+      const result = validateReactEmailCode(reactEmailCode);
+      setValidationErrors(result.errors);
+      setValidationWarnings(result.warnings || []);
+    }
+  }, [reactEmailCode]);
+
+  // Handle test email - just open drawer
+  const handleTestEmail = useCallback(() => {
+    setDrawerInitialTab("test-email");
+    setIsAlertsDrawerOpen(true);
+  }, []);
+
+  // Handle check compatibility - just open drawer
+  const handleCheckCompatibility = useCallback(() => {
+    setDrawerInitialTab("compatibility");
+    setIsAlertsDrawerOpen(true);
+  }, []);
+  
+  // Handle "go to line" from drawer - switch to code mode first if needed
+  const handleGoToLine = useCallback((line: number) => {
+    if (mode === "view") {
+      // Switch to code mode first
+      actions.setNodeMode(nodeId, "code");
+      // Wait for code mode to be active, then scroll
+      setTimeout(() => {
+        codeEditorScrollRef.current?.(line);
+      }, 200);
+    } else {
+      // Already in code mode, just scroll
+      codeEditorScrollRef.current?.(line);
+    }
+    // Close drawer
+    setIsAlertsDrawerOpen(false);
+  }, [mode, nodeId, actions]);
+
+  // Memoized callbacks to prevent infinite loops
+  const handleValidationStateChange = useCallback((errors: string[], warnings: string[]) => {
+    setValidationErrors(errors);
+    setValidationWarnings(warnings);
+  }, []);
+
+  const handleCachedHtmlChange = useCallback((html: { code: string; html: string } | null) => {
+    cachedHtmlRef.current = html;
+  }, []);
+
+  const handleEditorScrollRef = useCallback((scrollFn: (line: number) => void) => {
+    codeEditorScrollRef.current = scrollFn;
+  }, []);
+
+  const handleDrawerOpen = useCallback((tab: "linter" | "compatibility" | "test-email") => {
+    setDrawerInitialTab(tab);
+    setIsAlertsDrawerOpen(true);
+  }, []);
+
+  const handleDrawerClose = useCallback(() => {
+    setIsAlertsDrawerOpen(false);
+  }, []);
+
+  // Memoize drawer state object to prevent re-renders
+  const drawerState = useMemo(() => ({
+    isOpen: isAlertsDrawerOpen,
+    initialTab: drawerInitialTab,
+    onOpen: handleDrawerOpen,
+    onClose: handleDrawerClose,
+  }), [isAlertsDrawerOpen, drawerInitialTab, handleDrawerOpen, handleDrawerClose]);
+
   return (
     <div className="bg-background rounded-lg shadow-lg border border-border w-full max-w-[600px] sm:w-[600px] relative">
       {/* Connection handles */}
@@ -70,6 +156,10 @@ export function TemplateNode({ data, id }: TemplateNodeProps) {
         isCurrent={data.isCurrent}
         nodeId={nodeId}
         currentMode={mode}
+        templateId={templateState.currentTemplate?.id}
+        templateName={templateState.currentTemplate?.name}
+        onTestEmail={handleTestEmail}
+        onCheckCompatibility={handleCheckCompatibility}
       />
 
       {/* Node Body */}
@@ -109,10 +199,29 @@ export function TemplateNode({ data, id }: TemplateNodeProps) {
               onSaveSmartEditorChanges={onSaveSmartEditorChanges}
               onResetSmartEditorChanges={onResetSmartEditorChanges}
               isSaving={isSaving}
+              onTestEmailRef={null}
+              onCheckCompatibilityRef={null}
+              onValidationStateChange={handleValidationStateChange}
+              onCachedHtmlChange={handleCachedHtmlChange}
+              onEditorScrollRef={handleEditorScrollRef}
+              drawerState={drawerState}
             />
           )}
         </div>
       )}
+      
+      {/* Alerts Drawer - available in both modes */}
+      <CodeAlertsDrawer
+        isOpen={isAlertsDrawerOpen}
+        onClose={handleDrawerClose}
+        errors={validationErrors}
+        warnings={validationWarnings}
+        reactEmailCode={reactEmailCode}
+        onGoToLine={handleGoToLine}
+        cachedHtml={cachedHtmlRef.current}
+        initialTab={drawerInitialTab}
+      />
+      
       {/* Node Footer */}
       <div className="border-border flex items-center justify-between"></div>
     </div>
