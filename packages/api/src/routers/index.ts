@@ -8,6 +8,7 @@ import { templateRouter } from "./template";
 import { chatRouter } from "./chat";
 import { imageAssetRouter } from "./image-asset";
 import { subscriptionRouter } from "./subscription";
+import { emailTestRouter } from "./email-test";
 
 export const appRouter = router({
   healthCheck: publicProcedure.query(() => {
@@ -30,6 +31,7 @@ export const appRouter = router({
   chat: chatRouter,
   imageAsset: imageAssetRouter,
   subscription: subscriptionRouter,
+  emailTest: emailTestRouter,
 });
 
 export type AppRouter = typeof appRouter;

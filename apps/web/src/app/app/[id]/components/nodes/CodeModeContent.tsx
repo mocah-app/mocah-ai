@@ -1,17 +1,14 @@
 "use client";
 
-import React, { useState, useCallback, useEffect, useRef } from "react";
-import type { TemplateNodeData } from "./TemplateNode";
-import { ReactEmailCodeEditor } from "../code-editor/ReactEmailCodeEditor";
+import Loader from "@/components/loader";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { AlertTriangle, Copy, RefreshCw } from "lucide-react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
+import { toast } from "sonner";
 import type { CodeEditorRef } from "../code-editor/CodeEditor";
 import { HtmlCodeViewer } from "../code-editor/HtmlCodeViewer";
-import { CodeAlertsDrawer } from "../code-editor/CodeAlertsDrawer";
-import { Button } from "@/components/ui/button";
-import { Copy, RefreshCw, AlertTriangle, Save, RotateCcw } from "lucide-react";
-import Loader from "@/components/loader";
-import { toast } from "sonner";
-import { Badge } from "@/components/ui/badge";
-import { validateReactEmailCode } from "@mocah/shared/validation/react-email-validator";
+import { ReactEmailCodeEditor } from "../code-editor/ReactEmailCodeEditor";
 
 interface CodeModeContentProps {
   template: {
@@ -25,6 +22,17 @@ interface CodeModeContentProps {
   onSaveSmartEditorChanges?: () => void;
   onResetSmartEditorChanges?: () => void;
   isSaving?: boolean;
+  onTestEmailRef?: React.RefObject<(() => void) | null> | null;
+  onCheckCompatibilityRef?: React.RefObject<(() => void) | null> | null;
+  onValidationStateChange?: (errors: string[], warnings: string[]) => void;
+  onCachedHtmlChange?: (html: { code: string; html: string } | null) => void;
+  onEditorScrollRef?: (scrollFn: (line: number) => void) => void;
+  drawerState?: {
+    isOpen: boolean;
+    initialTab: "linter" | "compatibility" | "test-email";
+    onOpen: (tab: "linter" | "compatibility" | "test-email") => void;
+    onClose: () => void;
+  };
 }
 
 export function CodeModeContent({
@@ -34,6 +42,12 @@ export function CodeModeContent({
   onSaveSmartEditorChanges,
   onResetSmartEditorChanges,
   isSaving = false,
+  onTestEmailRef,
+  onCheckCompatibilityRef,
+  onValidationStateChange,
+  onCachedHtmlChange,
+  onEditorScrollRef,
+  drawerState,
 }: CodeModeContentProps) {
   const [activeTab, setActiveTab] = useState<"react" | "html">("react");
   // Cache rendered HTML to prevent unnecessary re-renders when switching tabs
@@ -47,45 +61,49 @@ export function CodeModeContent({
   const [htmlLoading, setHtmlLoading] = useState(false);
   const [htmlRefreshTrigger, setHtmlRefreshTrigger] = useState(0);
 
-  // State for validation and alerts drawer
+  // Local validation state for badge count
   const [validationErrors, setValidationErrors] = useState<string[]>([]);
   const [validationWarnings, setValidationWarnings] = useState<string[]>([]);
-  const [isAlertsDrawerOpen, setIsAlertsDrawerOpen] = useState(false);
 
   // Ref to the code editor for scrolling to lines
   const editorRef = useRef<CodeEditorRef>(null);
 
   const reactEmailCode = template.reactEmailCode || "";
 
-  // Handle "go to line" from alerts drawer
-  const handleGoToLine = useCallback((line: number) => {
-    // Switch to React tab if not already there
-    setActiveTab("react");
-    // Close the drawer
-    setIsAlertsDrawerOpen(false);
-    // Small delay to ensure tab switch completes and editor is mounted
-    setTimeout(() => {
-      editorRef.current?.scrollToLine(line);
-    }, 100);
-  }, []);
-
-  // Run initial validation when code changes
+  // Expose scroll function to parent
   useEffect(() => {
-    if (reactEmailCode) {
-      const result = validateReactEmailCode(reactEmailCode);
-      setValidationErrors(result.errors);
-      setValidationWarnings(result.warnings || []);
+    if (onEditorScrollRef) {
+      onEditorScrollRef((line: number) => {
+        // Switch to React tab if not already there
+        setActiveTab("react");
+        // Small delay to ensure tab switch completes and editor is mounted
+        setTimeout(() => {
+          editorRef.current?.scrollToLine(line);
+        }, 100);
+      });
     }
-  }, [reactEmailCode]);
+  }, [onEditorScrollRef]);
 
   // Handle validation state updates from the editor
   const handleValidationStateChange = useCallback(
     (errors: string[], warnings: string[]) => {
       setValidationErrors(errors);
       setValidationWarnings(warnings);
+      // Also notify parent
+      onValidationStateChange?.(errors, warnings);
     },
-    []
+    [onValidationStateChange]
   );
+
+  // Update cached HTML and notify parent
+  const handleHtmlRendered = useCallback((html: string) => {
+    const newCachedHtml = {
+      code: reactEmailCode,
+      html,
+    };
+    setCachedHtml(newCachedHtml);
+    onCachedHtmlChange?.(newCachedHtml);
+  }, [reactEmailCode, onCachedHtmlChange]);
 
   const totalAlerts = validationErrors.length + validationWarnings.length;
 
@@ -118,7 +136,9 @@ export function CodeModeContent({
             variant="outline"
             size="sm"
             className="text-xs relative"
-            onClick={() => setIsAlertsDrawerOpen(true)}
+            onClick={() => {
+              drawerState?.onOpen("compatibility");
+            }}
           >
             Alerts
             {totalAlerts > 0 && (
@@ -208,28 +228,13 @@ export function CodeModeContent({
           <HtmlCodeViewer
             reactEmailCode={reactEmailCode}
             cachedHtml={cachedHtml}
-            onHtmlRendered={(html) => {
-              setCachedHtml({
-                code: reactEmailCode,
-                html,
-              });
-            }}
+            onHtmlRendered={handleHtmlRendered}
             onLoadingChange={setHtmlLoading}
             onErrorChange={setHtmlError}
             refreshTrigger={htmlRefreshTrigger}
           />
         )}
       </div>
-
-      {/* Alerts Drawer */}
-      <CodeAlertsDrawer
-        isOpen={isAlertsDrawerOpen}
-        onClose={() => setIsAlertsDrawerOpen(false)}
-        errors={validationErrors}
-        warnings={validationWarnings}
-        reactEmailCode={reactEmailCode}
-        onGoToLine={handleGoToLine}
-      />
 
       {/* Overlay when smart editor has unsaved changes */}
       {hasUnsavedSmartEditorChanges && (

@@ -1,18 +1,30 @@
 "use client";
 
-import React from "react";
-import { Code, Eye, Copy, Trash2, MoreVertical } from "lucide-react";
-import { useEditorMode } from "../providers/EditorModeProvider";
-import { useCanvas } from "../providers/CanvasProvider";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Switch } from "@/components/ui/switch";
 import {
   DropdownMenu,
-  DropdownMenuItem,
   DropdownMenuContent,
+  DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { trpc } from "@/utils/trpc";
+import { AlertTriangle, Code, Copy, Eye, Mail, MoreVertical, Trash2 } from "lucide-react";
+import { useRouter } from "next/navigation";
+import { useState } from "react";
+import { toast } from "sonner";
+import { useCanvas } from "../providers/CanvasProvider";
+import { useEditorMode } from "../providers/EditorModeProvider";
 
 interface NodeHeaderProps {
   version: number;
@@ -20,6 +32,10 @@ interface NodeHeaderProps {
   isCurrent: boolean;
   nodeId: string;
   currentMode: "view" | "code";
+  templateId?: string;
+  templateName?: string;
+  onTestEmail?: () => void;
+  onCheckCompatibility?: () => void;
 }
 
 export function NodeHeader({
@@ -28,24 +44,78 @@ export function NodeHeader({
   isCurrent,
   nodeId,
   currentMode,
+  templateId,
+  templateName,
+  onTestEmail,
+  onCheckCompatibility,
 }: NodeHeaderProps) {
   const { actions: editorActions } = useEditorMode();
   const { actions: canvasActions } = useCanvas();
+  const router = useRouter();
+  const utils = trpc.useUtils();
+
+  const [showDuplicateDialog, setShowDuplicateDialog] = useState(false);
+  const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+
+  const duplicateMutation = trpc.template.core.duplicate.useMutation({
+    onSuccess: (data: any, variables: any) => {
+      const toastId = `duplicate-${variables.id}`;
+      toast.success("Template duplicated successfully", { id: toastId });
+      utils.template.core.list.invalidate();
+      router.push(`/app/${data.id}`);
+    },
+    onError: (error: any, variables: any) => {
+      const toastId = `duplicate-${variables.id}`;
+      toast.error(error.message || "Failed to duplicate template", { id: toastId });
+    },
+  });
+
+  const deleteMutation = trpc.template.core.delete.useMutation({
+    onSuccess: (_: any, variables: any) => {
+      const toastId = `delete-${variables.id}`;
+      toast.success("Template deleted successfully", { id: toastId });
+      utils.template.core.list.invalidate();
+      router.push("/app");
+    },
+    onError: (error: any, variables: any) => {
+      const toastId = `delete-${variables.id}`;
+      toast.error(error.message || "Failed to delete template", { id: toastId });
+    },
+  });
 
   const handleToggleMode = () => {
     const newMode = currentMode === "view" ? "code" : "view";
     editorActions.setNodeMode(nodeId, newMode);
   };
 
-  const handleDuplicate = () => {
-    console.log("Duplicate node:", nodeId);
-    // TODO: Implement duplication logic
+  const handleDuplicateClick = () => {
+    setShowDuplicateDialog(true);
   };
 
-  const handleDelete = () => {
-    if (confirm("Are you sure you want to delete this version?")) {
-      canvasActions.deleteNode(nodeId);
+  const handleDuplicateConfirm = () => {
+    if (!templateId) {
+      toast.error("Template ID not found");
+      return;
     }
+    const toastId = `duplicate-${templateId}`;
+    toast.loading("Duplicating template...", { id: toastId });
+    duplicateMutation.mutate({ id: templateId });
+    setShowDuplicateDialog(false);
+  };
+
+  const handleDeleteClick = () => {
+    setShowDeleteDialog(true);
+  };
+
+  const handleDeleteConfirm = () => {
+    if (!templateId) {
+      toast.error("Template ID not found");
+      return;
+    }
+    const toastId = `delete-${templateId}`;
+    toast.loading("Deleting template...", { id: toastId });
+    deleteMutation.mutate({ id: templateId });
+    setShowDeleteDialog(false);
   };
 
   return (
@@ -98,29 +168,109 @@ export function NodeHeader({
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent>
-            <DropdownMenuItem asChild>
-              <Button
-                variant="ghost"
-                onClick={handleDuplicate}
-                title="Duplicate"
-              >
-                <Copy className="size-4 text-muted-foreground" />
-                Duplicate
-              </Button>
-            </DropdownMenuItem>
-            <DropdownMenuItem asChild>
-              <Button
-                variant="ghost"
-                onClick={handleDelete}
-                className="text-destructive w-full justify-start hover:text-destructive"
-              >
-                <Trash2 className="size-4 text-destructive" />
-                Delete
-              </Button>
-            </DropdownMenuItem>
+            {onTestEmail && (
+              <DropdownMenuItem asChild>
+                <Button
+                  variant="ghost"
+                  onClick={onTestEmail}
+                  title="Test Email"
+                  className="w-full justify-start"
+                >
+                  <Mail className="size-4 text-muted-foreground" />
+                  Test Email
+                </Button>
+              </DropdownMenuItem>
+            )}
+            {onCheckCompatibility && (
+              <DropdownMenuItem asChild>
+                <Button
+                  variant="ghost"
+                  onClick={onCheckCompatibility}
+                  title="Check Compatibility"
+                  className="w-full justify-start"
+                >
+                  <AlertTriangle className="size-4 text-muted-foreground" />
+                  Check Compatibility
+                </Button>
+              </DropdownMenuItem>
+            )}
+            {templateId && (
+              <DropdownMenuItem asChild>
+                <Button
+                  variant="ghost"
+                  onClick={handleDuplicateClick}
+                  title="Duplicate"
+                  className="w-full justify-start"
+                  disabled={duplicateMutation.isPending}
+                >
+                  <Copy className="size-4 text-muted-foreground" />
+                  Duplicate
+                </Button>
+              </DropdownMenuItem>
+            )}
+            {templateId && (
+              <DropdownMenuItem asChild>
+                <Button
+                  variant="ghost"
+                  onClick={handleDeleteClick}
+                  className="text-destructive w-full justify-start hover:text-destructive"
+                  disabled={deleteMutation.isPending}
+                >
+                  <Trash2 className="size-4 text-destructive" />
+                  Delete
+                </Button>
+              </DropdownMenuItem>
+            )}
           </DropdownMenuContent>
         </DropdownMenu>
       </div>
+
+      {/* Duplicate Confirmation Dialog */}
+      <AlertDialog open={showDuplicateDialog} onOpenChange={setShowDuplicateDialog}>
+        <AlertDialogContent className="sm:max-w-sm">
+          <AlertDialogHeader>
+            <AlertDialogTitle>Duplicate Template</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to duplicate{" "}
+              <span className="font-bold text-foreground">{templateName || "this template"}</span>
+              ? A copy will be created in your workspace.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={duplicateMutation.isPending}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleDuplicateConfirm}
+              disabled={duplicateMutation.isPending}
+            >
+              {duplicateMutation.isPending ? "Duplicating..." : "Duplicate"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Delete Confirmation Dialog */}
+      <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
+        <AlertDialogContent className="sm:max-w-sm">
+          <AlertDialogHeader>
+            <AlertDialogTitle>Delete Template</AlertDialogTitle>
+            <AlertDialogDescription>
+              Are you sure you want to delete{" "}
+              <span className="font-bold text-destructive">{templateName || "this template"}</span>
+              ? This action cannot be undone.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={deleteMutation.isPending}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleDeleteConfirm}
+              disabled={deleteMutation.isPending}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              {deleteMutation.isPending ? "Deleting..." : "Delete"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

@@ -2,14 +2,12 @@
 
 import React, { useState } from "react";
 import {
-  Sheet,
-  SheetContent,
-  SheetHeader,
-  SheetTitle,
-  SheetDescription,
-  SheetClose,
-  SheetOverlay,
-} from "@/components/ui/sheet";
+  Drawer,
+  DrawerContent,
+  DrawerHeader,
+  DrawerTitle,
+  DrawerDescription,
+} from "@/components/ui/drawer";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -21,11 +19,12 @@ import {
   Wand2,
   CheckCircle2,
   Mail,
-  Shield,
   Code2,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useErrorFix } from "../providers/ErrorFixProvider";
+import { useTemplate } from "../providers/TemplateProvider";
+import { EmailTestTab } from "./EmailTestTab";
 
 interface AlertItem {
   id: string;
@@ -44,6 +43,8 @@ interface CodeAlertsDrawerProps {
   warnings: string[];
   reactEmailCode: string;
   onGoToLine?: (line: number) => void;
+  cachedHtml?: { code: string; html: string } | null;
+  initialTab?: "linter" | "compatibility" | "test-email";
 }
 
 // Email client compatibility data
@@ -240,9 +241,19 @@ export function CodeAlertsDrawer({
   warnings,
   reactEmailCode,
   onGoToLine,
+  cachedHtml,
+  initialTab = "compatibility",
 }: CodeAlertsDrawerProps) {
   const { onRequestErrorFix } = useErrorFix();
-  const [activeTab, setActiveTab] = useState("compatibility");
+  const { state: templateState } = useTemplate();
+  const [activeTab, setActiveTab] = useState(initialTab);
+
+  // Update active tab when initialTab prop changes (e.g., when drawer opens with specific tab)
+  React.useEffect(() => {
+    if (isOpen) {
+      setActiveTab(initialTab);
+    }
+  }, [isOpen, initialTab]);
 
   // Convert errors and warnings to AlertItems
   const errorAlerts = errors.map((err, idx) =>
@@ -308,35 +319,39 @@ Fix all issues in a single pass.`;
   };
 
   return (
-    <Sheet open={isOpen} onOpenChange={(open) => !open && onClose()}>
-      <SheetOverlay className="bg-black/5" />
-      <SheetContent
-        side="bottom"
-        className="w-full h-full lg:max-h-[300px] p-0 flex flex-col"
-      >
-        <SheetHeader className="p-2 px-4 border-b border-border">
+    <Drawer open={isOpen} onOpenChange={(open) => !open && onClose()}>
+      <DrawerContent className="max-h-[85vh] min-h-[50vh] max-w-xl ml-auto">
+        <DrawerHeader className="p-2 px-4 border-b border-border">
           <div className="flex items-center justify-between">
-            <SheetTitle className="flex items-center gap-2 text-base">
+            <DrawerTitle className="flex items-center gap-2 text-base">
               Email Review
               {totalIssues > 0 && (
                 <Badge variant="secondary" className="ml-1">
                   {totalIssues}
                 </Badge>
               )}
-            </SheetTitle>
+            </DrawerTitle>
           </div>
-          <SheetDescription className="sr-only">
+          <DrawerDescription className="sr-only">
             Review and fix issues and test email client compatibility.
-          </SheetDescription>
-        </SheetHeader>
+          </DrawerDescription>
+        </DrawerHeader>
 
         <Tabs
           value={activeTab}
-          onValueChange={setActiveTab}
-          className="flex-1 flex flex-col"
+          onValueChange={(value) => {
+            if (
+              value === "linter" ||
+              value === "compatibility" ||
+              value === "test-email"
+            ) {
+              setActiveTab(value);
+            }
+          }}
+          className="flex-1 flex flex-col overflow-hidden"
         >
           <div className="px-4 pb-1 border-b border-border flex flex-col lg:flex-row justify-between items-center">
-            <TabsList className="grid grid-cols-4 h-8">
+            <TabsList className="grid grid-cols-3 h-8">
               <TabsTrigger value="linter" className="text-xs gap-1">
                 <Code2 className="h-3 w-3" />
                 Linter
@@ -345,39 +360,22 @@ Fix all issues in a single pass.`;
                 <AlertTriangle className="h-3 w-3" />
                 Compatibility
               </TabsTrigger>
-              <TabsTrigger value="spam" className="text-xs gap-1">
-                <Shield className="h-3 w-3" />
-                Spam
-              </TabsTrigger>
-              <TabsTrigger value="resend" className="text-xs gap-1">
+              <TabsTrigger value="test-email" className="text-xs gap-1">
                 <Mail className="h-3 w-3" />
-                Resend
+                Test Email
               </TabsTrigger>
             </TabsList>
-            {allAlerts.length > 0 && (
-              <div className="w-full lg:w-auto p-4 bg-muted/30">
-                <Button
-                  onClick={handleFixAllIssues}
-                  className="w-full"
-                  variant="default"
-                  size="sm"
-                >
-                  <Wand2 className="h-4 w-4 mr-2" />
-                  Fix All ({allAlerts.length}) Issues
-                </Button>
-              </div>
-            )}
           </div>
 
           {/* Linter Tab */}
-          <TabsContent value="linter" className="flex-1 m-0">
+          <TabsContent value="linter" className="flex-1 m-0 overflow-hidden">
             <ScrollArea className="h-full">
               <div className="px-4 py-2">
                 {errorAlerts.length === 0 ? (
                   <div className="text-center py-8 text-muted-foreground">
                     <CheckCircle2 className="h-10 w-10 mx-auto mb-2 text-green-500" />
                     <p className="text-sm font-medium">No linting errors</p>
-                    <p className="text-xs mt-1">Your code looks good!</p>
+                    <p className="text-xs mt-1">Your email template looks good!</p>
                   </div>
                 ) : (
                   <div className="divide-y divide-border/50">
@@ -398,10 +396,10 @@ Fix all issues in a single pass.`;
           {/* Compatibility Tab */}
           <TabsContent
             value="compatibility"
-            className="flex-1 m-0 flex flex-col"
+            className="flex-1 m-0 overflow-hidden flex flex-col"
           >
             <ScrollArea className="flex-1">
-              <div className="px-4 py-2">
+              <div className="px-4 py-2 pb-4">
                 {allAlerts.length === 0 ? (
                   <div className="text-center py-8 text-muted-foreground">
                     <CheckCircle2 className="h-10 w-10 mx-auto mb-2 text-green-500" />
@@ -426,43 +424,34 @@ Fix all issues in a single pass.`;
                 )}
               </div>
             </ScrollArea>
+            {allAlerts.length > 0 && (
+              <div className="w-full p-4 bg-muted/30 border-t border-border">
+                <Button
+                  onClick={handleFixAllIssues}
+                  className="w-full"
+                  variant="default"
+
+                >
+                  <Wand2 className="h-4 w-4 mr-2" />
+                  Fix ({allAlerts.length}) Issues
+                </Button>
+              </div>
+            )}
           </TabsContent>
 
-          {/* Spam Tab */}
-          <TabsContent value="spam" className="flex-1 m-0">
-            <ScrollArea className="h-full">
-              <div className="p-4">
-                <div className="text-center py-8 text-muted-foreground">
-                  <Shield className="h-10 w-10 mx-auto mb-2 text-muted-foreground/50" />
-                  <p className="text-sm font-medium">Spam Check</p>
-                  <p className="text-xs mt-1">Coming soon...</p>
-                  <p className="text-xs mt-2 text-muted-foreground/70">
-                    Analyze your email for spam triggers and deliverability
-                    issues.
-                  </p>
-                </div>
-              </div>
-            </ScrollArea>
-          </TabsContent>
-
-          {/* Resend Tab */}
-          <TabsContent value="resend" className="flex-1 m-0">
-            <ScrollArea className="h-full">
-              <div className="p-4">
-                <div className="text-center py-8 text-muted-foreground">
-                  <Mail className="h-10 w-10 mx-auto mb-2 text-muted-foreground/50" />
-                  <p className="text-sm font-medium">Test Send</p>
-                  <p className="text-xs mt-1">Coming soon...</p>
-                  <p className="text-xs mt-2 text-muted-foreground/70">
-                    Send test emails to verify rendering across clients.
-                  </p>
-                </div>
-              </div>
-            </ScrollArea>
+          {/* Test Email Tab */}
+          <TabsContent value="test-email" className="flex-1 m-0 overflow-auto">
+            <div className="h-full">
+              <EmailTestTab
+                reactEmailCode={reactEmailCode}
+                cachedHtml={cachedHtml}
+                template={templateState.currentTemplate}
+              />
+            </div>
           </TabsContent>
         </Tabs>
-      </SheetContent>
-    </Sheet>
+      </DrawerContent>
+    </Drawer>
   );
 }
 
