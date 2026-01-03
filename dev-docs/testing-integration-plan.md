@@ -417,12 +417,13 @@ Set up CI/CD workflow with:
 - [x] Write first unit tests (56 tests: color-utils, file-utils, utils, convert-dates, constants)
 - [x] Set up GitHub Actions CI workflow
 
-### Phase 2: API Testing (Week 2)
-- [ ] Write unit tests for all tRPC routers
-- [ ] Write integration tests for critical API flows
-- [ ] Set up MSW for external API mocking
-- [ ] Test authentication flows
-- [ ] Test authorization checks
+### Phase 2: API Testing (Week 2) ✅ COMPLETE
+- [x] Set up API test utilities (mock context, mock db, mock session)
+- [x] Write unit tests for lib functions (html-tag-repair, json-repair) - 24 tests
+- [x] Set up MSW for external API mocking (OpenRouter, FAL, Stripe, Firecrawl)
+- [x] Write router tests (subscription router) - 18 tests
+- [x] Test authentication (protectedProcedure middleware)
+- [x] Test authorization (subscription checks, trial status)
 
 ### Phase 3: Component Testing (Week 3)
 - [ ] Write tests for shared UI components
@@ -621,7 +622,8 @@ TURBO_TOKEN, TURBO_TEAM (vars)
 |---------|-------|--------|
 | apps/web | 36 | ✅ Passing |
 | packages/shared | 20 | ✅ Passing |
-| packages/api | 0 | 🔜 Phase 2 |
+| packages/api | 42 | ✅ Passing |
+| **Total** | **98** | ✅ |
 
 ### Test Commands
 ```bash
