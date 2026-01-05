@@ -10,11 +10,16 @@ import { cachedStripeInvoicesList } from "@mocah/auth/stripe-sync";
 import { serverEnv } from "@mocah/config/env";
 import prisma from "@mocah/db";
 import { logger } from "@mocah/shared/logger";
+import { getRedis, isRedisAvailable } from "@mocah/shared/redis";
 import { TRPCError } from "@trpc/server";
 import Stripe from "stripe";
 import { z } from "zod";
 import { protectedProcedure, publicProcedure, router } from "../index";
 import { getUserUsageStats } from "../lib/usage-tracking";
+
+// Redis key for checkout preference (annual flag)
+const CHECKOUT_PREF_KEY = (userId: string) => `checkout:annual:${userId}`;
+const CHECKOUT_PREF_TTL = 300; // 5 minutes
 
 
 const TEMPLATES_LIMIT = 5; // TRIAL_LIMITS.templatesLimit
@@ -36,6 +41,10 @@ const createPortalSessionSchema = z.object({
 
 const getUsageHistorySchema = z.object({
   months: z.number().int().min(1).max(12).default(6),
+});
+
+const setCheckoutPreferenceSchema = z.object({
+  annual: z.boolean(),
 });
 
 
@@ -259,6 +268,34 @@ export const subscriptionRouter = router({
       return {
         url: session.url,
       };
+    }),
+
+  /**
+   * Store checkout preference (annual flag) before initiating Better Auth checkout
+   * This is read by getCheckoutSessionParams to determine whether to apply coupon
+   */
+  setCheckoutPreference: protectedProcedure
+    .input(setCheckoutPreferenceSchema)
+    .mutation(async ({ ctx, input }) => {
+      const userId = ctx.session.user.id;
+      const redis = getRedis();
+
+      if (!redis || !isRedisAvailable()) {
+        logger.warn("Redis not available for checkout preference storage");
+        // Still return success - checkout will work, just without auto-applied coupon
+        return { success: true };
+      }
+
+      try {
+        await redis.set(CHECKOUT_PREF_KEY(userId), input.annual ? "1" : "0", {
+          ex: CHECKOUT_PREF_TTL,
+        });
+        return { success: true };
+      } catch (error) {
+        logger.error("Failed to store checkout preference", error as Error);
+        // Don't throw - checkout should still work without coupon
+        return { success: true };
+      }
     }),
 
   // ==========================================================================

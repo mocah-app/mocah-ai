@@ -207,6 +207,52 @@ const authInstance = betterAuth({
             await invalidateAllStripeCache(user.stripeCustomerId);
           }
         },
+        // Customize checkout session to auto-apply launch discount for annual plans
+        // Uses coupon ID (not promotion code) to work with trial subscriptions
+        // where initial checkout amount is $0
+        getCheckoutSessionParams: async ({ user }) => {
+          const { getCouponId } = await import("./promo-code");
+          const couponId = getCouponId();
+          
+          // Read checkout preference from Redis (set by frontend before checkout)
+          let isAnnual = false;
+          const redis = getRedis();
+          const redisKey = `checkout:annual:${user.id}`;
+          
+          if (redis && isRedisAvailable()) {
+            try {
+              const pref = await redis.get(redisKey);
+              // Upstash Redis returns numbers, so check both string and number
+              isAnnual = String(pref) === "1";
+              // Clean up after reading (one-time use)
+              if (pref !== null && pref !== undefined) {
+                await redis.del(redisKey);
+              }
+            } catch (e) {
+              logger.warn(`Failed to read checkout preference: ${e}`);
+            }
+          }
+          
+          // Only apply coupon for annual plans
+          if (couponId && isAnnual) {
+            return {
+              params: {
+                discounts: [
+                  {
+                    coupon: couponId,
+                  },
+                ],
+              },
+            };
+          }
+          
+          // For monthly or if no coupon, allow manual promo code entry
+          return {
+            params: {
+              allow_promotion_codes: true,
+            },
+          };
+        },
       },
       // Handle additional Stripe events
       onEvent: async (event) => {

@@ -34,6 +34,9 @@ export default function PricingPage() {
     }
   );
 
+  // Mutation to store checkout preference before Better Auth checkout
+  const setCheckoutPref = trpc.subscription.setCheckoutPreference.useMutation();
+
   // Handle plan selection using Better Auth's subscription.upgrade()
   const handleSelectPlan = async (planId: string) => {
     // If not logged in, redirect to login
@@ -47,6 +50,9 @@ export default function PricingPage() {
     setLoadingPlan(planId);
     
     try {
+      // Store checkout preference (annual flag) for coupon application
+      await setCheckoutPref.mutateAsync({ annual: isAnnual });
+
       // If user has an existing subscription, pass subscriptionId to upgrade instead of creating new one
       const existingSubscription = subscriptionData?.subscription;
       const upgradeParams: Parameters<typeof authClient.subscription.upgrade>[0] = {
