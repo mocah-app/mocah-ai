@@ -33,6 +33,199 @@ export const templateLibraryRouter = router({
   }),
 
   /**
+   * Create a new template category (publisher only)
+   */
+  createCategory: protectedProcedure
+    .input(
+      z.object({
+        name: z.string().min(1).max(100),
+        description: z.string().optional(),
+        slug: z.string().optional(), // Optional, will be generated from name if not provided
+      })
+    )
+    .mutation(async ({ ctx, input }) => {
+      // Check authorization
+      if (!checkPublisherPermission(ctx.session.user.email)) {
+        throw new TRPCError({
+          code: "FORBIDDEN",
+          message: "You do not have permission to create template categories",
+        });
+      }
+
+      // Generate slug from name if not provided
+      let slug = input.slug || input.name
+        .toLowerCase()
+        .trim()
+        .replace(/[^\w\s-]/g, "") // Remove special characters
+        .replace(/[\s_-]+/g, "-") // Replace spaces and underscores with hyphens
+        .replace(/^-+|-+$/g, ""); // Remove leading/trailing hyphens
+
+      // Ensure slug is not empty
+      if (!slug) {
+        slug = `category-${Date.now()}`;
+      }
+
+      // Check if slug already exists
+      const existing = await ctx.db.templateCategory.findUnique({
+        where: { slug },
+      });
+
+      if (existing) {
+        // Append number if slug exists
+        let counter = 1;
+        let uniqueSlug = `${slug}-${counter}`;
+        while (
+          await ctx.db.templateCategory.findUnique({
+            where: { slug: uniqueSlug },
+          })
+        ) {
+          counter++;
+          uniqueSlug = `${slug}-${counter}`;
+        }
+        slug = uniqueSlug;
+      }
+
+      // Create category
+      const category = await ctx.db.templateCategory.create({
+        data: {
+          name: input.name.trim(),
+          slug,
+          description: input.description?.trim(),
+        },
+      });
+
+      return category;
+    }),
+
+  /**
+   * Update a template category (publisher only)
+   */
+  updateCategory: protectedProcedure
+    .input(
+      z.object({
+        id: z.string(),
+        name: z.string().min(1).max(100),
+        description: z.string().optional(),
+      })
+    )
+    .mutation(async ({ ctx, input }) => {
+      // Check authorization
+      if (!checkPublisherPermission(ctx.session.user.email)) {
+        throw new TRPCError({
+          code: "FORBIDDEN",
+          message: "You do not have permission to update template categories",
+        });
+      }
+
+      // Check if category exists
+      const existing = await ctx.db.templateCategory.findUnique({
+        where: { id: input.id },
+      });
+
+      if (!existing) {
+        throw new TRPCError({
+          code: "NOT_FOUND",
+          message: "Category not found",
+        });
+      }
+
+      // Generate new slug from name if name changed
+      let slug = existing.slug;
+      if (input.name.trim() !== existing.name) {
+        slug = input.name
+          .toLowerCase()
+          .trim()
+          .replace(/[^\w\s-]/g, "") // Remove special characters
+          .replace(/[\s_-]+/g, "-") // Replace spaces and underscores with hyphens
+          .replace(/^-+|-+$/g, ""); // Remove leading/trailing hyphens
+
+        // Ensure slug is not empty
+        if (!slug) {
+          slug = `category-${Date.now()}`;
+        }
+
+        // Check if new slug already exists (excluding current category)
+        const slugExists = await ctx.db.templateCategory.findFirst({
+          where: {
+            slug,
+            id: { not: input.id },
+          },
+        });
+
+        if (slugExists) {
+          // Append number if slug exists
+          let counter = 1;
+          let uniqueSlug = `${slug}-${counter}`;
+          while (
+            await ctx.db.templateCategory.findFirst({
+              where: {
+                slug: uniqueSlug,
+                id: { not: input.id },
+              },
+            })
+          ) {
+            counter++;
+            uniqueSlug = `${slug}-${counter}`;
+          }
+          slug = uniqueSlug;
+        }
+      }
+
+      // Update category
+      const category = await ctx.db.templateCategory.update({
+        where: { id: input.id },
+        data: {
+          name: input.name.trim(),
+          slug,
+          description: input.description?.trim() || null,
+        },
+      });
+
+      return category;
+    }),
+
+  /**
+   * Delete a template category (publisher only, soft delete)
+   */
+  deleteCategory: protectedProcedure
+    .input(
+      z.object({
+        id: z.string(),
+      })
+    )
+    .mutation(async ({ ctx, input }) => {
+      // Check authorization
+      if (!checkPublisherPermission(ctx.session.user.email)) {
+        throw new TRPCError({
+          code: "FORBIDDEN",
+          message: "You do not have permission to delete template categories",
+        });
+      }
+
+      // Check if category exists
+      const existing = await ctx.db.templateCategory.findUnique({
+        where: { id: input.id },
+      });
+
+      if (!existing) {
+        throw new TRPCError({
+          code: "NOT_FOUND",
+          message: "Category not found",
+        });
+      }
+
+      // Soft delete (set deletedAt)
+      await ctx.db.templateCategory.update({
+        where: { id: input.id },
+        data: {
+          deletedAt: new Date(),
+        },
+      });
+
+      return { success: true };
+    }),
+
+  /**
    * Get library templates with search and filter
    */
   getTemplates: publicProcedure
