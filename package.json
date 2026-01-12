@@ -17,16 +17,37 @@
     "db:generate": "turbo -F @mocah/db db:generate",
     "db:migrate": "turbo -F @mocah/db db:migrate",
     "db:migrate:deploy": "turbo -F @mocah/db db:migrate:deploy",
-    "db:seed": "turbo -F @mocah/db db:seed"
+    "db:seed": "turbo -F @mocah/db db:seed",
+    "test": "turbo test",
+    "test:ui": "vitest --ui",
+    "test:coverage": "vitest run --coverage",
+    "test:web": "turbo -F web test",
+    "test:api": "turbo -F @mocah/api test",
+    "test:e2e": "turbo -F web test:e2e",
+    "test:ci": "vitest run"
   },
   "dependencies": {
     "dotenv": "^17.2.2",
     "zod": "^4.1.11"
   },
   "devDependencies": {
+    "@faker-js/faker": "^10.1.0",
+    "@playwright/test": "^1.57.0",
+    "@testing-library/dom": "^10.4.1",
+    "@testing-library/jest-dom": "^6.9.1",
+    "@testing-library/react": "^16.3.1",
+    "@testing-library/user-event": "^14.6.1",
     "@types/node": "^22.13.11",
+    "@vitejs/plugin-react": "^5.1.2",
+    "@vitest/ui": "^4.0.16",
+    "jsdom": "^27.4.0",
+    "msw": "^2.12.7",
+    "stripe": "catalog:",
     "tsdown": "^0.15.5",
-    "turbo": "^2.5.4"
+    "turbo": "^2.5.4",
+    "vite-tsconfig-paths": "^6.0.3",
+    "vitest": "^4.0.16",
+    "vitest-mock-extended": "^3.1.0"
   },
   "packageManager": "pnpm@10.19.0"
 }

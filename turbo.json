@@ -77,6 +77,16 @@
 		"db:migrate:deploy": {
 			"cache": false,
 			"env": ["DATABASE_URL"]
+		},
+		"test": {
+			"cache": false,
+			"inputs": ["src/**/*.ts", "src/**/*.tsx", "**/*.test.ts", "**/*.test.tsx", "vitest.config.ts"],
+			"outputs": ["coverage/**"]
+		},
+		"test:e2e": {
+			"dependsOn": ["build"],
+			"inputs": ["tests/**/*.ts", "playwright.config.ts"],
+			"outputs": ["playwright-report/**", "test-results/**"]
 		}
 	}
 }

@@ -35,6 +35,8 @@ export const serverEnv = createEnv({
     // Scale Plan:
     STRIPE_PRICE_ID_SCALE_MONTHLY: z.string().optional(),
     STRIPE_PRICE_ID_SCALE_ANNUAL: z.string().optional(),
+    // Stripe Coupon ID for launch discount (use coupon, not promotion code, for trial compatibility)
+    STRIPE_LAUNCH_COUPON_ID: z.string().optional(),
 
     // Better Auth
     CORS_ORIGIN: z.url().optional(),

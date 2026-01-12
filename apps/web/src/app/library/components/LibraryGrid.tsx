@@ -10,11 +10,13 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { Search, Filter, Check } from "lucide-react";
+import { Search, Filter, Check, Plus, Pencil } from "lucide-react";
 import { trpc } from "@/utils/trpc";
 import { TemplateLibraryPreviewModal } from "./TemplateLibraryPreviewModal";
+import { CreateCategoryModal } from "./CreateCategoryModal";
 import { cn } from "@/lib/utils";
 
 // Masonry layout helper - assigns row spans based on position for natural distribution
@@ -34,9 +36,18 @@ export function LibraryGrid() {
   const searchParams = useSearchParams();
   const router = useRouter();
   const [search, setSearch] = useState("");
-  const [selectedCategory, setSelectedCategory] = useState<string | undefined>();
-  const [selectedTemplateId, setSelectedTemplateId] = useState<string | null>(null);
+  const [selectedCategory, setSelectedCategory] = useState<
+    string | undefined
+  >();
+  const [selectedTemplateId, setSelectedTemplateId] = useState<string | null>(
+    null
+  );
   const [previewOpen, setPreviewOpen] = useState(false);
+  const [createCategoryOpen, setCreateCategoryOpen] = useState(false);
+  const [editCategoryOpen, setEditCategoryOpen] = useState(false);
+  const [editingCategory, setEditingCategory] = useState<
+    { id: string; name: string; slug: string; description: string | null } | null
+  >(null);
   const [columnCount, setColumnCount] = useState(3);
 
   // Track screen size for responsive column count
@@ -54,8 +65,17 @@ export function LibraryGrid() {
   }, []);
 
   // Fetch categories
-  const { data: categoriesData } = trpc.template.library.getCategories.useQuery();
+  const { data: categoriesData } =
+    trpc.template.library.getCategories.useQuery();
   const categories = categoriesData || [];
+
+  // Check if user can publish (for showing create category option)
+  const { data: canPublish } = trpc.template.library.canPublish.useQuery(
+    undefined,
+    {
+      retry: false,
+    }
+  );
 
   // Fetch templates
   const { data, isLoading } = trpc.template.library.getTemplates.useQuery({
@@ -68,7 +88,8 @@ export function LibraryGrid() {
 
   // Handle template query parameter
   useEffect(() => {
-    const templateId = searchParams.get("template") || searchParams.get("preview");
+    const templateId =
+      searchParams.get("template") || searchParams.get("preview");
     if (templateId && templateId !== selectedTemplateId) {
       setSelectedTemplateId(templateId);
       setPreviewOpen(true);
@@ -119,12 +140,14 @@ export function LibraryGrid() {
                     <Filter className="size-4" />
                     <span className="hidden sm:inline">
                       {selectedCategory
-                        ? categories.find((c) => c.slug === selectedCategory)?.name
+                        ? categories.find((c) => c.slug === selectedCategory)
+                            ?.name
                         : "All Categories"}
                     </span>
                     <span className="sm:hidden">
                       {selectedCategory
-                        ? categories.find((c) => c.slug === selectedCategory)?.name
+                        ? categories.find((c) => c.slug === selectedCategory)
+                            ?.name
                         : "All"}
                     </span>
                   </Button>
@@ -137,7 +160,9 @@ export function LibraryGrid() {
                     <Check
                       className={cn(
                         "mr-2 size-4",
-                        selectedCategory === undefined ? "opacity-100" : "opacity-0"
+                        selectedCategory === undefined
+                          ? "opacity-100"
+                          : "opacity-0"
                       )}
                     />
                     All Templates
@@ -145,18 +170,63 @@ export function LibraryGrid() {
                   {categories.map((category) => (
                     <DropdownMenuItem
                       key={category.id}
-                      onClick={() => setSelectedCategory(category.slug)}
+                      onClick={(e) => {
+                        // Only select category if edit button wasn't clicked
+                        const target = e.target as HTMLElement;
+                        if (!target.closest('button[aria-label*="Edit"]')) {
+                          setSelectedCategory(category.slug);
+                        }
+                      }}
                       className="cursor-pointer"
                     >
-                      <Check
-                        className={cn(
-                          "mr-2 size-4",
-                          selectedCategory === category.slug ? "opacity-100" : "opacity-0"
+                      <div className="flex items-center justify-between w-full group">
+                        <div className="flex items-center flex-1 min-w-0">
+                          <Check
+                            className={cn(
+                              "mr-2 size-4 shrink-0",
+                              selectedCategory === category.slug
+                                ? "opacity-100"
+                                : "opacity-0"
+                            )}
+                          />
+                          <span className="truncate">{category.name}</span>
+                        </div>
+                        {canPublish && (
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              e.preventDefault();
+                              setEditingCategory(category);
+                              setEditCategoryOpen(true);
+                            }}
+                            onMouseDown={(e) => {
+                              // Prevent dropdown from closing
+                              e.stopPropagation();
+                            }}
+                            className="ml-2 p-1 rounded hover:bg-accent opacity-0 group-hover:opacity-100 transition-opacity shrink-0"
+                            aria-label={`Edit ${category.name}`}
+                          >
+                            <Pencil className="size-3.5 text-muted-foreground" />
+                          </button>
                         )}
-                      />
-                      {category.name}
+                      </div>
                     </DropdownMenuItem>
                   ))}
+                  {canPublish && (
+                    <>
+                      <DropdownMenuSeparator />
+                      <DropdownMenuItem
+                        onClick={() => setCreateCategoryOpen(true)}
+                        asChild
+                        className="w-full"
+                      >
+                        <Button>
+                          <Plus className="size-4" />
+                          Create Category
+                        </Button>
+                      </DropdownMenuItem>
+                    </>
+                  )}
                 </DropdownMenuContent>
               </DropdownMenu>
             </div>
@@ -251,6 +321,27 @@ export function LibraryGrid() {
         onOpenChange={handlePreviewClose}
         templateId={selectedTemplateId}
       />
+
+      {/* Create Category Modal */}
+      {canPublish && (
+        <>
+          <CreateCategoryModal
+            open={createCategoryOpen}
+            onOpenChange={setCreateCategoryOpen}
+          />
+          <CreateCategoryModal
+            open={editCategoryOpen}
+            onOpenChange={(open) => {
+              setEditCategoryOpen(open);
+              if (!open) {
+                setEditingCategory(null);
+              }
+            }}
+            mode="edit"
+            category={editingCategory || undefined}
+          />
+        </>
+      )}
     </>
   );
 }

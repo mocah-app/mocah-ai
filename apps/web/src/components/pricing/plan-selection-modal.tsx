@@ -55,6 +55,9 @@ export function PlanSelectionModal({
     }
   );
 
+  // Mutation to store checkout preference before Better Auth checkout
+  const setCheckoutPref = trpc.subscription.setCheckoutPreference.useMutation();
+
   // Determine current plan and if user has an existing subscription
   // Only show a plan as "current" if the subscription is active or trialing (not incomplete)
   const currentPlanId = (subscriptionData?.subscription && 
@@ -71,6 +74,9 @@ export function PlanSelectionModal({
     setLoadingPlan(planId);
     
     try {
+      // Store checkout preference (annual flag) for coupon application
+      await setCheckoutPref.mutateAsync({ annual: isAnnual });
+
       // If user has an existing subscription, pass subscriptionId to upgrade instead of creating new one
       const existingSubscription = subscriptionData?.subscription;
       const upgradeParams: Parameters<typeof authClient.subscription.upgrade>[0] = {
